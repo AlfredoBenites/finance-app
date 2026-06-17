@@ -67,6 +67,17 @@ export const dashboardApi = {
   get: () => request("/api/dashboard"),
 };
 
+export const sharesApi = {
+  listForProfile: (profileId) => request(`/api/profiles/${profileId}/shares`),
+  create: (profileId, email) =>
+    request(`/api/profiles/${profileId}/shares`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  remove: (shareId) => request(`/api/shares/${shareId}`, { method: "DELETE" }),
+  sharedWithMe: () => request("/api/shared-with-me"),
+};
+
 export const transactionsApi = {
   // filters: { profile_id, credit_card_id, category, is_paid_back, month, search }
   list: (filters = {}) => {

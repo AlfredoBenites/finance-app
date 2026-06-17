@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { profilesApi } from "../api/client";
+import { profilesApi, sharesApi } from "../api/client";
 
 const money = (n) => `$${Number(n).toFixed(2)}`;
 
@@ -8,6 +8,8 @@ export default function ProfilesPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [shares, setShares] = useState([]);
+  const [shareEmail, setShareEmail] = useState("");
 
   async function loadProfiles() {
     try {
@@ -46,7 +48,34 @@ export default function ProfilesPage() {
   async function viewSummary(id) {
     try {
       setError(null);
-      setSummary(await profilesApi.summary(id));
+      setShareEmail("");
+      const [summaryData, shareList] = await Promise.all([
+        profilesApi.summary(id),
+        sharesApi.listForProfile(id),
+      ]);
+      setSummary(summaryData);
+      setShares(shareList);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleShare(e) {
+    e.preventDefault();
+    if (!shareEmail.trim() || !summary) return;
+    try {
+      await sharesApi.create(summary.profile.id, shareEmail.trim());
+      setShareEmail("");
+      setShares(await sharesApi.listForProfile(summary.profile.id));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleRevoke(shareId) {
+    try {
+      await sharesApi.remove(shareId);
+      setShares(await sharesApi.listForProfile(summary.profile.id));
     } catch (e) {
       setError(e.message);
     }
@@ -109,6 +138,32 @@ export default function ProfilesPage() {
           <p>
             <small>{summary.transactions.length} transaction(s)</small>
           </p>
+
+          <h3>Sharing</h3>
+          <p>
+            <small>
+              Share this profile with someone by email. When they sign up with
+              that email, they can see (read-only) what they owe.
+            </small>
+          </p>
+          <form onSubmit={handleShare}>
+            <input
+              type="email"
+              value={shareEmail}
+              onChange={(e) => setShareEmail(e.target.value)}
+              placeholder="person@email.com"
+            />
+            <button type="submit">Share</button>
+          </form>
+          {shares.length === 0 && <p><small>Not shared with anyone yet.</small></p>}
+          {shares.map((s) => (
+            <div className="card" key={s.id}>
+              <span>{s.shared_with_email}</span>
+              <button className="danger" onClick={() => handleRevoke(s.id)}>
+                Revoke
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
