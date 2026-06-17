@@ -13,6 +13,7 @@ from app.routers import (
     credit_cards,
     dashboard,
     profiles,
+    shares,
     transactions,
 )
 
@@ -34,6 +35,7 @@ app.include_router(transactions.router)
 app.include_router(buckets.router)
 app.include_router(accounts.router)
 app.include_router(dashboard.router)
+app.include_router(shares.router)
 
 
 @app.get("/")
