@@ -12,7 +12,7 @@ async function request(path, options = {}) {
     let detail;
     try {
       detail = (await res.json()).detail;
-    } catch {
+    } catch (e) {
       // no JSON body
     }
     throw new Error(detail || `Request failed: ${res.status}`);
