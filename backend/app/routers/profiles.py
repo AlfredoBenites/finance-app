@@ -1,10 +1,14 @@
-"""CRUD endpoints for profiles, plus a per-profile summary (SPEC.md 7.4)."""
+"""CRUD endpoints for profiles, plus a per-profile summary (SPEC.md 7.4).
+
+All endpoints require a logged-in user and operate only on that user's rows.
+"""
 from decimal import Decimal
 
 from postgrest.exceptions import APIError
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth import get_current_user_id
 from app.database import supabase
 from app.db_errors import is_foreign_key_violation
 from app.services import calculations as calc
@@ -17,41 +21,70 @@ TABLE = "profiles"
 
 
 @router.get("", response_model=list[Profile])
-def list_profiles():
-    result = supabase.table(TABLE).select("*").order("created_at").execute()
+def list_profiles(user_id: str = Depends(get_current_user_id)):
+    result = (
+        supabase.table(TABLE)
+        .select("*")
+        .eq("owner_id", user_id)
+        .order("created_at")
+        .execute()
+    )
     return result.data
 
 
 @router.post("", response_model=Profile, status_code=201)
-def create_profile(payload: ProfileCreate):
-    result = supabase.table(TABLE).insert(payload.model_dump()).execute()
+def create_profile(payload: ProfileCreate, user_id: str = Depends(get_current_user_id)):
+    data = payload.model_dump()
+    data["owner_id"] = user_id
+    result = supabase.table(TABLE).insert(data).execute()
     return result.data[0]
 
 
 @router.get("/{profile_id}", response_model=Profile)
-def get_profile(profile_id: str):
-    result = supabase.table(TABLE).select("*").eq("id", profile_id).execute()
+def get_profile(profile_id: str, user_id: str = Depends(get_current_user_id)):
+    result = (
+        supabase.table(TABLE)
+        .select("*")
+        .eq("id", profile_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Profile not found")
     return result.data[0]
 
 
 @router.put("/{profile_id}", response_model=Profile)
-def update_profile(profile_id: str, payload: ProfileUpdate):
-    # Only send fields the client actually provided.
+def update_profile(
+    profile_id: str,
+    payload: ProfileUpdate,
+    user_id: str = Depends(get_current_user_id),
+):
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(status_code=400, detail="No fields to update")
-    result = supabase.table(TABLE).update(changes).eq("id", profile_id).execute()
+    result = (
+        supabase.table(TABLE)
+        .update(changes)
+        .eq("id", profile_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Profile not found")
     return result.data[0]
 
 
 @router.delete("/{profile_id}", status_code=204)
-def delete_profile(profile_id: str):
+def delete_profile(profile_id: str, user_id: str = Depends(get_current_user_id)):
     try:
-        result = supabase.table(TABLE).delete().eq("id", profile_id).execute()
+        result = (
+            supabase.table(TABLE)
+            .delete()
+            .eq("id", profile_id)
+            .eq("owner_id", user_id)
+            .execute()
+        )
     except APIError as e:
         if is_foreign_key_violation(e):
             raise HTTPException(
@@ -65,13 +98,19 @@ def delete_profile(profile_id: str):
 
 
 @router.get("/{profile_id}/summary")
-def profile_summary(profile_id: str):
+def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)):
     """Totals and activity for one profile (SPEC.md 7.4).
 
     'owed' = everything this profile was charged; it splits into 'paid' (already
     paid back) and 'unpaid' (still owed). Amounts are reported as positive.
     """
-    profile = supabase.table(TABLE).select("*").eq("id", profile_id).execute()
+    profile = (
+        supabase.table(TABLE)
+        .select("*")
+        .eq("id", profile_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
     if not profile.data:
         raise HTTPException(status_code=404, detail="Profile not found")
 
@@ -79,11 +118,18 @@ def profile_summary(profile_id: str):
         supabase.table("transactions")
         .select("*")
         .eq("profile_id", profile_id)
+        .eq("owner_id", user_id)
         .order("transaction_date", desc=True)
         .execute()
         .data
     )
-    cards = supabase.table("credit_cards").select("id, name").execute().data
+    cards = (
+        supabase.table("credit_cards")
+        .select("id, name")
+        .eq("owner_id", user_id)
+        .execute()
+        .data
+    )
     card_names = {c["id"]: c["name"] for c in cards}
 
     total_unpaid = calc.total_card_debt(txns)  # negated sum of unpaid amounts

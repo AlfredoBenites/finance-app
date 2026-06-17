@@ -1,10 +1,11 @@
-"""Dashboard summary endpoint.
+"""Dashboard summary endpoint. Scoped to the logged-in user.
 
-Fetches the raw rows once, then delegates all math to services.calculations.
+Fetches the user's rows once, then delegates all math to services.calculations.
 Returns plain floats so the frontend can display them directly.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth import get_current_user_id
 from app.database import supabase
 from app.services import calculations as calc
 
@@ -12,12 +13,15 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 @router.get("")
-def get_dashboard():
-    transactions = supabase.table("transactions").select("*").execute().data
-    buckets = supabase.table("buckets").select("*").execute().data
-    accounts = supabase.table("accounts").select("*").execute().data
-    profiles = supabase.table("profiles").select("id, name").execute().data
-    cards = supabase.table("credit_cards").select("id, name").execute().data
+def get_dashboard(user_id: str = Depends(get_current_user_id)):
+    def owned(table, columns="*"):
+        return supabase.table(table).select(columns).eq("owner_id", user_id).execute().data
+
+    transactions = owned("transactions")
+    buckets = owned("buckets")
+    accounts = owned("accounts")
+    profiles = owned("profiles", "id, name")
+    cards = owned("credit_cards", "id, name")
 
     profile_names = {p["id"]: p["name"] for p in profiles}
     card_names = {c["id"]: c["name"] for c in cards}
