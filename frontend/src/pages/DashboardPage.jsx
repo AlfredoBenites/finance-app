@@ -18,7 +18,25 @@ export default function DashboardPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    dashboardApi.get().then(setData).catch((e) => setError(e.message));
+    let cancelled = false;
+    // The very first request right after login can lose a race (CORS preflight
+    // / token settling), so retry once before showing an error.
+    async function load(attempt = 0) {
+      try {
+        const d = await dashboardApi.get();
+        if (!cancelled) setData(d);
+      } catch (e) {
+        if (attempt < 1) {
+          setTimeout(() => load(attempt + 1), 500);
+          return;
+        }
+        if (!cancelled) setError(e.message);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (error) return <p style={{ color: "#dc2626" }}>Error: {error}</p>;
