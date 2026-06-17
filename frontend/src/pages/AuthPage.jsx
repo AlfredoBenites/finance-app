@@ -12,20 +12,24 @@ export default function AuthPage() {
     e.preventDefault();
     setError(null);
     setInfo(null);
-    const fn =
-      mode === "login"
-        ? supabase.auth.signInWithPassword
-        : supabase.auth.signUp;
-    const { data, error } = await fn({ email, password });
-    if (error) {
-      setError(error.message);
-      return;
+    try {
+      // Call directly on supabase.auth so the methods keep their `this` binding.
+      const { data, error } =
+        mode === "login"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      // If email confirmation is on, signUp returns a user with no session.
+      if (mode === "signup" && !data.session) {
+        setInfo("Check your email to confirm your account, then log in.");
+      }
+      // On success with a session, AuthContext picks it up automatically.
+    } catch (err) {
+      setError(err.message || "Something went wrong. Try again.");
     }
-    // If email confirmation is on, signUp returns a user with no session.
-    if (mode === "signup" && !data.session) {
-      setInfo("Check your email to confirm your account, then log in.");
-    }
-    // On success with a session, AuthContext picks it up automatically.
   }
 
   return (
