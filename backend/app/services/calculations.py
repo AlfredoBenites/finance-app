@@ -1,0 +1,117 @@
+"""Pure calculation functions for the dashboard (SPEC.md section 9).
+
+These take plain lists of dict rows (as returned by Supabase) and return Decimals.
+Keeping them pure (no DB access) makes them easy to read and test.
+
+Sign convention reminder: purchases are stored negative, refunds positive.
+So "debt" and "amount owed" are the NEGATED sum of unpaid transaction amounts.
+"""
+from decimal import Decimal
+
+# Account types that count as spendable cash for "real available money".
+LIQUID_ACCOUNT_TYPES = {"checking", "savings", "cash"}
+
+
+def _dec(value) -> Decimal:
+    """Coerce a possibly-None / string / number DB value to Decimal."""
+    if value is None:
+        return Decimal("0")
+    return Decimal(str(value))
+
+
+def unpaid(transactions: list[dict]) -> list[dict]:
+    return [t for t in transactions if not t.get("is_paid_back")]
+
+
+def paid(transactions: list[dict]) -> list[dict]:
+    return [t for t in transactions if t.get("is_paid_back")]
+
+
+def total_card_debt(transactions: list[dict]) -> Decimal:
+    """Total owed across all cards = negated sum of unpaid amounts (SPEC 9.1)."""
+    return -sum((_dec(t["amount"]) for t in unpaid(transactions)), Decimal("0"))
+
+
+def debt_by_card(transactions: list[dict]) -> dict[str, Decimal]:
+    """Map credit_card_id -> outstanding balance (SPEC 9.1)."""
+    totals: dict[str, Decimal] = {}
+    for t in unpaid(transactions):
+        cid = t["credit_card_id"]
+        totals[cid] = totals.get(cid, Decimal("0")) - _dec(t["amount"])
+    return totals
+
+
+def owed_by_profile(transactions: list[dict]) -> dict[str, Decimal]:
+    """Map profile_id -> amount that profile still owes (SPEC 9.2)."""
+    totals: dict[str, Decimal] = {}
+    for t in unpaid(transactions):
+        pid = t["profile_id"]
+        totals[pid] = totals.get(pid, Decimal("0")) - _dec(t["amount"])
+    return totals
+
+
+def cashback_earned(transactions: list[dict]) -> Decimal:
+    """Cashback from settled (paid-back) transactions (SPEC 9.4)."""
+    return sum((_dec(t.get("cashback_amount")) for t in paid(transactions)), Decimal("0"))
+
+
+def cashback_pending(transactions: list[dict]) -> Decimal:
+    """Cashback from not-yet-settled transactions (SPEC 9.5)."""
+    return sum((_dec(t.get("cashback_amount")) for t in unpaid(transactions)), Decimal("0"))
+
+
+def total_bucket_money(buckets: list[dict]) -> Decimal:
+    """Sum of current_amount across active buckets (SPEC 9.6)."""
+    return sum(
+        (_dec(b["current_amount"]) for b in buckets if b.get("is_active")),
+        Decimal("0"),
+    )
+
+
+def liquid_cash(accounts: list[dict]) -> Decimal:
+    """Spendable cash: active checking/savings/cash account balances."""
+    return sum(
+        (
+            _dec(a["balance"])
+            for a in accounts
+            if a.get("is_active") and a.get("account_type") in LIQUID_ACCOUNT_TYPES
+        ),
+        Decimal("0"),
+    )
+
+
+def total_assets(accounts: list[dict]) -> Decimal:
+    """All active asset account balances (SPEC 9.8)."""
+    return sum(
+        (_dec(a["balance"]) for a in accounts if a.get("is_active") and a.get("is_asset")),
+        Decimal("0"),
+    )
+
+
+def other_liabilities(accounts: list[dict]) -> Decimal:
+    """Active non-asset account balances (debts other than card debt)."""
+    return sum(
+        (
+            _dec(a["balance"])
+            for a in accounts
+            if a.get("is_active") and not a.get("is_asset")
+        ),
+        Decimal("0"),
+    )
+
+
+def real_available_money(
+    accounts: list[dict], transactions: list[dict], buckets: list[dict]
+) -> Decimal:
+    """Liquid cash minus card debt minus money set aside in buckets (SPEC 9.7)."""
+    return (
+        liquid_cash(accounts)
+        - total_card_debt(transactions)
+        - total_bucket_money(buckets)
+    )
+
+
+def net_worth(accounts: list[dict], transactions: list[dict]) -> Decimal:
+    """Assets minus liabilities. Buckets do NOT reduce net worth (SPEC 9.8)."""
+    liabilities = total_card_debt(transactions) + other_liabilities(accounts)
+    return total_assets(accounts) - liabilities

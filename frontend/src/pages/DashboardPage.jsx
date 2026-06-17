@@ -1,0 +1,59 @@
+import { useEffect, useState } from "react";
+import { dashboardApi } from "../api/client";
+
+const money = (n) =>
+  `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
+
+function Stat({ label, value }) {
+  return (
+    <div className="card" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+      <small>{label}</small>
+      <strong style={{ fontSize: 20 }}>{money(value)}</strong>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    dashboardApi.get().then(setData).catch((e) => setError(e.message));
+  }, []);
+
+  if (error) return <p style={{ color: "#dc2626" }}>Error: {error}</p>;
+  if (!data) return <p>Loading…</p>;
+
+  return (
+    <div>
+      <h1>Dashboard</h1>
+
+      <Stat label="Total credit card debt" value={data.total_credit_card_debt} />
+      <Stat label="Cashback earned" value={data.total_cashback_earned} />
+      <Stat label="Cashback pending" value={data.total_cashback_pending} />
+      <Stat label="Money set aside in buckets" value={data.total_bucket_money} />
+      <Stat label="Liquid cash" value={data.liquid_cash} />
+      <Stat label="Real available money" value={data.real_available_money} />
+      <Stat label="Total assets" value={data.total_assets} />
+      <Stat label="Net worth" value={data.net_worth} />
+
+      <h2>Owed by profile</h2>
+      {data.owed_by_profile.length === 0 && <p>Nothing owed.</p>}
+      {data.owed_by_profile.map((p) => (
+        <div className="card" key={p.profile_id}>
+          <span>{p.name}</span>
+          <strong>{money(p.amount)}</strong>
+        </div>
+      ))}
+
+      <h2>Debt by card</h2>
+      {data.debt_by_card.length === 0 && <p>No card debt.</p>}
+      {data.debt_by_card.map((c) => (
+        <div className="card" key={c.credit_card_id}>
+          <span>{c.name}</span>
+          <strong>{money(c.balance)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}

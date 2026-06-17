@@ -1,0 +1,42 @@
+"""Pydantic request/response models for buckets."""
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+class BucketCreate(BaseModel):
+    name: str
+    target_amount: Optional[Decimal] = None
+    current_amount: Decimal = Decimal("0")
+    due_date: Optional[date] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+    is_completed: bool = False
+
+
+class BucketUpdate(BaseModel):
+    name: Optional[str] = None
+    target_amount: Optional[Decimal] = None
+    current_amount: Optional[Decimal] = None
+    due_date: Optional[date] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_completed: Optional[bool] = None
+
+
+class Bucket(BaseModel):
+    id: str
+    name: str
+    target_amount: Optional[Decimal] = None
+    current_amount: Decimal
+    due_date: Optional[date] = None
+    category: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool
+    is_completed: bool
+    created_at: datetime
+    updated_at: datetime
