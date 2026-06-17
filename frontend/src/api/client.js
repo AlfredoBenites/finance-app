@@ -1,10 +1,19 @@
 // Thin wrapper around fetch for talking to the FastAPI backend.
 // Fall back to the local backend if the env var didn't load.
+import { supabase } from "../auth/supabaseClient";
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 async function request(path, options = {}) {
+  // Attach the Supabase access token so the backend can identify the user.
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
   if (!res.ok) {

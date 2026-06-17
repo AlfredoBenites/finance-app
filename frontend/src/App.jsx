@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "./auth/AuthContext";
+import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProfilesPage from "./pages/ProfilesPage";
 import CreditCardsPage from "./pages/CreditCardsPage";
@@ -16,10 +18,26 @@ const PAGES = [
 ];
 
 export default function App() {
+  const { loading, session, user, signOut } = useAuth();
   const [page, setPage] = useState("dashboard");
+
+  if (loading) return <div className="container">Loading…</div>;
+  if (!session) return <AuthPage />;
 
   return (
     <div className="container">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 16,
+        }}
+      >
+        <small>{user?.email}</small>
+        <button onClick={signOut}>Log out</button>
+      </div>
+
       <nav style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         {PAGES.map(([key, label]) => (
           <button key={key} onClick={() => setPage(key)}>

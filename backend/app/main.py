@@ -3,9 +3,10 @@
 Run from the backend/ folder:
     uvicorn app.main:app --reload
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import get_current_user
 from app.routers import (
     accounts,
     buckets,
@@ -48,3 +49,9 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/me")
+def me(user=Depends(get_current_user)):
+    """Returns the logged-in user. Proves the auth token round-trips."""
+    return {"id": user.id, "email": user.email}
