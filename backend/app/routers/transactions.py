@@ -1,9 +1,10 @@
-"""CRUD + filtering endpoints for transactions."""
+"""CRUD + filtering endpoints for transactions. Scoped to the logged-in user."""
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.auth import get_current_user_id
 from app.database import supabase
 from app.models.transaction import Transaction, TransactionCreate, TransactionUpdate
 
@@ -33,6 +34,7 @@ def _first_of_next_month(year: int, month: int) -> str:
 
 @router.get("", response_model=list[Transaction])
 def list_transactions(
+    user_id: str = Depends(get_current_user_id),
     profile_id: Optional[str] = None,
     credit_card_id: Optional[str] = None,
     category: Optional[str] = None,
@@ -40,7 +42,7 @@ def list_transactions(
     month: Optional[str] = Query(default=None, description="Filter by month, format YYYY-MM"),
     search: Optional[str] = Query(default=None, description="Merchant name contains"),
 ):
-    query = supabase.table(TABLE).select("*")
+    query = supabase.table(TABLE).select("*").eq("owner_id", user_id)
 
     if profile_id is not None:
         query = query.eq("profile_id", profile_id)
@@ -67,8 +69,11 @@ def list_transactions(
 
 
 @router.post("", response_model=Transaction, status_code=201)
-def create_transaction(payload: TransactionCreate):
+def create_transaction(
+    payload: TransactionCreate, user_id: str = Depends(get_current_user_id)
+):
     data = payload.model_dump(mode="json")
+    data["owner_id"] = user_id
     cashback = compute_cashback(payload.amount, payload.cashback_rate)
     data["cashback_amount"] = str(cashback) if cashback is not None else None
     result = supabase.table(TABLE).insert(data).execute()
@@ -76,15 +81,25 @@ def create_transaction(payload: TransactionCreate):
 
 
 @router.get("/{transaction_id}", response_model=Transaction)
-def get_transaction(transaction_id: str):
-    result = supabase.table(TABLE).select("*").eq("id", transaction_id).execute()
+def get_transaction(transaction_id: str, user_id: str = Depends(get_current_user_id)):
+    result = (
+        supabase.table(TABLE)
+        .select("*")
+        .eq("id", transaction_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return result.data[0]
 
 
 @router.put("/{transaction_id}", response_model=Transaction)
-def update_transaction(transaction_id: str, payload: TransactionUpdate):
+def update_transaction(
+    transaction_id: str,
+    payload: TransactionUpdate,
+    user_id: str = Depends(get_current_user_id),
+):
     changes = payload.model_dump(mode="json", exclude_unset=True)
     if not changes:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -92,7 +107,13 @@ def update_transaction(transaction_id: str, payload: TransactionUpdate):
     # If amount or rate changed, recompute cashback using the new values
     # merged with whatever the row currently has.
     if "amount" in changes or "cashback_rate" in changes:
-        current = supabase.table(TABLE).select("*").eq("id", transaction_id).execute()
+        current = (
+            supabase.table(TABLE)
+            .select("*")
+            .eq("id", transaction_id)
+            .eq("owner_id", user_id)
+            .execute()
+        )
         if not current.data:
             raise HTTPException(status_code=404, detail="Transaction not found")
         row = current.data[0]
@@ -104,15 +125,27 @@ def update_transaction(transaction_id: str, payload: TransactionUpdate):
         cashback = compute_cashback(amount, rate)
         changes["cashback_amount"] = str(cashback) if cashback is not None else None
 
-    result = supabase.table(TABLE).update(changes).eq("id", transaction_id).execute()
+    result = (
+        supabase.table(TABLE)
+        .update(changes)
+        .eq("id", transaction_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return result.data[0]
 
 
 @router.delete("/{transaction_id}", status_code=204)
-def delete_transaction(transaction_id: str):
-    result = supabase.table(TABLE).delete().eq("id", transaction_id).execute()
+def delete_transaction(transaction_id: str, user_id: str = Depends(get_current_user_id)):
+    result = (
+        supabase.table(TABLE)
+        .delete()
+        .eq("id", transaction_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
     if not result.data:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return None
