@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { dashboardApi } from "../api/client";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 import usePersistedState from "../hooks/usePersistedState";
+import { money } from "../format";
 
 function Toggle({ on, onClick, label }) {
   return (
@@ -13,9 +14,6 @@ function Toggle({ on, onClick, label }) {
     </button>
   );
 }
-
-const money = (n) =>
-  `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
 
 function Stat({ label, value }) {
   return (

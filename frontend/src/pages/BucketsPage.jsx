@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { bucketsApi } from "../api/client";
 
-const money = (n) => `$${Number(n).toFixed(2)}`;
+import { money } from "../format";
 
 export default function BucketsPage() {
   const [buckets, setBuckets] = useState([]);

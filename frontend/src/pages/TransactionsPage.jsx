@@ -10,9 +10,9 @@ import {
 } from "../api/client";
 import { CATEGORIES as FALLBACK_CATEGORIES } from "../constants";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
+import { money } from "../format";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (n) => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
 const ADD_NEW = "__add_new__";
 
 const EMPTY_FORM = {
