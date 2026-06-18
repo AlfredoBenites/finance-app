@@ -47,6 +47,20 @@ def test_user_cannot_read_update_or_delete_anothers_profile(api):
     assert api.client.get(f"/api/profiles/{profile_id}").json()["name"] == "Mom"
 
 
+def test_profile_summary_shows_debt_per_card(api):
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    visa = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
+    amex = api.client.post("/api/credit-cards", json={"name": "Amex"}).json()["id"]
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                                               "profile_id": pid, "credit_card_id": visa})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -50,
+                                               "profile_id": pid, "credit_card_id": amex})
+    summary = api.client.get(f"/api/profiles/{pid}/summary").json()
+    debts = {d["name"]: d["balance"] for d in summary["debt_by_card"]}
+    assert debts == {"Visa": 100.0, "Amex": 50.0}
+
+
 def test_dashboard_is_scoped_to_the_user(api):
     api.login(*USER_A)
     profile_id = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]

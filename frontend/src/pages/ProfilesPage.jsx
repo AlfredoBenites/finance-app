@@ -135,6 +135,17 @@ export default function ProfilesPage() {
             <span>Cards used</span>
             <span>{summary.cards_used.join(", ") || "—"}</span>
           </div>
+
+          <h3>Owed by card</h3>
+          {(!summary.debt_by_card || summary.debt_by_card.length === 0) && (
+            <p><small>Nothing owed on any card.</small></p>
+          )}
+          {(summary.debt_by_card || []).map((c) => (
+            <div className="card" key={c.name}>
+              <span>{c.name}</span>
+              <strong>{money(c.balance)}</strong>
+            </div>
+          ))}
           <p>
             <small>{summary.transactions.length} transaction(s)</small>
           </p>

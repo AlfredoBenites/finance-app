@@ -42,8 +42,8 @@ export default function IncomePage() {
 
   async function handleAdd(e) {
     e.preventDefault();
-    if (!form.source.trim() || !form.amount) {
-      setError("Source and amount are required.");
+    if (!form.source.trim() || !form.amount || !form.account_id) {
+      setError("Source, amount, and account are required.");
       return;
     }
     try {
@@ -103,8 +103,12 @@ export default function IncomePage() {
           value={form.amount}
           onChange={(e) => setField("amount", e.target.value)}
         />
-        <select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)}>
-          <option value="">Into account… (optional)</option>
+        <select
+          value={form.account_id}
+          onChange={(e) => setField("account_id", e.target.value)}
+          required
+        >
+          <option value="">Into account…</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}

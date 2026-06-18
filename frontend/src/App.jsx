@@ -14,7 +14,7 @@ const PAGES = [
   ["dashboard", "Dashboard"],
   ["profiles", "Profiles"],
   ["cards", "Credit Cards"],
-  ["transactions", "Transactions"],
+  ["transactions", "Expenses"],
   ["income", "Income"],
   ["buckets", "Buckets"],
   ["accounts", "Accounts"],

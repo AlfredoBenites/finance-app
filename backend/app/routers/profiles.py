@@ -138,6 +138,13 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
 
     cards_used = sorted({card_names.get(t["credit_card_id"], "Unknown") for t in txns})
 
+    # How much THIS profile still owes on each card (unpaid card charges).
+    debt_by_card = [
+        {"name": card_names.get(cid, "Unknown"), "balance": float(bal)}
+        for cid, bal in calc.debt_by_card(txns).items()
+    ]
+    debt_by_card.sort(key=lambda d: -d["balance"])
+
     return {
         "profile": profile.data[0],
         "total_owed": float(total_owed),
@@ -146,5 +153,6 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
         "cashback_earned": float(calc.cashback_earned(txns)),
         "cashback_pending": float(calc.cashback_pending(txns)),
         "cards_used": cards_used,
+        "debt_by_card": debt_by_card,
         "transactions": txns,
     }
