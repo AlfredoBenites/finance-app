@@ -59,3 +59,7 @@ Thumbs.db
 # ---------- Markdown files / md ----------
 CLAUDE.md
 SPEC.md
+
+# ---------- Private data imports (never commit financial data) ----------
+data/
+*.csv

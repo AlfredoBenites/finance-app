@@ -16,7 +16,9 @@ class TransactionCreate(BaseModel):
     category: Optional[str] = None
     amount: Decimal
     profile_id: str
-    credit_card_id: str
+    # Exactly one payment source: a credit card OR an account.
+    credit_card_id: Optional[str] = None
+    account_id: Optional[str] = None
     cashback_rate: Optional[Decimal] = None
     is_paid_back: bool = False
     paid_back_date: Optional[date] = None
@@ -30,6 +32,7 @@ class TransactionUpdate(BaseModel):
     amount: Optional[Decimal] = None
     profile_id: Optional[str] = None
     credit_card_id: Optional[str] = None
+    account_id: Optional[str] = None
     cashback_rate: Optional[Decimal] = None
     is_paid_back: Optional[bool] = None
     paid_back_date: Optional[date] = None
@@ -43,7 +46,8 @@ class Transaction(BaseModel):
     category: Optional[str] = None
     amount: Decimal
     profile_id: str
-    credit_card_id: str
+    credit_card_id: Optional[str] = None
+    account_id: Optional[str] = None
     cashback_rate: Optional[Decimal] = None
     cashback_amount: Optional[Decimal] = None
     is_paid_back: bool

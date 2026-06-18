@@ -54,6 +54,17 @@ def test_debt_by_card_groups_by_card():
     assert calc.debt_by_card(txns) == {"c1": Decimal("450"), "c2": Decimal("30")}
 
 
+def test_card_debt_ignores_account_purchases():
+    # An account (bank/cash) purchase has no credit_card_id and is not card debt.
+    account_txn = {
+        "amount": -50, "is_paid_back": False, "profile_id": "p1",
+        "credit_card_id": None, "account_id": "a1", "cashback_amount": None,
+    }
+    txns = [txn(-400, card="c1"), account_txn]
+    assert calc.total_card_debt(txns) == Decimal("400")
+    assert calc.debt_by_card(txns) == {"c1": Decimal("400")}
+
+
 def test_owed_by_profile_groups_by_profile():
     txns = [txn(-400, profile="mom"), txn(-100, profile="me", paid=True), txn(-25, profile="mom")]
     # paid one excluded; mom owes 425, me owes 0 (not present)

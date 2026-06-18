@@ -1,8 +1,11 @@
 """CRUD endpoints for accounts. Scoped to the logged-in user."""
+from postgrest.exceptions import APIError
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user_id
 from app.database import supabase
+from app.db_errors import is_foreign_key_violation
 from app.models.account import Account, AccountCreate, AccountUpdate
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
@@ -67,13 +70,21 @@ def update_account(
 
 @router.delete("/{account_id}", status_code=204)
 def delete_account(account_id: str, user_id: str = Depends(get_current_user_id)):
-    result = (
-        supabase.table(TABLE)
-        .delete()
-        .eq("id", account_id)
-        .eq("owner_id", user_id)
-        .execute()
-    )
+    try:
+        result = (
+            supabase.table(TABLE)
+            .delete()
+            .eq("id", account_id)
+            .eq("owner_id", user_id)
+            .execute()
+        )
+    except APIError as e:
+        if is_foreign_key_violation(e):
+            raise HTTPException(
+                status_code=409,
+                detail="Account has transactions. Delete or reassign them first.",
+            )
+        raise
     if not result.data:
         raise HTTPException(status_code=404, detail="Account not found")
     return None
