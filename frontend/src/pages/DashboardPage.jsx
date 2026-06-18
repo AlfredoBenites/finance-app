@@ -103,8 +103,12 @@ export default function DashboardPage() {
       {data.debt_by_card.length === 0 && <p>No card debt.</p>}
       {data.debt_by_card.map((c) => (
         <div className="card" key={c.credit_card_id}>
-          <span>{c.name}</span>
-          <strong>{money(c.balance)}</strong>
+          <span>
+            {c.name}
+            <br />
+            <small>owed {money(c.owed)} · saved {money(c.saved)}</small>
+          </span>
+          <strong>{money(c.balance)} left</strong>
         </div>
       ))}
     </div>
