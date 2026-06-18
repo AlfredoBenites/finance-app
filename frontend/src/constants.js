@@ -6,5 +6,6 @@ export const CATEGORIES = [
 
 // Income types.
 export const INCOME_TYPES = [
-  "Job", "Side Gig", "Tip", "Gift", "Cashback", "Refund", "Other",
+  "Job", "Side Gig", "Tip", "Gift", "Cashback", "Bonus", "Interest",
+  "Repayment", "Financial Aid", "Refund", "Other",
 ];
