@@ -56,8 +56,25 @@ def get_dashboard(
     owed = calc.owed_by_profile(transactions)
     debts = calc.debt_by_card(debt_txns)
 
+    # Each card's payoff-bucket savings reduce its displayed (remaining) debt.
+    savings = calc.card_bucket_savings(buckets)
+    debt_by_card = []
+    net_card_debt = calc.Decimal("0")
+    for cid, owed_amt in debts.items():
+        saved = savings.get(cid, calc.Decimal("0"))
+        remaining = max(calc.Decimal("0"), owed_amt - saved)
+        net_card_debt += remaining
+        debt_by_card.append({
+            "credit_card_id": cid,
+            "name": card_names.get(cid, "Unknown"),
+            "owed": float(owed_amt),
+            "saved": float(saved),
+            "balance": float(remaining),
+        })
+    debt_by_card.sort(key=lambda d: -d["balance"])
+
     return {
-        "total_credit_card_debt": float(calc.total_card_debt(debt_txns)),
+        "total_credit_card_debt": float(net_card_debt),
         "total_cashback_earned": float(calc.cashback_earned(transactions)),
         "total_cashback_pending": float(calc.cashback_pending(transactions)),
         "total_bucket_money": float(calc.total_bucket_money(buckets)),
@@ -72,8 +89,5 @@ def get_dashboard(
             {"profile_id": pid, "name": profile_names.get(pid, "Unknown"), "amount": float(amt)}
             for pid, amt in owed.items()
         ],
-        "debt_by_card": [
-            {"credit_card_id": cid, "name": card_names.get(cid, "Unknown"), "balance": float(bal)}
-            for cid, bal in debts.items()
-        ],
+        "debt_by_card": debt_by_card,
     }

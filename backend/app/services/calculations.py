@@ -89,6 +89,33 @@ def total_bucket_money(buckets: list[dict]) -> Decimal:
     )
 
 
+def non_card_bucket_money(buckets: list[dict]) -> Decimal:
+    """Active buckets NOT tied to a credit card.
+
+    Card payoff buckets are earmarked for card debt (which is already subtracted
+    from available money), so they don't reduce available money a second time.
+    """
+    return sum(
+        (
+            _dec(b["current_amount"])
+            for b in buckets
+            if b.get("is_active") and not b.get("credit_card_id")
+        ),
+        Decimal("0"),
+    )
+
+
+def card_bucket_savings(buckets: list[dict]) -> dict[str, Decimal]:
+    """Map credit_card_id -> money saved in that card's payoff bucket(s)."""
+    totals: dict[str, Decimal] = {}
+    for b in buckets:
+        cid = b.get("credit_card_id")
+        if not cid or not b.get("is_active"):
+            continue
+        totals[cid] = totals.get(cid, Decimal("0")) + _dec(b["current_amount"])
+    return totals
+
+
 def liquid_cash(accounts: list[dict]) -> Decimal:
     """Spendable cash: active checking/savings/cash account balances."""
     return sum(
@@ -124,11 +151,15 @@ def other_liabilities(accounts: list[dict]) -> Decimal:
 def real_available_money(
     accounts: list[dict], transactions: list[dict], buckets: list[dict]
 ) -> Decimal:
-    """Liquid cash minus card debt minus money set aside in buckets (SPEC 9.7)."""
+    """Liquid cash minus card debt minus non-card bucket money (SPEC 9.7).
+
+    Card payoff buckets are excluded here: they fund the card debt that's already
+    subtracted, so counting them again would double-count.
+    """
     return (
         liquid_cash(accounts)
         - total_card_debt(transactions)
-        - total_bucket_money(buckets)
+        - non_card_bucket_money(buckets)
     )
 
 

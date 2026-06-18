@@ -104,6 +104,20 @@ def test_dashboard_exclude_repayments(api):
     assert api.client.get("/api/dashboard?exclude_repayments=true").json()["total_income"] == 1000.0
 
 
+def test_card_payoff_bucket_reduces_displayed_debt(api):
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    card = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -500,
+                                               "profile_id": pid, "credit_card_id": card})
+    # set aside $200 toward this card
+    api.client.post("/api/buckets", json={"name": "extra", "current_amount": 200, "credit_card_id": card})
+    d = api.client.get("/api/dashboard").json()
+    assert d["total_credit_card_debt"] == 300.0
+    row = next(c for c in d["debt_by_card"] if c["name"] == "Visa")
+    assert row["owed"] == 500.0 and row["saved"] == 200.0 and row["balance"] == 300.0
+
+
 def test_dashboard_is_scoped_to_the_user(api):
     api.login(*USER_A)
     profile_id = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]

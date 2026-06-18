@@ -33,7 +33,16 @@ def create_credit_card(
     data = payload.model_dump(mode="json")
     data["owner_id"] = user_id
     result = supabase.table(TABLE).insert(data).execute()
-    return result.data[0]
+    card = result.data[0]
+    # Auto-create a payoff bucket for the new card (money saved to pay it off).
+    supabase.table("buckets").insert({
+        "owner_id": user_id,
+        "name": f"{card['name']} payoff",
+        "category": "Credit Card Payoff",
+        "current_amount": "0",
+        "credit_card_id": card["id"],
+    }).execute()
+    return card
 
 
 @router.get("/{card_id}", response_model=CreditCard)
