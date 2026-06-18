@@ -108,7 +108,7 @@ export default function IncomePage() {
           onChange={(e) => setField("income_date", e.target.value)}
         />
         <input
-          placeholder="Source (e.g., DoodyCalls, cut grass for dad)"
+          placeholder="Source (e.g., paycheck, gig, gift)"
           value={form.source}
           onChange={(e) => setField("source", e.target.value)}
         />

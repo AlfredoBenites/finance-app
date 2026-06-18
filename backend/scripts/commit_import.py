@@ -54,7 +54,7 @@ def commit(planned, cat_map, email):
         print(f"  {table}: deleted {len(res.data)}")
 
     # 2. Seed profiles / cards / accounts.
-    profiles = _insert_named("profiles", owner, ["Alfredo", "Mom"])
+    profiles = _insert_named("profiles", owner, ["Me", "Mom"])
     cards = _insert_named("credit_cards", owner, sorted({p["card"] for p in planned if p["card"]}))
     accounts = _insert_named(
         "accounts", owner, sorted({p["account"] for p in planned if p["account"]}),
