@@ -36,6 +36,7 @@ export const profilesApi = {
     request("/api/profiles", { method: "POST", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/profiles/${id}`, { method: "DELETE" }),
   summary: (id) => request(`/api/profiles/${id}/summary`),
+  makePrimary: (id) => request(`/api/profiles/${id}/make-primary`, { method: "POST" }),
 };
 
 export const creditCardsApi = {
@@ -64,7 +65,14 @@ export const accountsApi = {
 };
 
 export const dashboardApi = {
-  get: (year) => request(`/api/dashboard${year ? `?year=${year}` : ""}`),
+  get: ({ year, onlyPrimary, excludeRepayments } = {}) => {
+    const p = new URLSearchParams();
+    if (year) p.append("year", year);
+    if (onlyPrimary) p.append("only_primary", "true");
+    if (excludeRepayments) p.append("exclude_repayments", "true");
+    const qs = p.toString();
+    return request(`/api/dashboard${qs ? `?${qs}` : ""}`);
+  },
 };
 
 export const incomeApi = {

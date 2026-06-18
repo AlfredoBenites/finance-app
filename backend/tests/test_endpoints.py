@@ -61,6 +61,31 @@ def test_profile_summary_shows_debt_per_card(api):
     assert debts == {"Visa": 100.0, "Amex": 50.0}
 
 
+def test_dashboard_only_my_debt_scopes_to_primary_profile(api):
+    api.login(*USER_A)
+    me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    mom = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    api.client.post(f"/api/profiles/{me}/make-primary")
+    card = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
+    # $100 of my unpaid debt, $400 of Mom's unpaid debt
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                                               "profile_id": me, "credit_card_id": card})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -400,
+                                               "profile_id": mom, "credit_card_id": card})
+    assert api.client.get("/api/dashboard").json()["total_credit_card_debt"] == 500.0
+    assert api.client.get("/api/dashboard?only_primary=true").json()["total_credit_card_debt"] == 100.0
+
+
+def test_dashboard_exclude_repayments(api):
+    api.login(*USER_A)
+    api.client.post("/api/income", json={"income_date": "2026-06-01", "source": "Job",
+                                         "amount": 1000, "category": "Job", "account_id": "a1"})
+    api.client.post("/api/income", json={"income_date": "2026-06-02", "source": "Mom",
+                                         "amount": 300, "category": "Repayment", "account_id": "a1"})
+    assert api.client.get("/api/dashboard").json()["total_income"] == 1300.0
+    assert api.client.get("/api/dashboard?exclude_repayments=true").json()["total_income"] == 1000.0
+
+
 def test_dashboard_is_scoped_to_the_user(api):
     api.login(*USER_A)
     profile_id = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
