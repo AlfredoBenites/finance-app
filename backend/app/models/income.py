@@ -11,7 +11,7 @@ class IncomeCreate(BaseModel):
     source: str
     category: Optional[str] = None
     amount: Decimal
-    account_id: Optional[str] = None
+    account_id: str  # required: which account the money landed in
     notes: Optional[str] = None
 
 

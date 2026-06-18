@@ -228,7 +228,7 @@ export default function TransactionsPage() {
 
   return (
     <div>
-      <h1>Transactions</h1>
+      <h1>Expenses</h1>
 
       <form onSubmit={handleSubmit} style={{ flexWrap: "wrap" }}>
         <input
@@ -256,7 +256,7 @@ export default function TransactionsPage() {
         </select>
         <select value={form.type} onChange={(e) => setField("type", e.target.value)}>
           <option value="purchase">Purchase</option>
-          <option value="refund">Refund / Income</option>
+          <option value="refund">Refund</option>
         </select>
         <input
           type="number"

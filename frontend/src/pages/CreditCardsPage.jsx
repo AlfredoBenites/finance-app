@@ -72,7 +72,7 @@ export default function CreditCardsPage() {
     try {
       setError(null);
       setRulePct("");
-      setRuleCategory(CATEGORIES[0]);
+      setRuleCategory(categoryList[0] || FALLBACK_CATEGORIES[0]);
       setRules(await cashbackRulesApi.listForCard(cardId));
       setOpenCardId(cardId);
     } catch (e) {
