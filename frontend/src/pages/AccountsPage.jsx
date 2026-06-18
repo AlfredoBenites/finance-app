@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { accountsApi } from "../api/client";
 
+import { money } from "../format";
+
 const ACCOUNT_TYPES = ["checking", "savings", "cash", "investment", "roth_ira"];
-const money = (n) => `$${Number(n).toFixed(2)}`;
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);

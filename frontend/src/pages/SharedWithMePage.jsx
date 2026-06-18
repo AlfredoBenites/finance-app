@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { sharesApi } from "../api/client";
 
-const money = (n) => `$${Number(n).toFixed(2)}`;
+import { money } from "../format";
 
 export default function SharedWithMePage() {
   const [items, setItems] = useState([]);

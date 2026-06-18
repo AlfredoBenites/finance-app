@@ -3,9 +3,9 @@ import { incomeApi, accountsApi } from "../api/client";
 import { INCOME_TYPES } from "../constants";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 import usePersistedState from "../hooks/usePersistedState";
+import { money } from "../format";
 
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (n) => `$${Number(n).toFixed(2)}`;
 
 const EMPTY = {
   income_date: today(),
