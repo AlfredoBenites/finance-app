@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { creditCardsApi } from "../api/client";
+import { creditCardsApi, cashbackRulesApi } from "../api/client";
+import { CATEGORIES } from "../constants";
 
 export default function CreditCardsPage() {
   const [cards, setCards] = useState([]);
@@ -7,6 +8,12 @@ export default function CreditCardsPage() {
   const [issuer, setIssuer] = useState("");
   const [cashbackPct, setCashbackPct] = useState("");
   const [error, setError] = useState(null);
+
+  // Which card's category-rules panel is open, and that card's rules.
+  const [openCardId, setOpenCardId] = useState(null);
+  const [rules, setRules] = useState([]);
+  const [ruleCategory, setRuleCategory] = useState(CATEGORIES[0]);
+  const [rulePct, setRulePct] = useState("");
 
   async function loadCards() {
     try {
@@ -24,7 +31,6 @@ export default function CreditCardsPage() {
     e.preventDefault();
     if (!name.trim()) return;
     try {
-      // User enters a percent (e.g. 1.5); store as a rate (0.015).
       const rate = cashbackPct === "" ? null : Number(cashbackPct) / 100;
       await creditCardsApi.create({
         name: name.trim(),
@@ -43,7 +49,45 @@ export default function CreditCardsPage() {
   async function handleDelete(id) {
     try {
       await creditCardsApi.remove(id);
+      if (openCardId === id) setOpenCardId(null);
       loadCards();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function toggleRules(cardId) {
+    if (openCardId === cardId) {
+      setOpenCardId(null);
+      return;
+    }
+    try {
+      setError(null);
+      setRulePct("");
+      setRuleCategory(CATEGORIES[0]);
+      setRules(await cashbackRulesApi.listForCard(cardId));
+      setOpenCardId(cardId);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleAddRule(e) {
+    e.preventDefault();
+    if (rulePct === "") return;
+    try {
+      await cashbackRulesApi.upsert(openCardId, ruleCategory, Number(rulePct) / 100);
+      setRulePct("");
+      setRules(await cashbackRulesApi.listForCard(openCardId));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleDeleteRule(ruleId) {
+    try {
+      await cashbackRulesApi.remove(ruleId);
+      setRules(await cashbackRulesApi.listForCard(openCardId));
     } catch (e) {
       setError(e.message);
     }
@@ -67,7 +111,7 @@ export default function CreditCardsPage() {
         <input
           value={cashbackPct}
           onChange={(e) => setCashbackPct(e.target.value)}
-          placeholder="Cashback %"
+          placeholder="Default cashback %"
           type="number"
           step="0.01"
         />
@@ -79,17 +123,60 @@ export default function CreditCardsPage() {
       {cards.length === 0 && <p>No credit cards yet.</p>}
 
       {cards.map((c) => (
-        <div className="card" key={c.id}>
-          <span>
-            {c.name}
-            {c.issuer ? ` · ${c.issuer}` : ""}
-            {c.default_cashback_rate != null
-              ? ` · ${(Number(c.default_cashback_rate) * 100).toFixed(2)}% back`
-              : ""}
-          </span>
-          <button className="danger" onClick={() => handleDelete(c.id)}>
-            Delete
-          </button>
+        <div key={c.id}>
+          <div className="card">
+            <span>
+              {c.name}
+              {c.issuer ? ` · ${c.issuer}` : ""}
+              {c.default_cashback_rate != null
+                ? ` · ${(Number(c.default_cashback_rate) * 100).toFixed(2)}% default`
+                : ""}
+            </span>
+            <span style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => toggleRules(c.id)}>
+                {openCardId === c.id ? "Hide categories" : "Cashback by category"}
+              </button>
+              <button className="danger" onClick={() => handleDelete(c.id)}>
+                Delete
+              </button>
+            </span>
+          </div>
+
+          {openCardId === c.id && (
+            <div style={{ margin: "0 0 16px 16px" }}>
+              <form onSubmit={handleAddRule}>
+                <select
+                  value={ruleCategory}
+                  onChange={(e) => setRuleCategory(e.target.value)}
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Cashback %"
+                  value={rulePct}
+                  onChange={(e) => setRulePct(e.target.value)}
+                />
+                <button type="submit">Set</button>
+              </form>
+              {rules.length === 0 && (
+                <p><small>No category rules — uses the card default.</small></p>
+              )}
+              {rules.map((r) => (
+                <div className="card" key={r.id}>
+                  <span>
+                    {r.category}: {(Number(r.rate) * 100).toFixed(2)}%
+                  </span>
+                  <button className="danger" onClick={() => handleDeleteRule(r.id)}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>
