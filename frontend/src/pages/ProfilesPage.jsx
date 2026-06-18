@@ -143,6 +143,19 @@ export default function ProfilesPage() {
               {money(summary.cashback_earned)} / {money(summary.cashback_pending)}
             </strong>
           </div>
+
+          <h3>Cashback by card</h3>
+          {(!summary.cashback_by_card || summary.cashback_by_card.length === 0) && (
+            <p><small>No cashback yet.</small></p>
+          )}
+          {(summary.cashback_by_card || []).map((c) => (
+            <div className="card" key={c.name}>
+              <span>{c.name}</span>
+              <span>
+                earned <strong>{money(c.earned)}</strong> · pending {money(c.pending)}
+              </span>
+            </div>
+          ))}
           <div className="card">
             <span>Cards used</span>
             <span>{summary.cards_used.join(", ") || "—"}</span>
