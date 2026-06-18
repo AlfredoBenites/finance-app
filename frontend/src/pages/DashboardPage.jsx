@@ -80,6 +80,25 @@ export default function DashboardPage() {
       {header}
       <p><small>Income, spending, cashback and debt below are for {year === "all" ? "all time" : year}; balances/net worth are current.</small></p>
 
+      {data.upcoming_payments?.length > 0 && (
+        <>
+          <h2>Upcoming payments</h2>
+          {data.upcoming_payments.map((p, i) => (
+            <div
+              className="card"
+              key={i}
+              style={p.days_until <= 5 ? { borderColor: "#dc2626", borderWidth: 2 } : undefined}
+            >
+              <span>
+                {p.name} — due {p.due_date}{" "}
+                <small>({p.days_until === 0 ? "today" : `in ${p.days_until} day${p.days_until === 1 ? "" : "s"}`})</small>
+              </span>
+              <strong>{money(p.amount)}</strong>
+            </div>
+          ))}
+        </>
+      )}
+
       <Stat label="Total income" value={data.total_income} />
       <Stat label="Total credit card debt" value={data.total_credit_card_debt} />
       <Stat label="Cashback earned" value={data.total_cashback_earned} />
