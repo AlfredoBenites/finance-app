@@ -90,6 +90,14 @@ class _Query:
                         and existing["shared_with_email"] == record["shared_with_email"]
                     ):
                         raise APIError({"code": "23505", "message": "duplicate key"})
+            # Enforce unique(owner_id, name) on categories.
+            if self._table == "categories":
+                for existing in rows:
+                    if (
+                        existing["owner_id"] == record["owner_id"]
+                        and existing["name"] == record["name"]
+                    ):
+                        raise APIError({"code": "23505", "message": "duplicate key"})
             # Enforce exactly-one-payment-source on transactions.
             if self._table == "transactions":
                 cc = record.get("credit_card_id")
