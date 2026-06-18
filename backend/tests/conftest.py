@@ -90,6 +90,12 @@ class _Query:
                         and existing["shared_with_email"] == record["shared_with_email"]
                     ):
                         raise APIError({"code": "23505", "message": "duplicate key"})
+            # Enforce exactly-one-payment-source on transactions.
+            if self._table == "transactions":
+                cc = record.get("credit_card_id")
+                ac = record.get("account_id")
+                if (cc is None) == (ac is None):
+                    raise APIError({"code": "23514", "message": "check violation"})
             rows.append(record)
             return _Result([record])
 

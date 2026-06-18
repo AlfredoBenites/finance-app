@@ -2,16 +2,21 @@
 from decimal import Decimal
 from typing import Optional
 
+from postgrest.exceptions import APIError
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth import get_current_user_id
 from app.database import supabase
+from app.db_errors import is_check_violation
 from app.models.transaction import Transaction, TransactionCreate, TransactionUpdate
 from app.services.calculations import compute_cashback
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 TABLE = "transactions"
+
+ONE_SOURCE_MSG = "A transaction must have exactly one payment source: a card or an account."
 
 
 def _first_of_next_month(year: int, month: int) -> str:
@@ -65,7 +70,12 @@ def create_transaction(
     data["owner_id"] = user_id
     cashback = compute_cashback(payload.amount, payload.cashback_rate)
     data["cashback_amount"] = str(cashback) if cashback is not None else None
-    result = supabase.table(TABLE).insert(data).execute()
+    try:
+        result = supabase.table(TABLE).insert(data).execute()
+    except APIError as e:
+        if is_check_violation(e):
+            raise HTTPException(status_code=400, detail=ONE_SOURCE_MSG)
+        raise
     return result.data[0]
 
 
@@ -114,13 +124,18 @@ def update_transaction(
         cashback = compute_cashback(amount, rate)
         changes["cashback_amount"] = str(cashback) if cashback is not None else None
 
-    result = (
-        supabase.table(TABLE)
-        .update(changes)
-        .eq("id", transaction_id)
-        .eq("owner_id", user_id)
-        .execute()
-    )
+    try:
+        result = (
+            supabase.table(TABLE)
+            .update(changes)
+            .eq("id", transaction_id)
+            .eq("owner_id", user_id)
+            .execute()
+        )
+    except APIError as e:
+        if is_check_violation(e):
+            raise HTTPException(status_code=400, detail=ONE_SOURCE_MSG)
+        raise
     if not result.data:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return result.data[0]

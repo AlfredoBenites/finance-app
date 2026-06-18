@@ -41,15 +41,23 @@ def paid(transactions: list[dict]) -> list[dict]:
 
 
 def total_card_debt(transactions: list[dict]) -> Decimal:
-    """Total owed across all cards = negated sum of unpaid amounts (SPEC 9.1)."""
-    return -sum((_dec(t["amount"]) for t in unpaid(transactions)), Decimal("0"))
+    """Total owed across all cards = negated sum of unpaid amounts (SPEC 9.1).
+
+    Only counts card transactions; account (bank/cash) purchases are not card debt.
+    """
+    return -sum(
+        (_dec(t["amount"]) for t in unpaid(transactions) if t.get("credit_card_id")),
+        Decimal("0"),
+    )
 
 
 def debt_by_card(transactions: list[dict]) -> dict[str, Decimal]:
     """Map credit_card_id -> outstanding balance (SPEC 9.1)."""
     totals: dict[str, Decimal] = {}
     for t in unpaid(transactions):
-        cid = t["credit_card_id"]
+        cid = t.get("credit_card_id")
+        if not cid:
+            continue  # account purchase, not card debt
         totals[cid] = totals.get(cid, Decimal("0")) - _dec(t["amount"])
     return totals
 
