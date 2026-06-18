@@ -164,6 +164,22 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
     ]
     debt_by_card.sort(key=lambda d: -d["balance"])
 
+    # Cashback this profile generated on each card (earned = settled, pending = unpaid).
+    cb_by_card: dict[str, dict[str, Decimal]] = {}
+    for t in txns:
+        cid = t.get("credit_card_id")
+        if not cid:
+            continue
+        entry = cb_by_card.setdefault(cid, {"earned": Decimal("0"), "pending": Decimal("0")})
+        amount = calc._dec(t.get("cashback_amount"))
+        entry["earned" if t.get("is_paid_back") else "pending"] += amount
+    cashback_by_card = [
+        {"name": card_names.get(cid, "Unknown"), "earned": float(v["earned"]), "pending": float(v["pending"])}
+        for cid, v in cb_by_card.items()
+        if v["earned"] or v["pending"]
+    ]
+    cashback_by_card.sort(key=lambda d: -(d["earned"] + d["pending"]))
+
     return {
         "profile": profile.data[0],
         "total_owed": float(total_owed),
@@ -173,5 +189,6 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
         "cashback_pending": float(calc.cashback_pending(txns)),
         "cards_used": cards_used,
         "debt_by_card": debt_by_card,
+        "cashback_by_card": cashback_by_card,
         "transactions": txns,
     }

@@ -61,6 +61,24 @@ def test_profile_summary_shows_debt_per_card(api):
     assert debts == {"Visa": 100.0, "Amex": 50.0}
 
 
+def test_profile_summary_shows_cashback_per_card(api):
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    visa = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
+    # paid purchase (earned cashback) and unpaid purchase (pending) on the same card
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                                               "profile_id": pid, "credit_card_id": visa,
+                                               "cashback_rate": 0.03, "is_paid_back": True})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -100,
+                                               "profile_id": pid, "credit_card_id": visa,
+                                               "cashback_rate": 0.03})
+    cb = api.client.get(f"/api/profiles/{pid}/summary").json()["cashback_by_card"]
+    assert len(cb) == 1
+    assert cb[0]["name"] == "Visa"
+    assert cb[0]["earned"] == 3.0
+    assert cb[0]["pending"] == 3.0
+
+
 def test_dashboard_only_my_debt_scopes_to_primary_profile(api):
     api.login(*USER_A)
     me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
