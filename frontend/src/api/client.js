@@ -78,6 +78,17 @@ export const sharesApi = {
   sharedWithMe: () => request("/api/shared-with-me"),
 };
 
+export const cashbackRulesApi = {
+  listAll: () => request("/api/cashback-rules"),
+  listForCard: (cardId) => request(`/api/credit-cards/${cardId}/cashback-rules`),
+  upsert: (cardId, category, rate) =>
+    request(`/api/credit-cards/${cardId}/cashback-rules`, {
+      method: "POST",
+      body: JSON.stringify({ category, rate }),
+    }),
+  remove: (ruleId) => request(`/api/cashback-rules/${ruleId}`, { method: "DELETE" }),
+};
+
 export const transactionsApi = {
   // filters: { profile_id, credit_card_id, category, is_paid_back, month, search }
   list: (filters = {}) => {

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { profilesApi, creditCardsApi, transactionsApi } from "../api/client";
-
-// Hardcoded categories for the MVP (SPEC.md section 10).
-const CATEGORIES = [
-  "Food", "Gas", "Groceries", "Bills", "Insurance", "School", "Clothes",
-  "Professional", "Car", "Health", "Gifts", "Subscriptions", "Travel", "Other",
-];
+import {
+  profilesApi,
+  creditCardsApi,
+  transactionsApi,
+  cashbackRulesApi,
+} from "../api/client";
+import { CATEGORIES } from "../constants";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (n) => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
@@ -25,6 +25,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [cards, setCards] = useState([]);
+  const [rules, setRules] = useState([]);
   const [error, setError] = useState(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
@@ -37,12 +38,49 @@ export default function TransactionsPage() {
 
   async function loadLookups() {
     try {
-      const [p, c] = await Promise.all([profilesApi.list(), creditCardsApi.list()]);
+      const [p, c, r] = await Promise.all([
+        profilesApi.list(),
+        creditCardsApi.list(),
+        cashbackRulesApi.listAll(),
+      ]);
       setProfiles(p);
       setCards(c);
+      setRules(r);
     } catch (e) {
       setError(e.message);
     }
+  }
+
+  // Resolve the cashback % for a card+category: a category rule wins, else the
+  // card's default rate, else blank. Returned as a percent string for the input.
+  function resolveRatePct(cardId, category) {
+    const rule = rules.find((r) => r.card_id === cardId && r.category === category);
+    let rate = null;
+    if (rule) {
+      rate = Number(rule.rate);
+    } else {
+      const card = cards.find((c) => c.id === cardId);
+      if (card && card.default_cashback_rate != null) {
+        rate = Number(card.default_cashback_rate);
+      }
+    }
+    return rate == null ? "" : String(Math.round(rate * 10000) / 100);
+  }
+
+  function onCardChange(cardId) {
+    setForm((f) => ({
+      ...f,
+      credit_card_id: cardId,
+      cashbackPct: resolveRatePct(cardId, f.category),
+    }));
+  }
+
+  function onCategoryChange(category) {
+    setForm((f) => ({
+      ...f,
+      category,
+      cashbackPct: resolveRatePct(f.credit_card_id, category),
+    }));
   }
 
   async function loadTransactions() {
@@ -155,7 +193,7 @@ export default function TransactionsPage() {
           value={form.merchant}
           onChange={(e) => setField("merchant", e.target.value)}
         />
-        <select value={form.category} onChange={(e) => setField("category", e.target.value)}>
+        <select value={form.category} onChange={(e) => onCategoryChange(e.target.value)}>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
@@ -179,7 +217,7 @@ export default function TransactionsPage() {
         </select>
         <select
           value={form.credit_card_id}
-          onChange={(e) => setField("credit_card_id", e.target.value)}
+          onChange={(e) => onCardChange(e.target.value)}
         >
           <option value="">Card…</option>
           {cards.map((c) => (

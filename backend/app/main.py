@@ -10,6 +10,7 @@ from app.auth import get_current_user
 from app.routers import (
     accounts,
     buckets,
+    cashback_rules,
     credit_cards,
     dashboard,
     profiles,
@@ -36,6 +37,7 @@ app.include_router(buckets.router)
 app.include_router(accounts.router)
 app.include_router(dashboard.router)
 app.include_router(shares.router)
+app.include_router(cashback_rules.router)
 
 
 @app.get("/")
