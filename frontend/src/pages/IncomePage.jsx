@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { incomeApi, accountsApi } from "../api/client";
 import { INCOME_TYPES } from "../constants";
+import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (n) => `$${Number(n).toFixed(2)}`;
@@ -19,12 +20,16 @@ export default function IncomePage() {
   const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState(null);
+  const [year, setYear] = useState(CURRENT_YEAR);
 
   const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "—";
 
   async function load() {
     try {
-      const [inc, accts] = await Promise.all([incomeApi.list(), accountsApi.list()]);
+      const [inc, accts] = await Promise.all([
+        incomeApi.list(year === "all" ? undefined : year),
+        accountsApi.list(),
+      ]);
       setIncome(inc);
       setAccounts(accts);
     } catch (e) {
@@ -34,7 +39,7 @@ export default function IncomePage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [year]);
 
   function setField(name, value) {
     setForm((f) => ({ ...f, [name]: value }));
@@ -78,7 +83,10 @@ export default function IncomePage() {
 
   return (
     <div>
-      <h1>Income</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>Income</h1>
+        <YearSelect value={year} onChange={setYear} />
+      </div>
 
       <form onSubmit={handleAdd} style={{ flexWrap: "wrap" }}>
         <input

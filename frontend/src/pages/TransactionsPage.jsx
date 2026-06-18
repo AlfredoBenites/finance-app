@@ -9,6 +9,7 @@ import {
   merchantCategoriesApi,
 } from "../api/client";
 import { CATEGORIES as FALLBACK_CATEGORIES } from "../constants";
+import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (n) => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
@@ -37,7 +38,9 @@ export default function TransactionsPage() {
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
-  const [filters, setFilters] = useState({ profile_id: "", is_paid_back: "", search: "" });
+  const [filters, setFilters] = useState({
+    profile_id: "", is_paid_back: "", search: "", year: CURRENT_YEAR,
+  });
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.name ?? "—";
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "—";
@@ -299,6 +302,10 @@ export default function TransactionsPage() {
       </form>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <YearSelect
+          value={filters.year === "" ? "all" : filters.year}
+          onChange={(v) => setFilters((f) => ({ ...f, year: v === "all" ? "" : v }))}
+        />
         <select
           value={filters.profile_id}
           onChange={(e) => setFilters((f) => ({ ...f, profile_id: e.target.value }))}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { dashboardApi } from "../api/client";
+import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 
 const money = (n) =>
   `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
@@ -16,6 +17,7 @@ function Stat({ label, value }) {
 export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [year, setYear] = useState(CURRENT_YEAR);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,7 +25,7 @@ export default function DashboardPage() {
     // / token settling), so retry once before showing an error.
     async function load(attempt = 0) {
       try {
-        const d = await dashboardApi.get();
+        const d = await dashboardApi.get(year === "all" ? undefined : year);
         if (!cancelled) setData(d);
       } catch (e) {
         if (attempt < 1) {
@@ -33,18 +35,28 @@ export default function DashboardPage() {
         if (!cancelled) setError(e.message);
       }
     }
+    setData(null);
+    setError(null);
     load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [year]);
 
-  if (error) return <p style={{ color: "#dc2626" }}>Error: {error}</p>;
-  if (!data) return <p>Loading…</p>;
+  const header = (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <h1>Dashboard</h1>
+      <YearSelect value={year} onChange={setYear} />
+    </div>
+  );
+
+  if (error) return <div>{header}<p style={{ color: "#dc2626" }}>Error: {error}</p></div>;
+  if (!data) return <div>{header}<p>Loading…</p></div>;
 
   return (
     <div>
-      <h1>Dashboard</h1>
+      {header}
+      <p><small>Income, spending, cashback and debt below are for {year === "all" ? "all time" : year}; balances/net worth are current.</small></p>
 
       <Stat label="Total income" value={data.total_income} />
       <Stat label="Total credit card debt" value={data.total_credit_card_debt} />

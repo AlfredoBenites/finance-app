@@ -1,5 +1,7 @@
 """CRUD endpoints for income. Scoped to the logged-in user."""
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth import get_current_user_id
 from app.database import supabase
@@ -11,15 +13,16 @@ TABLE = "income"
 
 
 @router.get("", response_model=list[Income])
-def list_income(user_id: str = Depends(get_current_user_id)):
-    result = (
-        supabase.table(TABLE)
-        .select("*")
-        .eq("owner_id", user_id)
-        .order("income_date", desc=True)
-        .execute()
-    )
-    return result.data
+def list_income(
+    user_id: str = Depends(get_current_user_id),
+    year: Optional[int] = Query(default=None, description="Filter by year, e.g. 2026"),
+):
+    query = supabase.table(TABLE).select("*").eq("owner_id", user_id)
+    if year is not None:
+        query = query.gte("income_date", f"{year}-01-01").lt(
+            "income_date", f"{year + 1}-01-01"
+        )
+    return query.order("income_date", desc=True).execute().data
 
 
 @router.post("", response_model=Income, status_code=201)

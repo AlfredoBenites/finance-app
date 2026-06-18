@@ -41,6 +41,17 @@ def test_income_shows_in_dashboard_total(api):
     assert api.client.get("/api/dashboard").json()["total_income"] == 1050.0
 
 
+def test_dashboard_year_scopes_income(api):
+    api.login(*USER_A)
+    api.client.post("/api/income", json={"income_date": "2025-05-01", "source": "Old",
+                                         "amount": 100, "account_id": "acct-1"})
+    api.client.post("/api/income", json={"income_date": "2026-05-01", "source": "New",
+                                         "amount": 200, "account_id": "acct-1"})
+    assert api.client.get("/api/dashboard?year=2026").json()["total_income"] == 200.0
+    assert api.client.get("/api/dashboard?year=2025").json()["total_income"] == 100.0
+    assert api.client.get("/api/dashboard").json()["total_income"] == 300.0
+
+
 def test_delete_income(api):
     api.login(*USER_A)
     iid = api.client.post(
