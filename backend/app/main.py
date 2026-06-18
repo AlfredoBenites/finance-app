@@ -14,6 +14,7 @@ from app.routers import (
     categories,
     credit_cards,
     dashboard,
+    income,
     profiles,
     shares,
     transactions,
@@ -40,6 +41,7 @@ app.include_router(dashboard.router)
 app.include_router(shares.router)
 app.include_router(cashback_rules.router)
 app.include_router(categories.router)
+app.include_router(income.router)
 
 
 @app.get("/")

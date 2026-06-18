@@ -3,3 +3,8 @@ export const CATEGORIES = [
   "Food", "Gas", "Groceries", "Bills", "Insurance", "School", "Clothes",
   "Professional", "Car", "Health", "Gifts", "Subscriptions", "Travel", "Other",
 ];
+
+// Income types.
+export const INCOME_TYPES = [
+  "Job", "Side Gig", "Tip", "Gift", "Cashback", "Refund", "Other",
+];
