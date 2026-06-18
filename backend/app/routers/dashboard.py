@@ -3,6 +3,8 @@
 Fetches the user's rows once, then delegates all math to services.calculations.
 Returns plain floats so the frontend can display them directly.
 """
+import calendar
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -28,7 +30,7 @@ def get_dashboard(
     buckets = owned("buckets")
     accounts = owned("accounts")
     profiles = owned("profiles", "id, name, is_primary")
-    cards = owned("credit_cards", "id, name")
+    cards = owned("credit_cards", "id, name, due_day")
     income_rows = owned("income", "amount, income_date, category")
 
     # Year scopes the transaction/income-derived numbers; account balances are
@@ -73,7 +75,35 @@ def get_dashboard(
         })
     debt_by_card.sort(key=lambda d: -d["balance"])
 
+    # Upcoming payment reminders: the full balance owed to the bank, due on each
+    # card's due day. (Uses all profiles' charges — you pay the bank the total.)
+    full_debts = calc.debt_by_card(transactions)
+    today = date.today()
+
+    def next_due(day):
+        def on(y, m):
+            return date(y, m, min(day, calendar.monthrange(y, m)[1]))
+        this_month = on(today.year, today.month)
+        if this_month >= today:
+            return this_month
+        y, m = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
+        return on(y, m)
+
+    upcoming_payments = []
+    for c in cards:
+        owed_amt = float(full_debts.get(c["id"], calc.Decimal("0")))
+        if c.get("due_day") and owed_amt > 0:
+            nd = next_due(int(c["due_day"]))
+            upcoming_payments.append({
+                "name": c["name"],
+                "due_date": nd.isoformat(),
+                "days_until": (nd - today).days,
+                "amount": owed_amt,
+            })
+    upcoming_payments.sort(key=lambda x: x["days_until"])
+
     return {
+        "upcoming_payments": upcoming_payments,
         "total_credit_card_debt": float(net_card_debt),
         "total_cashback_earned": float(calc.cashback_earned(transactions)),
         "total_cashback_pending": float(calc.cashback_pending(transactions)),

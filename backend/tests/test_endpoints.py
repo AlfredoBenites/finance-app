@@ -79,6 +79,18 @@ def test_profile_summary_shows_cashback_per_card(api):
     assert cb[0]["pending"] == 3.0
 
 
+def test_dashboard_upcoming_payments(api):
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    card = api.client.post("/api/credit-cards", json={"name": "Visa", "due_day": 15}).json()["id"]
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -250,
+                                               "profile_id": pid, "credit_card_id": card})
+    up = api.client.get("/api/dashboard").json()["upcoming_payments"]
+    assert len(up) == 1
+    assert up[0]["name"] == "Visa" and up[0]["amount"] == 250.0
+    assert "due_date" in up[0] and "days_until" in up[0]
+
+
 def test_dashboard_only_my_debt_scopes_to_primary_profile(api):
     api.login(*USER_A)
     me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
