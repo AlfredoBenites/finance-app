@@ -7,13 +7,13 @@ def test_create_and_list_income(api):
     api.login(*USER_A)
     r = api.client.post(
         "/api/income",
-        json={"income_date": "2026-06-01", "source": "DoodyCalls", "category": "Side Gig",
+        json={"income_date": "2026-06-01", "source": "Gig", "category": "Side Gig",
               "amount": 240, "account_id": "acct-1"},
     )
     assert r.status_code == 201
     rows = api.client.get("/api/income").json()
     assert len(rows) == 1
-    assert rows[0]["source"] == "DoodyCalls"
+    assert rows[0]["source"] == "Gig"
 
 
 def test_income_requires_account(api):

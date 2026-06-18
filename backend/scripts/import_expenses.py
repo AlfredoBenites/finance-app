@@ -158,7 +158,7 @@ def classify(rows, cat_map):
 
         rate = parse_rate(r[6]) if is_card else None
         cashback = (-amount * rate).quantize(Decimal("0.01"), ROUND_HALF_UP) if rate is not None else None
-        profile = "Mom" if "mom" in notes.lower() else "Alfredo"
+        profile = "Mom" if "mom" in notes.lower() else "Me"
         is_paid = not (paid_raw == "NOT PAID" or "not paid" in notes.lower())
 
         planned.append({
@@ -220,7 +220,7 @@ def report(planned, skips, skip_sum, cat_map):
     cards = sorted({p["card"] for p in planned if p["card"]})
     accts = sorted({p["account"] for p in planned if p["account"]})
     section("Will be created on commit")
-    print(f"  profiles: Alfredo, Mom")
+    print("  profiles: Me, Mom")
     print(f"  cards ({len(cards)}): {', '.join(cards)}")
     print(f"  accounts ({len(accts)}): {', '.join(accts)}")
     print(f"  categories ({len(cats)}) + {len([m for m,c in cat_map.items() if c!='EXCLUDE'])} merchant defaults")

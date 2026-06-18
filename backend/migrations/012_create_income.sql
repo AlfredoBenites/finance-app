@@ -11,7 +11,7 @@ create table if not exists income (
     id          uuid primary key default gen_random_uuid(),
     owner_id    uuid not null references auth.users (id) on delete cascade,
     income_date date not null,
-    source      text not null,          -- e.g. "DoodyCalls", "Cut grass for dad", "Tip from Rebecca"
+    source      text not null,          -- where the income came from (e.g. a job, a gig, a tip)
     category    text,                    -- type: Job / Side Gig / Tip / Gift / Cashback / Refund / Other
     amount      numeric(12, 2) not null, -- positive
     account_id  uuid references accounts (id) on delete set null,  -- where it landed (optional)

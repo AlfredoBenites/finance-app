@@ -28,7 +28,7 @@ EXCLUDE_TYPES = {"transfer", "temporary", "amazon refund"}  # transfers, verific
 # Income "Payment Method" (type) -> our income category.
 TYPE_CATEGORY = {
     "refund": "Financial Aid", "mdc refund": "Financial Aid", "scholarship": "Financial Aid",
-    "stipend": "Job", "afrl payment": "Job", "afrl stipend": "Job", "payroll": "Job",
+    "stipend": "Job", "payroll": "Job",
     "chase bonus": "Bonus", "bmo bonus": "Bonus", "ally referral": "Bonus",
     "gift": "Gift", "dad's gift": "Gift",
     "cashback": "Cashback", "interest": "Interest",
@@ -63,7 +63,7 @@ def classify_payment(notes):
     n = (notes or "").lower()
     if "tip" in n:
         return "Tip"
-    if "doodycalls" in n or "sold" in n or "ebay" in n:
+    if "sold" in n or "ebay" in n:
         return "Side Gig"
     if "interest" in n:
         return "Interest"
