@@ -67,6 +67,22 @@ export const dashboardApi = {
   get: () => request("/api/dashboard"),
 };
 
+export const categoriesApi = {
+  list: () => request("/api/categories"),
+  create: (name) =>
+    request("/api/categories", { method: "POST", body: JSON.stringify({ name }) }),
+  remove: (id) => request(`/api/categories/${id}`, { method: "DELETE" }),
+};
+
+export const merchantCategoriesApi = {
+  list: () => request("/api/merchant-categories"),
+  upsert: (merchant, category) =>
+    request("/api/merchant-categories", {
+      method: "POST",
+      body: JSON.stringify({ merchant, category }),
+    }),
+};
+
 export const sharesApi = {
   listForProfile: (profileId) => request(`/api/profiles/${profileId}/shares`),
   create: (profileId, email) =>

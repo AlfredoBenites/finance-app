@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { creditCardsApi, cashbackRulesApi } from "../api/client";
-import { CATEGORIES } from "../constants";
+import { creditCardsApi, cashbackRulesApi, categoriesApi } from "../api/client";
+import { CATEGORIES as FALLBACK_CATEGORIES } from "../constants";
 
 export default function CreditCardsPage() {
   const [cards, setCards] = useState([]);
@@ -12,8 +12,9 @@ export default function CreditCardsPage() {
   // Which card's category-rules panel is open, and that card's rules.
   const [openCardId, setOpenCardId] = useState(null);
   const [rules, setRules] = useState([]);
-  const [ruleCategory, setRuleCategory] = useState(CATEGORIES[0]);
+  const [ruleCategory, setRuleCategory] = useState(FALLBACK_CATEGORIES[0]);
   const [rulePct, setRulePct] = useState("");
+  const [categoryList, setCategoryList] = useState(FALLBACK_CATEGORIES);
 
   async function loadCards() {
     try {
@@ -25,6 +26,13 @@ export default function CreditCardsPage() {
 
   useEffect(() => {
     loadCards();
+    categoriesApi
+      .list()
+      .then((cats) => {
+        const names = new Set([...FALLBACK_CATEGORIES, ...cats.map((c) => c.name)]);
+        setCategoryList([...names].sort());
+      })
+      .catch(() => {});
   }, []);
 
   async function handleAdd(e) {
@@ -149,7 +157,7 @@ export default function CreditCardsPage() {
                   value={ruleCategory}
                   onChange={(e) => setRuleCategory(e.target.value)}
                 >
-                  {CATEGORIES.map((cat) => (
+                  {categoryList.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>

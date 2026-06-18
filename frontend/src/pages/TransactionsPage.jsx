@@ -5,17 +5,20 @@ import {
   accountsApi,
   transactionsApi,
   cashbackRulesApi,
+  categoriesApi,
+  merchantCategoriesApi,
 } from "../api/client";
-import { CATEGORIES } from "../constants";
+import { CATEGORIES as FALLBACK_CATEGORIES } from "../constants";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (n) => `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
+const ADD_NEW = "__add_new__";
 
 const EMPTY_FORM = {
   transaction_date: today(),
   merchant: "",
-  category: CATEGORIES[0],
-  type: "purchase", // purchase -> stored negative; refund -> stored positive
+  category: "",
+  type: "purchase",
   amount: "",
   profile_id: "",
   paymentSource: "", // "card:<id>" or "account:<id>"
@@ -28,11 +31,12 @@ export default function TransactionsPage() {
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [rules, setRules] = useState([]);
+  const [categoryList, setCategoryList] = useState([]);
+  const [merchantDefaults, setMerchantDefaults] = useState([]); // [{merchant, category}]
   const [error, setError] = useState(null);
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
-
   const [filters, setFilters] = useState({ profile_id: "", is_paid_back: "", search: "" });
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.name ?? "—";
@@ -41,18 +45,27 @@ export default function TransactionsPage() {
   const sourceName = (t) =>
     t.credit_card_id ? cardName(t.credit_card_id) : accountName(t.account_id);
 
+  function mergeCategories(apiCats) {
+    const names = new Set([...FALLBACK_CATEGORIES, ...apiCats.map((c) => c.name)]);
+    return [...names].sort();
+  }
+
   async function loadLookups() {
     try {
-      const [p, c, a, r] = await Promise.all([
+      const [p, c, a, r, cats, md] = await Promise.all([
         profilesApi.list(),
         creditCardsApi.list(),
         accountsApi.list(),
         cashbackRulesApi.listAll(),
+        categoriesApi.list(),
+        merchantCategoriesApi.list(),
       ]);
       setProfiles(p);
       setCards(c);
       setAccounts(a);
       setRules(r);
+      setCategoryList(mergeCategories(cats));
+      setMerchantDefaults(md);
     } catch (e) {
       setError(e.message);
     }
@@ -78,13 +91,11 @@ export default function TransactionsPage() {
     setForm((f) => ({ ...f, [name]: value }));
   }
 
-  // Cashback % for a card+category: a category rule wins, else the card default.
   function resolveRatePct(cardId, category) {
     const rule = rules.find((r) => r.card_id === cardId && r.category === category);
     let rate = null;
-    if (rule) {
-      rate = Number(rule.rate);
-    } else {
+    if (rule) rate = Number(rule.rate);
+    else {
       const card = cards.find((c) => c.id === cardId);
       if (card && card.default_cashback_rate != null) rate = Number(card.default_cashback_rate);
     }
@@ -92,7 +103,6 @@ export default function TransactionsPage() {
   }
 
   function onSourceChange(value) {
-    // Auto-fill cashback only for cards; accounts have none.
     if (value.startsWith("card:")) {
       const cardId = value.slice(5);
       setForm((f) => ({ ...f, paymentSource: value, cashbackPct: resolveRatePct(cardId, f.category) }));
@@ -101,7 +111,7 @@ export default function TransactionsPage() {
     }
   }
 
-  function onCategoryChange(category) {
+  function setCategory(category) {
     setForm((f) => {
       const pct = f.paymentSource.startsWith("card:")
         ? resolveRatePct(f.paymentSource.slice(5), category)
@@ -110,13 +120,39 @@ export default function TransactionsPage() {
     });
   }
 
+  async function onCategorySelect(value) {
+    if (value === ADD_NEW) {
+      const name = window.prompt("New category name:");
+      if (!name || !name.trim()) return;
+      try {
+        await categoriesApi.create(name.trim());
+        const cats = await categoriesApi.list();
+        setCategoryList(mergeCategories(cats));
+        setCategory(name.trim());
+      } catch (e) {
+        setError(e.message);
+      }
+      return;
+    }
+    setCategory(value);
+  }
+
+  function onMerchantChange(value) {
+    setField("merchant", value);
+    // Auto-fill category from this merchant's remembered default.
+    const def = merchantDefaults.find(
+      (m) => m.merchant.toLowerCase() === value.trim().toLowerCase()
+    );
+    if (def) setCategory(def.category);
+  }
+
   function startEdit(t) {
     setEditingId(t.id);
     setError(null);
     setForm({
       transaction_date: t.transaction_date,
       merchant: t.merchant ?? "",
-      category: t.category ?? CATEGORIES[0],
+      category: t.category ?? "",
       type: Number(t.amount) < 0 ? "purchase" : "refund",
       amount: String(Math.abs(Number(t.amount))),
       profile_id: t.profile_id,
@@ -141,10 +177,11 @@ export default function TransactionsPage() {
     const magnitude = Math.abs(Number(form.amount));
     const amount = form.type === "purchase" ? -magnitude : magnitude;
     const rate = isCard && form.cashbackPct !== "" ? Number(form.cashbackPct) / 100 : null;
+    const merchant = form.merchant.trim() || null;
     const payload = {
       transaction_date: form.transaction_date,
-      merchant: form.merchant.trim() || null,
-      category: form.category,
+      merchant,
+      category: form.category || null,
       amount,
       profile_id: form.profile_id,
       credit_card_id: isCard ? sourceId : null,
@@ -152,10 +189,12 @@ export default function TransactionsPage() {
       cashback_rate: rate,
     };
     try {
-      if (editingId) {
-        await transactionsApi.update(editingId, payload);
-      } else {
-        await transactionsApi.create(payload);
+      if (editingId) await transactionsApi.update(editingId, payload);
+      else await transactionsApi.create(payload);
+      // Remember this merchant's category for next time.
+      if (merchant && form.category) {
+        await merchantCategoriesApi.upsert(merchant, form.category);
+        setMerchantDefaults(await merchantCategoriesApi.list());
       }
       cancelEdit();
       setError(null);
@@ -199,13 +238,21 @@ export default function TransactionsPage() {
         />
         <input
           placeholder="Merchant"
+          list="merchant-options"
           value={form.merchant}
-          onChange={(e) => setField("merchant", e.target.value)}
+          onChange={(e) => onMerchantChange(e.target.value)}
         />
-        <select value={form.category} onChange={(e) => onCategoryChange(e.target.value)}>
-          {CATEGORIES.map((c) => (
+        <datalist id="merchant-options">
+          {merchantDefaults.map((m) => (
+            <option key={m.merchant} value={m.merchant} />
+          ))}
+        </datalist>
+        <select value={form.category} onChange={(e) => onCategorySelect(e.target.value)}>
+          <option value="">Category…</option>
+          {categoryList.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
+          <option value={ADD_NEW}>➕ Add new category…</option>
         </select>
         <select value={form.type} onChange={(e) => setField("type", e.target.value)}>
           <option value="purchase">Purchase</option>
@@ -247,13 +294,10 @@ export default function TransactionsPage() {
         />
         <button type="submit">{editingId ? "Save" : "Add"}</button>
         {editingId && (
-          <button type="button" onClick={cancelEdit}>
-            Cancel
-          </button>
+          <button type="button" onClick={cancelEdit}>Cancel</button>
         )}
       </form>
 
-      {/* Filters */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <select
           value={filters.profile_id}
@@ -280,7 +324,6 @@ export default function TransactionsPage() {
       </div>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
-
       {transactions.length === 0 && <p>No transactions match.</p>}
 
       {transactions.map((t) => (
@@ -299,9 +342,7 @@ export default function TransactionsPage() {
             <button onClick={() => togglePaid(t)}>
               {t.is_paid_back ? "Mark unpaid" : "Mark paid"}
             </button>
-            <button className="danger" onClick={() => handleDelete(t.id)}>
-              Delete
-            </button>
+            <button className="danger" onClick={() => handleDelete(t.id)}>Delete</button>
           </span>
         </div>
       ))}
