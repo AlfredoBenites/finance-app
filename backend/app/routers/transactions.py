@@ -1,5 +1,5 @@
 """CRUD + filtering endpoints for transactions. Scoped to the logged-in user."""
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,22 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.auth import get_current_user_id
 from app.database import supabase
 from app.models.transaction import Transaction, TransactionCreate, TransactionUpdate
+from app.services.calculations import compute_cashback
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 TABLE = "transactions"
-
-
-def compute_cashback(amount: Decimal, rate: Optional[Decimal]) -> Optional[Decimal]:
-    """Cashback earned on a transaction.
-
-    Purchases are negative, so we negate to make cashback on spending positive
-    (and a positive refund correctly produces negative/clawed-back cashback).
-    Returns None when there is no rate.
-    """
-    if rate is None:
-        return None
-    return (-amount * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _first_of_next_month(year: int, month: int) -> str:

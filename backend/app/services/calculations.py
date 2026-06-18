@@ -6,7 +6,8 @@ Keeping them pure (no DB access) makes them easy to read and test.
 Sign convention reminder: purchases are stored negative, refunds positive.
 So "debt" and "amount owed" are the NEGATED sum of unpaid transaction amounts.
 """
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Optional
 
 # Account types that count as spendable cash for "real available money".
 LIQUID_ACCOUNT_TYPES = {"checking", "savings", "cash"}
@@ -17,6 +18,18 @@ def _dec(value) -> Decimal:
     if value is None:
         return Decimal("0")
     return Decimal(str(value))
+
+
+def compute_cashback(amount: Decimal, rate: Optional[Decimal]) -> Optional[Decimal]:
+    """Cashback earned on a transaction (SPEC.md 9.3).
+
+    Purchases are stored negative, so we negate to make cashback on spending
+    positive (and a positive refund correctly produces negative/clawed-back
+    cashback). Returns None when there is no rate.
+    """
+    if rate is None:
+        return None
+    return (-amount * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def unpaid(transactions: list[dict]) -> list[dict]:
