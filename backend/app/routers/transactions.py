@@ -33,6 +33,7 @@ def list_transactions(
     credit_card_id: Optional[str] = None,
     category: Optional[str] = None,
     is_paid_back: Optional[bool] = None,
+    year: Optional[int] = Query(default=None, description="Filter by year, e.g. 2026"),
     month: Optional[str] = Query(default=None, description="Filter by month, format YYYY-MM"),
     search: Optional[str] = Query(default=None, description="Merchant name contains"),
 ):
@@ -46,6 +47,10 @@ def list_transactions(
         query = query.eq("category", category)
     if is_paid_back is not None:
         query = query.eq("is_paid_back", is_paid_back)
+    if year is not None:
+        query = query.gte("transaction_date", f"{year}-01-01").lt(
+            "transaction_date", f"{year + 1}-01-01"
+        )
     if month is not None:
         try:
             year_str, month_str = month.split("-")

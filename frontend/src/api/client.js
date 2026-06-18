@@ -64,11 +64,11 @@ export const accountsApi = {
 };
 
 export const dashboardApi = {
-  get: () => request("/api/dashboard"),
+  get: (year) => request(`/api/dashboard${year ? `?year=${year}` : ""}`),
 };
 
 export const incomeApi = {
-  list: () => request("/api/income"),
+  list: (year) => request(`/api/income${year ? `?year=${year}` : ""}`),
   create: (data) =>
     request("/api/income", { method: "POST", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/income/${id}`, { method: "DELETE" }),

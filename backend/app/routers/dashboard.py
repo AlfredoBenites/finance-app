@@ -3,7 +3,9 @@
 Fetches the user's rows once, then delegates all math to services.calculations.
 Returns plain floats so the frontend can display them directly.
 """
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 
 from app.auth import get_current_user_id
 from app.database import supabase
@@ -13,7 +15,10 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 @router.get("")
-def get_dashboard(user_id: str = Depends(get_current_user_id)):
+def get_dashboard(
+    user_id: str = Depends(get_current_user_id),
+    year: Optional[int] = Query(default=None, description="Scope to a year, e.g. 2026"),
+):
     def owned(table, columns="*"):
         return supabase.table(table).select(columns).eq("owner_id", user_id).execute().data
 
@@ -22,7 +27,15 @@ def get_dashboard(user_id: str = Depends(get_current_user_id)):
     accounts = owned("accounts")
     profiles = owned("profiles", "id, name")
     cards = owned("credit_cards", "id, name")
-    income_rows = owned("income", "amount")
+    income_rows = owned("income", "amount, income_date")
+
+    # Year scopes the transaction/income-derived numbers; account balances are
+    # always current (they aren't dated).
+    if year is not None:
+        prefix = f"{year}-"
+        transactions = [t for t in transactions if str(t["transaction_date"]).startswith(prefix)]
+        income_rows = [i for i in income_rows if str(i["income_date"]).startswith(prefix)]
+
     total_income = sum((calc._dec(i["amount"]) for i in income_rows), calc.Decimal("0"))
 
     profile_names = {p["id"]: p["name"] for p in profiles}
