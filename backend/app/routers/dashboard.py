@@ -22,6 +22,8 @@ def get_dashboard(user_id: str = Depends(get_current_user_id)):
     accounts = owned("accounts")
     profiles = owned("profiles", "id, name")
     cards = owned("credit_cards", "id, name")
+    income_rows = owned("income", "amount")
+    total_income = sum((calc._dec(i["amount"]) for i in income_rows), calc.Decimal("0"))
 
     profile_names = {p["id"]: p["name"] for p in profiles}
     card_names = {c["id"]: c["name"] for c in cards}
@@ -40,6 +42,7 @@ def get_dashboard(user_id: str = Depends(get_current_user_id)):
         ),
         "total_assets": float(calc.total_assets(accounts)),
         "net_worth": float(calc.net_worth(accounts, transactions)),
+        "total_income": float(total_income),
         "owed_by_profile": [
             {"profile_id": pid, "name": profile_names.get(pid, "Unknown"), "amount": float(amt)}
             for pid, amt in owed.items()

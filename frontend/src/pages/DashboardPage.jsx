@@ -46,6 +46,7 @@ export default function DashboardPage() {
     <div>
       <h1>Dashboard</h1>
 
+      <Stat label="Total income" value={data.total_income} />
       <Stat label="Total credit card debt" value={data.total_credit_card_debt} />
       <Stat label="Cashback earned" value={data.total_cashback_earned} />
       <Stat label="Cashback pending" value={data.total_cashback_pending} />

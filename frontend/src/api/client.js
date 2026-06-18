@@ -67,6 +67,13 @@ export const dashboardApi = {
   get: () => request("/api/dashboard"),
 };
 
+export const incomeApi = {
+  list: () => request("/api/income"),
+  create: (data) =>
+    request("/api/income", { method: "POST", body: JSON.stringify(data) }),
+  remove: (id) => request(`/api/income/${id}`, { method: "DELETE" }),
+};
+
 export const categoriesApi = {
   list: () => request("/api/categories"),
   create: (name) =>
