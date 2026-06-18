@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { dashboardApi } from "../api/client";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
+import usePersistedState from "../hooks/usePersistedState";
+
+function Toggle({ on, onClick, label }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ background: on ? "#2563eb" : "#9ca3af" }}
+    >
+      {label}: {on ? "on" : "off"}
+    </button>
+  );
+}
 
 const money = (n) =>
   `${n < 0 ? "-" : ""}$${Math.abs(Number(n)).toFixed(2)}`;
@@ -18,6 +30,8 @@ export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [year, setYear] = useState(CURRENT_YEAR);
+  const [hideRepayments, setHideRepayments] = usePersistedState("dash.hideRepayments", false);
+  const [onlyMyDebt, setOnlyMyDebt] = usePersistedState("dash.onlyMyDebt", false);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,7 +39,11 @@ export default function DashboardPage() {
     // / token settling), so retry once before showing an error.
     async function load(attempt = 0) {
       try {
-        const d = await dashboardApi.get(year === "all" ? undefined : year);
+        const d = await dashboardApi.get({
+          year: year === "all" ? undefined : year,
+          onlyPrimary: onlyMyDebt,
+          excludeRepayments: hideRepayments,
+        });
         if (!cancelled) setData(d);
       } catch (e) {
         if (attempt < 1) {
@@ -41,12 +59,18 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [year]);
+  }, [year, hideRepayments, onlyMyDebt]);
 
   const header = (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <h1>Dashboard</h1>
-      <YearSelect value={year} onChange={setYear} />
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h1>Dashboard</h1>
+        <YearSelect value={year} onChange={setYear} />
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+        <Toggle on={hideRepayments} onClick={() => setHideRepayments((v) => !v)} label="Hide repayments" />
+        <Toggle on={onlyMyDebt} onClick={() => setOnlyMyDebt((v) => !v)} label="Only my debt" />
+      </div>
     </div>
   );
 

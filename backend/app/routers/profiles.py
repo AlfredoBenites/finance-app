@@ -97,6 +97,25 @@ def delete_profile(profile_id: str, user_id: str = Depends(get_current_user_id))
     return None
 
 
+@router.post("/{profile_id}/make-primary", response_model=Profile)
+def make_primary(profile_id: str, user_id: str = Depends(get_current_user_id)):
+    """Mark this profile as 'me' (and unmark any others)."""
+    owned = (
+        supabase.table(TABLE).select("id").eq("id", profile_id).eq("owner_id", user_id).execute()
+    )
+    if not owned.data:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    supabase.table(TABLE).update({"is_primary": False}).eq("owner_id", user_id).execute()
+    result = (
+        supabase.table(TABLE)
+        .update({"is_primary": True})
+        .eq("id", profile_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
+    return result.data[0]
+
+
 @router.get("/{profile_id}/summary")
 def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)):
     """Totals and activity for one profile (SPEC.md 7.4).

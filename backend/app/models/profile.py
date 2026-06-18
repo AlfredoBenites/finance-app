@@ -28,5 +28,6 @@ class Profile(BaseModel):
     color: Optional[str] = None
     avatar_initials: Optional[str] = None
     is_active: bool
+    is_primary: bool = False
     created_at: datetime
     updated_at: datetime

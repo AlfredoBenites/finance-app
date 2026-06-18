@@ -45,6 +45,15 @@ export default function ProfilesPage() {
     }
   }
 
+  async function handleMakePrimary(id) {
+    try {
+      await profilesApi.makePrimary(id);
+      loadProfiles();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function viewSummary(id) {
     try {
       setError(null);
@@ -100,8 +109,11 @@ export default function ProfilesPage() {
 
       {profiles.map((p) => (
         <div className="card" key={p.id}>
-          <span>{p.name}</span>
+          <span>{p.name}{p.is_primary ? " (me)" : ""}</span>
           <span style={{ display: "flex", gap: 6 }}>
+            {!p.is_primary && (
+              <button onClick={() => handleMakePrimary(p.id)}>This is me</button>
+            )}
             <button onClick={() => viewSummary(p.id)}>View</button>
             <button className="danger" onClick={() => handleDelete(p.id)}>
               Delete

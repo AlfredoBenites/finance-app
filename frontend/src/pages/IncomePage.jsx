@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { incomeApi, accountsApi } from "../api/client";
 import { INCOME_TYPES } from "../constants";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
+import usePersistedState from "../hooks/usePersistedState";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (n) => `$${Number(n).toFixed(2)}`;
@@ -21,6 +22,7 @@ export default function IncomePage() {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState(null);
   const [year, setYear] = useState(CURRENT_YEAR);
+  const [hideRepayments, setHideRepayments] = usePersistedState("income.hideRepayments", false);
 
   const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "—";
 
@@ -77,15 +79,26 @@ export default function IncomePage() {
     }
   }
 
-  const total = income.reduce((s, i) => s + Number(i.amount), 0);
+  const visible = hideRepayments
+    ? income.filter((i) => (i.category || "") !== "Repayment")
+    : income;
+  const total = visible.reduce((s, i) => s + Number(i.amount), 0);
   const byType = {};
-  for (const i of income) byType[i.category || "Other"] = (byType[i.category || "Other"] || 0) + Number(i.amount);
+  for (const i of visible) byType[i.category || "Other"] = (byType[i.category || "Other"] || 0) + Number(i.amount);
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Income</h1>
-        <YearSelect value={year} onChange={setYear} />
+        <span style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setHideRepayments((v) => !v)}
+            style={{ background: hideRepayments ? "#2563eb" : "#9ca3af" }}
+          >
+            Hide repayments: {hideRepayments ? "on" : "off"}
+          </button>
+          <YearSelect value={year} onChange={setYear} />
+        </span>
       </div>
 
       <form onSubmit={handleAdd} style={{ flexWrap: "wrap" }}>
@@ -145,8 +158,8 @@ export default function IncomePage() {
         ))}
 
       <h2>Entries</h2>
-      {income.length === 0 && <p>No income yet.</p>}
-      {income.map((i) => (
+      {visible.length === 0 && <p>No income yet.</p>}
+      {visible.map((i) => (
         <div className="card" key={i.id}>
           <span>
             {i.income_date} · {i.source} · {i.category || "—"}
