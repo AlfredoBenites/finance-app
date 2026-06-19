@@ -14,6 +14,7 @@ class BucketCreate(BaseModel):
     category: Optional[str] = None
     notes: Optional[str] = None
     credit_card_id: Optional[str] = None
+    account_id: Optional[str] = None
     is_active: bool = True
     is_completed: bool = False
 
@@ -38,6 +39,7 @@ class Bucket(BaseModel):
     category: Optional[str] = None
     notes: Optional[str] = None
     credit_card_id: Optional[str] = None
+    account_id: Optional[str] = None
     is_active: bool
     is_completed: bool
     created_at: datetime

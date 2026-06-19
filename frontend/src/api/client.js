@@ -53,6 +53,10 @@ export const bucketsApi = {
   update: (id, data) =>
     request(`/api/buckets/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/buckets/${id}`, { method: "DELETE" }),
+  // move money within an account: { account_id, from, to, amount } where
+  // from/to are a bucket id or "unallocated".
+  transfer: (data) =>
+    request("/api/buckets/transfer", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export const accountsApi = {
