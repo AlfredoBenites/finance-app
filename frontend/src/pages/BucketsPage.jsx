@@ -85,6 +85,15 @@ export default function BucketsPage() {
     }
   }
 
+  async function reassignBucket(bucketId, accountId) {
+    try {
+      await bucketsApi.update(bucketId, { account_id: accountId });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function handleDelete(id) {
     try {
       await bucketsApi.remove(id);
@@ -141,6 +150,15 @@ export default function BucketsPage() {
                 </span>
                 <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <strong>{money(b.current_amount)}</strong>
+                  <select
+                    value={a.id}
+                    title="Move bucket to another account"
+                    onChange={(e) => reassignBucket(b.id, e.target.value)}
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                  </select>
                   {!b.credit_card_id && (
                     <button className="danger" onClick={() => handleDelete(b.id)}>Delete</button>
                   )}
