@@ -5,7 +5,7 @@ different people, savings "buckets," account balances, and net worth — a clean
 faster alternative to managing the same data in a spreadsheet.
 
 Built as an MVP with correctness of the data model and calculations as the first
-priority. See [`SPEC.md`](./SPEC.md) for the full product spec.
+priority.
 
 ## Features
 
@@ -46,7 +46,6 @@ role key**, which bypasses RLS.
 
 ```
 finance-app/
-├── SPEC.md                  product spec (source of truth)
 ├── .env.local               backend secrets (gitignored)
 ├── .env.example             backend env template
 ├── backend/
@@ -59,7 +58,7 @@ finance-app/
 │       ├── db_errors.py     maps DB errors to HTTP responses
 │       ├── models/          Pydantic request/response models
 │       ├── routers/         one file per resource + dashboard
-│       └── services/        pure calculation functions (SPEC section 9)
+│       └── services/        pure calculation functions
 └── frontend/
     ├── .env.local           VITE_API_BASE_URL (gitignored)
     └── src/
@@ -138,7 +137,7 @@ The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
 7. Mark the transaction **paid back** — card debt drops and its cashback moves from
    pending to earned.
 
-## Key calculations (SPEC section 9)
+## Key calculations
 
 - **Amount sign:** purchases are stored negative, refunds/income positive.
 - **Card debt / amount owed:** negated sum of unpaid transaction amounts.
@@ -155,10 +154,10 @@ The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
 
 ## Known limitations / future work
 
-- Dashboard is global; per-profile dashboards (SPEC 7.4) are partially covered by the
+- Dashboard is global; per-profile dashboards are partially covered by the
   profile summary view.
 - "Real available money" treats all active buckets as set-aside (no "core savings"
   exemption field yet).
 - "Owed by profile" includes every profile (no is-owner flag).
-- Not yet built (deferred per spec): authentication, Plaid/bank sync, recurring
+- Not yet built (deferred for later): authentication, Plaid/bank sync, recurring
   expenses, charts, CSV/Sheets import.
