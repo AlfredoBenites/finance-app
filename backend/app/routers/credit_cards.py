@@ -57,6 +57,11 @@ def upgrade_card(
         "new_card_id": payload.new_card_id,
         "upgraded_on": payload.upgraded_on.isoformat() if payload.upgraded_on else None,
     }).execute()
+    # The archived card no longer needs a payoff bucket; removing it just frees
+    # its allocation back to the account (balances are manual, so no money lost).
+    supabase.table("buckets").delete().eq("credit_card_id", card_id).eq(
+        "owner_id", user_id
+    ).execute()
     result = (
         supabase.table(TABLE)
         .update({"is_active": False})
@@ -95,6 +100,8 @@ def create_credit_card(
         "category": "Credit Card Payoff",
         "current_amount": "0",
         "credit_card_id": card["id"],
+        "is_active": True,
+        "is_completed": False,
     }).execute()
     return card
 
