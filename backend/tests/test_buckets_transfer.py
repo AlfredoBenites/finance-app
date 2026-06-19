@@ -42,3 +42,11 @@ def test_cannot_overdraw_a_bucket(api):
     api.client.post("/api/buckets/transfer", json={"account_id": acct, "from": "unallocated", "to": gas, "amount": 100})
     r = api.client.post("/api/buckets/transfer", json={"account_id": acct, "from": gas, "to": payoff, "amount": 200})
     assert r.status_code == 400
+
+
+def test_can_move_bucket_to_another_account(api):
+    acct, gas, _ = _setup(api)
+    acct2 = api.client.post("/api/accounts", json={"name": "HYSA", "balance": 0}).json()["id"]
+    r = api.client.put(f"/api/buckets/{gas}", json={"account_id": acct2})
+    assert r.status_code == 200
+    assert r.json()["account_id"] == acct2

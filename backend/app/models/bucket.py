@@ -26,6 +26,8 @@ class BucketUpdate(BaseModel):
     due_date: Optional[date] = None
     category: Optional[str] = None
     notes: Optional[str] = None
+    credit_card_id: Optional[str] = None
+    account_id: Optional[str] = None
     is_active: Optional[bool] = None
     is_completed: Optional[bool] = None
 
