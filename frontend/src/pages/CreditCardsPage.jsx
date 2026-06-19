@@ -18,11 +18,37 @@ export default function CreditCardsPage() {
   const [rulePct, setRulePct] = useState("");
   const [categoryList, setCategoryList] = useState(FALLBACK_CATEGORIES);
 
+  const [upgrades, setUpgrades] = useState([]);
+  const [upgrading, setUpgrading] = useState(null); // cardId whose upgrade form is open
+  const [upgradeNew, setUpgradeNew] = useState("");
+  const [upgradeDate, setUpgradeDate] = useState("");
+
   async function loadCards() {
     try {
       const list = await creditCardsApi.list();
       setCards(list);
       setDates(Object.fromEntries(list.map((c) => [c.id, c.due_day ?? ""])));
+      setUpgrades(await creditCardsApi.upgrades());
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleUpgrade(oldId) {
+    if (!upgradeNew) {
+      setError("Pick the card it was upgraded to.");
+      return;
+    }
+    try {
+      await creditCardsApi.upgrade(oldId, {
+        new_card_id: upgradeNew,
+        upgraded_on: upgradeDate || null,
+      });
+      setUpgrading(null);
+      setUpgradeNew("");
+      setUpgradeDate("");
+      setError(null);
+      loadCards();
     } catch (e) {
       setError(e.message);
     }
@@ -119,6 +145,9 @@ export default function CreditCardsPage() {
     }
   }
 
+  const activeCards = cards.filter((c) => c.is_active !== false);
+  const archivedCards = cards.filter((c) => c.is_active === false);
+
   return (
     <div>
       <h1>Credit Cards</h1>
@@ -154,9 +183,9 @@ export default function CreditCardsPage() {
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
 
-      {cards.length === 0 && <p>No credit cards yet.</p>}
+      {activeCards.length === 0 && <p>No credit cards yet.</p>}
 
-      {cards.map((c) => (
+      {activeCards.map((c) => (
         <div key={c.id}>
           <div className="card">
             <span>
@@ -170,11 +199,28 @@ export default function CreditCardsPage() {
               <button onClick={() => toggleRules(c.id)}>
                 {openCardId === c.id ? "Hide categories" : "Cashback by category"}
               </button>
+              <button onClick={() => setUpgrading(upgrading === c.id ? null : c.id)}>
+                Upgrade
+              </button>
               <button className="danger" onClick={() => handleDelete(c.id)}>
                 Delete
               </button>
             </span>
           </div>
+
+          {upgrading === c.id && (
+            <div style={{ margin: "0 0 8px 16px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <small>Upgraded to</small>
+              <select value={upgradeNew} onChange={(e) => setUpgradeNew(e.target.value)}>
+                <option value="">Card…</option>
+                {activeCards.filter((o) => o.id !== c.id).map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+              <input type="date" value={upgradeDate} onChange={(e) => setUpgradeDate(e.target.value)} />
+              <button onClick={() => handleUpgrade(c.id)}>Confirm (archives {c.name})</button>
+            </div>
+          )}
 
           <div style={{ margin: "0 0 8px 16px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <small>Statement due day</small>
@@ -221,6 +267,29 @@ export default function CreditCardsPage() {
           )}
         </div>
       ))}
+
+      {archivedCards.length > 0 && (
+        <>
+          <h2>Archived cards</h2>
+          {archivedCards.map((c) => (
+            <div className="card" key={c.id}>
+              <span><small>{c.name}{c.issuer ? ` · ${c.issuer}` : ""} (upgraded)</small></span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {upgrades.length > 0 && (
+        <>
+          <h2>Upgrade history</h2>
+          {upgrades.map((u) => (
+            <div className="card" key={u.id}>
+              <span>{u.old_name} → {u.new_name}</span>
+              <small>{u.upgraded_on || ""}</small>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
