@@ -116,6 +116,19 @@ def test_dashboard_exclude_repayments(api):
     assert api.client.get("/api/dashboard?exclude_repayments=true").json()["total_income"] == 1000.0
 
 
+def test_card_upgrade_archives_old_and_records_history(api):
+    api.login(*USER_A)
+    old = api.client.post("/api/credit-cards", json={"name": "Platinum"}).json()["id"]
+    new = api.client.post("/api/credit-cards", json={"name": "Quicksilver"}).json()["id"]
+    r = api.client.post(f"/api/credit-cards/{old}/upgrade",
+                        json={"new_card_id": new, "upgraded_on": "2026-06-01"})
+    assert r.status_code == 200
+    assert r.json()["is_active"] is False
+    hist = api.client.get("/api/credit-cards/upgrades").json()
+    assert len(hist) == 1
+    assert hist[0]["old_name"] == "Platinum" and hist[0]["new_name"] == "Quicksilver"
+
+
 def test_card_payoff_bucket_reduces_displayed_debt(api):
     api.login(*USER_A)
     pid = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]

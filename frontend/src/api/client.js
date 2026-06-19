@@ -43,7 +43,12 @@ export const creditCardsApi = {
   list: () => request("/api/credit-cards"),
   create: (data) =>
     request("/api/credit-cards", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, data) =>
+    request(`/api/credit-cards/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/credit-cards/${id}`, { method: "DELETE" }),
+  upgrade: (id, data) =>
+    request(`/api/credit-cards/${id}/upgrade`, { method: "POST", body: JSON.stringify(data) }),
+  upgrades: () => request("/api/credit-cards/upgrades"),
 };
 
 export const bucketsApi = {

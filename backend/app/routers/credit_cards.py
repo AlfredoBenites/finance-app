@@ -1,5 +1,10 @@
 """CRUD endpoints for credit cards. Scoped to the logged-in user."""
+from datetime import date
+from typing import Optional
+
 from postgrest.exceptions import APIError
+
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -11,6 +16,55 @@ from app.models.credit_card import CreditCard, CreditCardCreate, CreditCardUpdat
 router = APIRouter(prefix="/api/credit-cards", tags=["credit_cards"])
 
 TABLE = "credit_cards"
+
+
+class UpgradeRequest(BaseModel):
+    new_card_id: str
+    upgraded_on: Optional[date] = None
+
+
+@router.get("/upgrades")
+def list_upgrades(user_id: str = Depends(get_current_user_id)):
+    """History of card upgrades (old -> new), with card names."""
+    rows = supabase.table("card_upgrades").select("*").eq("owner_id", user_id).execute().data
+    cards = supabase.table(TABLE).select("id, name").eq("owner_id", user_id).execute().data
+    names = {c["id"]: c["name"] for c in cards}
+    return [
+        {
+            "id": r["id"],
+            "old_name": names.get(r["old_card_id"], "Unknown"),
+            "new_name": names.get(r["new_card_id"], "Unknown"),
+            "upgraded_on": r["upgraded_on"],
+        }
+        for r in sorted(rows, key=lambda r: r.get("upgraded_on") or "", reverse=True)
+    ]
+
+
+@router.post("/{card_id}/upgrade", response_model=CreditCard)
+def upgrade_card(
+    card_id: str, payload: UpgradeRequest, user_id: str = Depends(get_current_user_id)
+):
+    """Record an upgrade to another card and archive the old one (keep history)."""
+    if card_id == payload.new_card_id:
+        raise HTTPException(status_code=400, detail="A card can't be upgraded to itself")
+    for cid in (card_id, payload.new_card_id):
+        owned = supabase.table(TABLE).select("id").eq("id", cid).eq("owner_id", user_id).execute()
+        if not owned.data:
+            raise HTTPException(status_code=404, detail="Credit card not found")
+    supabase.table("card_upgrades").insert({
+        "owner_id": user_id,
+        "old_card_id": card_id,
+        "new_card_id": payload.new_card_id,
+        "upgraded_on": payload.upgraded_on.isoformat() if payload.upgraded_on else None,
+    }).execute()
+    result = (
+        supabase.table(TABLE)
+        .update({"is_active": False})
+        .eq("id", card_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
+    return result.data[0]
 
 
 @router.get("", response_model=list[CreditCard])
