@@ -1,16 +1,16 @@
 # Personal Finance / Credit Card Tracker
 
-A personal finance web app for tracking credit-card spending, cashback, money owed
-by different people, savings "buckets," account balances, and net worth. It replaces
-a Google Sheets system with something cleaner and faster to update.
+A full-stack web app for tracking credit-card spending, cashback, money owed by
+different people, savings "buckets," account balances, and net worth — a cleaner,
+faster alternative to managing the same data in a spreadsheet.
 
 Built as an MVP with correctness of the data model and calculations as the first
 priority. See [`SPEC.md`](./SPEC.md) for the full product spec.
 
 ## Features
 
-- **Profiles** — people whose spending you track (e.g. you, Mom). Profiles are
-  separate but can share the same credit cards.
+- **Profiles** — separate people whose spending is tracked independently. Profiles
+  are distinct but can share the same credit cards.
 - **Credit cards** — shared across profiles; balances are calculated from transactions.
 - **Transactions** — each belongs to one profile and one card, with per-transaction
   cashback and a "paid me back" flag. Filter by profile, card, category, month,
@@ -124,7 +124,7 @@ The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
 
 ## How to manually test
 
-1. **Profiles** — add "Mom" and "Alfredo".
+1. **Profiles** — add two profiles.
 2. **Credit Cards** — add "Chase Freedom", issuer "Chase", cashback `1.5`.
 3. **Transactions** — add an unpaid purchase: merchant "Publix", Groceries, type
    Purchase, amount `52.40`, pick a profile and card, cashback `1.5`. It stores as
@@ -161,4 +161,4 @@ The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
   exemption field yet).
 - "Owed by profile" includes every profile (no is-owner flag).
 - Not yet built (deferred per spec): authentication, Plaid/bank sync, recurring
-  expenses, charts, CSV/Sheets import, statement/due-date tracking.
+  expenses, charts, CSV/Sheets import.
