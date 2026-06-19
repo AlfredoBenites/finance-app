@@ -127,6 +127,9 @@ def test_card_upgrade_archives_old_and_records_history(api):
     hist = api.client.get("/api/credit-cards/upgrades").json()
     assert len(hist) == 1
     assert hist[0]["old_name"] == "Platinum" and hist[0]["new_name"] == "Quicksilver"
+    # the archived card's payoff bucket is removed
+    buckets = api.client.get("/api/buckets").json()
+    assert not any(b.get("credit_card_id") == old for b in buckets)
 
 
 def test_card_payoff_bucket_reduces_displayed_debt(api):

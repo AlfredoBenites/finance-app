@@ -170,11 +170,15 @@ export default function BucketsPage() {
                 <small>Move</small>
                 <select value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
                   <option value="">From…</option>
-                  {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  {options.filter((o) => o.id !== m.to).map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
                 </select>
                 <select value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
                   <option value="">To…</option>
-                  {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  {options.filter((o) => o.id !== m.from).map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
                 </select>
                 <input
                   type="number" step="0.01" placeholder="$" style={{ width: 90 }}
