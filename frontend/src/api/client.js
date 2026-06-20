@@ -140,6 +140,8 @@ export const accountsApi = {
   update: (id, data) =>
     request(`/api/accounts/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/accounts/${id}`, { method: "DELETE" }),
+  transfer: (data) =>
+    request("/api/accounts/transfer", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export const dashboardApi = {

@@ -1,5 +1,8 @@
 """CRUD endpoints for accounts. Scoped to the logged-in user."""
+from decimal import Decimal
+
 from postgrest.exceptions import APIError
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -11,6 +14,12 @@ from app.models.account import Account, AccountCreate, AccountUpdate
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 TABLE = "accounts"
+
+
+class AccountTransfer(BaseModel):
+    from_account_id: str
+    to_account_id: str
+    amount: Decimal
 
 
 @router.get("", response_model=list[Account])
@@ -31,6 +40,35 @@ def create_account(payload: AccountCreate, user_id: str = Depends(get_current_us
     data["owner_id"] = user_id
     result = supabase.table(TABLE).insert(data).execute()
     return result.data[0]
+
+
+@router.post("/transfer")
+def transfer_between_accounts(payload: AccountTransfer, user_id: str = Depends(get_current_user_id)):
+    """Move money from one account to another (e.g. bank -> brokerage). Comes out
+    of the source's UNallocated money so bucket envelopes stay intact."""
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    if payload.from_account_id == payload.to_account_id:
+        raise HTTPException(status_code=400, detail="Pick two different accounts")
+
+    src = supabase.table(TABLE).select("balance, name").eq("id", payload.from_account_id).eq("owner_id", user_id).execute().data
+    dst = supabase.table(TABLE).select("balance").eq("id", payload.to_account_id).eq("owner_id", user_id).execute().data
+    if not src or not dst:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    src_balance = Decimal(str(src[0]["balance"]))
+    bks = supabase.table("buckets").select("current_amount").eq("owner_id", user_id).eq("account_id", payload.from_account_id).execute().data
+    allocated = sum((Decimal(str(b["current_amount"])) for b in bks), Decimal("0"))
+    unallocated = src_balance - allocated
+    if payload.amount > unallocated:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {unallocated} is unallocated in {src[0]['name']}; move money out of its buckets first.",
+        )
+
+    supabase.table(TABLE).update({"balance": str(src_balance - payload.amount)}).eq("id", payload.from_account_id).eq("owner_id", user_id).execute()
+    supabase.table(TABLE).update({"balance": str(Decimal(str(dst[0]["balance"])) + payload.amount)}).eq("id", payload.to_account_id).eq("owner_id", user_id).execute()
+    return {"ok": True, "transferred": float(payload.amount)}
 
 
 @router.get("/{account_id}", response_model=Account)

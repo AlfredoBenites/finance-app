@@ -12,6 +12,7 @@ export default function AccountsPage() {
   const [isAsset, setIsAsset] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [edit, setEdit] = useState({});
+  const [xfer, setXfer] = useState({ from: "", to: "", amount: "" });
   const [error, setError] = useState(null);
 
   async function load() {
@@ -25,6 +26,26 @@ export default function AccountsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  async function doTransfer(e) {
+    e.preventDefault();
+    if (!xfer.from || !xfer.to || !xfer.amount) {
+      setError("Pick both accounts and an amount to transfer.");
+      return;
+    }
+    try {
+      await accountsApi.transfer({
+        from_account_id: xfer.from,
+        to_account_id: xfer.to,
+        amount: Number(xfer.amount),
+      });
+      setXfer({ from: "", to: "", amount: "" });
+      setError(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -105,6 +126,23 @@ export default function AccountsPage() {
           <input type="checkbox" checked={isAsset} onChange={(e) => setIsAsset(e.target.checked)} /> Asset
         </label>
         <button type="submit">Add</button>
+      </form>
+
+      <form onSubmit={doTransfer} style={{ flexWrap: "wrap", alignItems: "center" }}>
+        <small>Transfer</small>
+        <input type="number" step="0.01" style={{ width: 90 }} value={xfer.amount}
+          onChange={(e) => setXfer((s) => ({ ...s, amount: e.target.value }))} placeholder="$" />
+        <small>from</small>
+        <select value={xfer.from} onChange={(e) => setXfer((s) => ({ ...s, from: e.target.value }))}>
+          <option value="">account…</option>
+          {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <small>to</small>
+        <select value={xfer.to} onChange={(e) => setXfer((s) => ({ ...s, to: e.target.value }))}>
+          <option value="">account…</option>
+          {activeAccounts.filter((a) => a.id !== xfer.from).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <button type="submit">Transfer</button>
       </form>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
