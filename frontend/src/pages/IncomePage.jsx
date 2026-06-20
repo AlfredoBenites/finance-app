@@ -6,6 +6,8 @@ import usePersistedState from "../hooks/usePersistedState";
 import { money } from "../format";
 
 const today = () => new Date().toISOString().slice(0, 10);
+const ADD_NEW = "__add_new__";
+const uniqSorted = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 const EMPTY = {
   income_date: today(),
@@ -19,6 +21,8 @@ const EMPTY = {
 export default function IncomePage() {
   const [income, setIncome] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  // All income (any year) used only to populate the source/category dropdowns.
+  const [pool, setPool] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState(null);
   const [year, setYear] = useState(CURRENT_YEAR);
@@ -39,12 +43,42 @@ export default function IncomePage() {
     }
   }
 
+  async function loadPool() {
+    try {
+      setPool(await incomeApi.list()); // all years
+    } catch (e) {
+      // dropdown suggestions are best-effort; ignore failures
+    }
+  }
+
   useEffect(() => {
     load();
   }, [year]);
 
+  useEffect(() => {
+    loadPool();
+  }, []);
+
   function setField(name, value) {
     setForm((f) => ({ ...f, [name]: value }));
+  }
+
+  function onCategorySelect(value) {
+    if (value === ADD_NEW) {
+      const name = window.prompt("New income category name:");
+      if (name && name.trim()) setField("category", name.trim());
+      return;
+    }
+    setField("category", value);
+  }
+
+  function onSourceSelect(value) {
+    if (value === ADD_NEW) {
+      const name = window.prompt("New source name:");
+      if (name && name.trim()) setField("source", name.trim());
+      return;
+    }
+    setField("source", value);
   }
 
   async function handleAdd(e) {
@@ -65,6 +99,7 @@ export default function IncomePage() {
       setForm({ ...EMPTY, income_date: form.income_date });
       setError(null);
       load();
+      loadPool(); // a new source/category becomes a future suggestion
     } catch (e) {
       setError(e.message);
     }
@@ -74,10 +109,16 @@ export default function IncomePage() {
     try {
       await incomeApi.remove(id);
       load();
+      loadPool();
     } catch (e) {
       setError(e.message);
     }
   }
+
+  // Dropdown options: known defaults + everything used before + the current
+  // (possibly just-added) value, so a freshly typed entry stays selected.
+  const categoryOptions = uniqSorted([...INCOME_TYPES, ...pool.map((e) => e.category), form.category]);
+  const sourceOptions = uniqSorted([...pool.map((e) => e.source), form.source]);
 
   const visible = hideRepayments
     ? income.filter((i) => (i.category || "") !== "Repayment")
@@ -107,15 +148,18 @@ export default function IncomePage() {
           value={form.income_date}
           onChange={(e) => setField("income_date", e.target.value)}
         />
-        <input
-          placeholder="Source (e.g., paycheck, gig, gift)"
-          value={form.source}
-          onChange={(e) => setField("source", e.target.value)}
-        />
-        <select value={form.category} onChange={(e) => setField("category", e.target.value)}>
-          {INCOME_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
+        <select value={form.source} onChange={(e) => onSourceSelect(e.target.value)}>
+          <option value="">Source…</option>
+          {sourceOptions.map((sName) => (
+            <option key={sName} value={sName}>{sName}</option>
           ))}
+          <option value={ADD_NEW}>➕ Add new source…</option>
+        </select>
+        <select value={form.category} onChange={(e) => onCategorySelect(e.target.value)}>
+          {categoryOptions.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+          <option value={ADD_NEW}>➕ Add new category…</option>
         </select>
         <input
           type="number"
