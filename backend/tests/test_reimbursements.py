@@ -29,6 +29,9 @@ def test_suggests_own_and_others_paid_charges(api):
     assert by_profile["Mom"]["amount"] == 100.0
     assert by_profile["Mom"]["source_bucket_id"] == moms  # Mom's default bucket
     assert by_profile["Me"]["amount"] == 40.0
+    # each suggestion lists the paid charges that add up to its total
+    assert len(by_profile["Mom"]["transactions"]) == 1
+    assert by_profile["Mom"]["transactions"][0]["amount"] == -100.0
 
 
 def test_allocate_moves_source_to_dest_and_clears(api):
