@@ -118,7 +118,7 @@ export default function BucketsPage() {
         <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New bucket name" />
         <select value={newAccount} onChange={(e) => setNewAccount(e.target.value)}>
           <option value="">In account…</option>
-          {accounts.map((a) => (
+          {accounts.filter((a) => a.is_active !== false).map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
         </select>
@@ -155,7 +155,7 @@ export default function BucketsPage() {
                     title="Move bucket to another account"
                     onChange={(e) => reassignBucket(b.id, e.target.value)}
                   >
-                    {accounts.map((acc) => (
+                    {accounts.filter((acc) => acc.is_active !== false || acc.id === a.id).map((acc) => (
                       <option key={acc.id} value={acc.id}>{acc.name}</option>
                     ))}
                   </select>
@@ -208,7 +208,7 @@ export default function BucketsPage() {
                   onChange={(e) => setAssign((s) => ({ ...s, [b.id]: e.target.value }))}
                 >
                   <option value="">Account…</option>
-                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {accounts.filter((a) => a.is_active !== false).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
                 <button onClick={() => assignAccount(b.id)}>Assign</button>
               </span>

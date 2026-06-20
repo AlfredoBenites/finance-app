@@ -91,7 +91,7 @@ export default function PaymentsPage() {
         </select>
         <select value={accountId} onChange={(e) => { setAccountId(e.target.value); setBucketId(""); }}>
           <option value="">From account…</option>
-          {accounts.map((a) => (
+          {accounts.filter((a) => a.is_active !== false).map((a) => (
             <option key={a.id} value={a.id}>{a.name} ({money(a.balance)})</option>
           ))}
         </select>

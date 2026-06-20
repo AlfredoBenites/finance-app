@@ -78,9 +78,22 @@ export default function AccountsPage() {
     }
   }
 
+  async function setClosed(id, closed) {
+    try {
+      await accountsApi.update(id, { is_active: !closed });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  const activeAccounts = accounts.filter((a) => a.is_active !== false);
+  const closedAccounts = accounts.filter((a) => a.is_active === false);
+
   return (
     <div>
       <h1>Accounts / Net Worth</h1>
+      <p><small>Closed accounts are kept for history but don't count toward net worth.</small></p>
 
       <form onSubmit={handleAdd} style={{ flexWrap: "wrap" }}>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Account name (e.g., Chase Checking)" />
@@ -97,7 +110,7 @@ export default function AccountsPage() {
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
       {accounts.length === 0 && <p>No accounts yet.</p>}
 
-      {accounts.map((a) =>
+      {activeAccounts.map((a) =>
         editingId === a.id ? (
           <div className="card" key={a.id}>
             <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -121,10 +134,23 @@ export default function AccountsPage() {
             <span>{a.name} · {a.account_type} · {money(a.balance)} · {a.is_asset ? "asset" : "liability"}</span>
             <span style={{ display: "flex", gap: 6 }}>
               <button onClick={() => startEdit(a)}>Edit</button>
+              <button onClick={() => setClosed(a.id, true)}>Close</button>
               <button className="danger" onClick={() => handleDelete(a.id)}>Delete</button>
             </span>
           </div>
         )
+      )}
+
+      {closedAccounts.length > 0 && (
+        <>
+          <h2>Closed accounts</h2>
+          {closedAccounts.map((a) => (
+            <div className="card" key={a.id}>
+              <span><small>{a.name} · {a.account_type} · {money(a.balance)} (closed)</small></span>
+              <button onClick={() => setClosed(a.id, false)}>Reopen</button>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );
