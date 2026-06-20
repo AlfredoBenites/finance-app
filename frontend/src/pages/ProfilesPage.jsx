@@ -12,6 +12,7 @@ export default function ProfilesPage() {
   const [summary, setSummary] = useState(null);
   const [shares, setShares] = useState([]);
   const [shareEmail, setShareEmail] = useState("");
+  const [stmtLang, setStmtLang] = useState("en");
 
   async function loadProfiles() {
     try {
@@ -92,7 +93,7 @@ export default function ProfilesPage() {
     try {
       setError(null);
       const s = await profilesApi.statement(id);
-      writeStatement(win, s);
+      writeStatement(win, s, stmtLang);
     } catch (e) {
       win.close();
       setError(e.message);
@@ -134,6 +135,14 @@ export default function ProfilesPage() {
       </form>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+        <small>Statement language:</small>
+        <select value={stmtLang} onChange={(e) => setStmtLang(e.target.value)}>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
 
       {profiles.length === 0 && <p>No profiles yet.</p>}
 
