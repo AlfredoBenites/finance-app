@@ -2,7 +2,9 @@
 // Fall back to the local backend if the env var didn't load.
 import { supabase } from "../auth/supabaseClient";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// 127.0.0.1 (not "localhost") forces IPv4 to match uvicorn's default bind;
+// "localhost" can resolve to IPv6 first and intermittently drop requests on macOS.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 // Supabase rotates refresh tokens, so two refreshes firing at once race and one
 // fails. When several requests load a page in parallel and all see an expired
