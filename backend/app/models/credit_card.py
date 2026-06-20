@@ -15,6 +15,7 @@ class CreditCardCreate(BaseModel):
     default_cashback_rate: Optional[Decimal] = None
     color: Optional[str] = None
     due_day: Optional[int] = None
+    statement_day: Optional[int] = None
     is_active: bool = True
 
 
@@ -27,6 +28,7 @@ class CreditCardUpdate(BaseModel):
     default_cashback_rate: Optional[Decimal] = None
     color: Optional[str] = None
     due_day: Optional[int] = None
+    statement_day: Optional[int] = None
     is_active: Optional[bool] = None
 
 
@@ -40,6 +42,7 @@ class CreditCard(BaseModel):
     default_cashback_rate: Optional[Decimal] = None
     color: Optional[str] = None
     due_day: Optional[int] = None
+    statement_day: Optional[int] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime

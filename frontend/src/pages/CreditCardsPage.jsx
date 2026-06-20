@@ -8,7 +8,9 @@ export default function CreditCardsPage() {
   const [issuer, setIssuer] = useState("");
   const [cashbackPct, setCashbackPct] = useState("");
   const [dueDay, setDueDay] = useState("");
+  const [stmtDay, setStmtDay] = useState("");
   const [dates, setDates] = useState({}); // {cardId: dueDayString}
+  const [closes, setCloses] = useState({}); // {cardId: statementDayString}
   const [error, setError] = useState(null);
 
   // Which card's category-rules panel is open, and that card's rules.
@@ -28,6 +30,7 @@ export default function CreditCardsPage() {
       const list = await creditCardsApi.list();
       setCards(list);
       setDates(Object.fromEntries(list.map((c) => [c.id, c.due_day ?? ""])));
+      setCloses(Object.fromEntries(list.map((c) => [c.id, c.statement_day ?? ""])));
       setUpgrades(await creditCardsApi.upgrades());
     } catch (e) {
       setError(e.message);
@@ -56,9 +59,11 @@ export default function CreditCardsPage() {
 
   async function saveDates(cardId) {
     const d = dates[cardId];
+    const s = closes[cardId];
     try {
       await creditCardsApi.update(cardId, {
         due_day: d === "" || d == null ? null : Number(d),
+        statement_day: s === "" || s == null ? null : Number(s),
       });
       loadCards();
     } catch (e) {
@@ -87,11 +92,13 @@ export default function CreditCardsPage() {
         issuer: issuer.trim() || null,
         default_cashback_rate: rate,
         due_day: dueDay === "" ? null : Number(dueDay),
+        statement_day: stmtDay === "" ? null : Number(stmtDay),
       });
       setName("");
       setIssuer("");
       setCashbackPct("");
       setDueDay("");
+      setStmtDay("");
       loadCards();
     } catch (e) {
       setError(e.message);
@@ -174,9 +181,17 @@ export default function CreditCardsPage() {
           type="number"
           min="1"
           max="31"
+          value={stmtDay}
+          onChange={(e) => setStmtDay(e.target.value)}
+          placeholder="Statement closing day (1-31)"
+        />
+        <input
+          type="number"
+          min="1"
+          max="31"
           value={dueDay}
           onChange={(e) => setDueDay(e.target.value)}
-          placeholder="Statement due day (1-31)"
+          placeholder="Payment due day (1-31)"
         />
         <button type="submit">Add</button>
       </form>
@@ -223,7 +238,11 @@ export default function CreditCardsPage() {
           )}
 
           <div style={{ margin: "0 0 8px 16px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            <small>Statement due day</small>
+            <small>Statement closes day</small>
+            <input type="number" min="1" max="31" style={{ width: 56 }}
+              value={closes[c.id] ?? ""}
+              onChange={(e) => setCloses((m) => ({ ...m, [c.id]: e.target.value }))} />
+            <small>Payment due day</small>
             <input type="number" min="1" max="31" style={{ width: 56 }}
               value={dates[c.id] ?? ""}
               onChange={(e) => setDates((m) => ({ ...m, [c.id]: e.target.value }))} />
