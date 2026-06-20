@@ -19,24 +19,41 @@ function refreshSessionOnce() {
   return refreshInFlight;
 }
 
-async function request(path, options = {}, retried = false) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// `retry` tracks the two independent one-shot retries: `auth` (refresh an
+// expired token) and `net` (a dropped/failed fetch). Pages like Pay-a-card fire
+// several requests at once, so a single transient network blip shouldn't take
+// down the whole page — retry it once before surfacing an error.
+async function request(path, options = {}, retry = { auth: true, net: true }) {
   // Attach the Supabase access token so the backend can identify the user.
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    ...options,
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      ...options,
+    });
+  } catch (err) {
+    // fetch() itself rejected — a network-level failure (the browser shows this
+    // as "Load failed" / "Failed to fetch"), not an error the server returned.
+    if (retry.net) {
+      await sleep(400);
+      return request(path, options, { ...retry, net: false });
+    }
+    throw new Error("Couldn't reach the server. Make sure the backend is running, then try again.");
+  }
 
   // The access token can expire while a tab sits idle. On the first 401,
   // force a token refresh and retry once before surfacing an error.
-  if (res.status === 401 && !retried) {
+  if (res.status === 401 && retry.auth) {
     await refreshSessionOnce();
-    return request(path, options, true);
+    return request(path, options, { ...retry, auth: false });
   }
 
   if (!res.ok) {
