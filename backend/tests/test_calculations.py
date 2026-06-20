@@ -29,8 +29,11 @@ def acct(balance, account_type="checking", is_asset=True, active=True):
     }
 
 
-def bucket(current, active=True):
-    return {"current_amount": current, "is_active": active}
+def bucket(current, active=True, kind="set_aside", card=None):
+    b = {"current_amount": current, "is_active": active, "kind": kind}
+    if card:
+        b["credit_card_id"] = card
+    return b
 
 
 # --- _dec --------------------------------------------------------------------
@@ -129,6 +132,20 @@ def test_net_worth_excludes_buckets_but_includes_liabilities():
     txns = [txn(-400)]
     # 1500 assets - (400 card debt + 200 other liability) = 900
     assert calc.net_worth(accounts, txns) == Decimal("900")
+
+
+def test_net_worth_subtracts_not_mine_buckets_only():
+    accounts = [acct("1000")]
+    buckets = [bucket("200", kind="not_mine"), bucket("300", kind="set_aside"), bucket("100", kind="spendable")]
+    # only the 'not_mine' 200 is subtracted; your own buckets stay in net worth
+    assert calc.net_worth(accounts, [], buckets) == Decimal("800")
+
+
+def test_real_available_keeps_spendable_buckets_but_drops_others():
+    accounts = [acct("1000", "checking")]
+    buckets = [bucket("200", kind="set_aside"), bucket("100", kind="spendable"), bucket("50", kind="not_mine")]
+    # spendable stays available; set_aside + not_mine are subtracted: 1000 - 250 = 750
+    assert calc.real_available_money(accounts, [], buckets) == Decimal("750")
 
 
 def test_spec_9_7_worked_example():

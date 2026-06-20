@@ -167,16 +167,33 @@ def total_bucket_money(buckets: list[dict]) -> Decimal:
 
 
 def non_card_bucket_money(buckets: list[dict]) -> Decimal:
-    """Active buckets NOT tied to a credit card.
+    """Active non-card buckets that reduce real available money.
 
-    Card payoff buckets are earmarked for card debt (which is already subtracted
-    from available money), so they don't reduce available money a second time.
+    Excludes card payoff buckets (their debt is already subtracted, so counting
+    them again would double-count) and buckets marked 'spendable' (the user
+    treats that money as freely available). 'set_aside' / 'not_mine' / unset
+    buckets are subtracted.
     """
     return sum(
         (
             _dec(b["current_amount"])
             for b in buckets
-            if b.get("is_active") and not b.get("credit_card_id")
+            if b.get("is_active")
+            and not b.get("credit_card_id")
+            and b.get("kind") != "spendable"
+        ),
+        Decimal("0"),
+    )
+
+
+def not_mine_bucket_money(buckets: list[dict]) -> Decimal:
+    """Active buckets holding someone else's money (kind='not_mine'). This cash
+    sits in your accounts but isn't yours, so it's subtracted from net worth."""
+    return sum(
+        (
+            _dec(b["current_amount"])
+            for b in buckets
+            if b.get("is_active") and b.get("kind") == "not_mine"
         ),
         Decimal("0"),
     )
@@ -240,11 +257,13 @@ def real_available_money(
     )
 
 
-def net_worth(accounts: list[dict], transactions: list[dict]) -> Decimal:
-    """Assets minus liabilities. Buckets do NOT reduce net worth (SPEC 9.8).
+def net_worth(accounts: list[dict], transactions: list[dict], buckets: list[dict] = ()) -> Decimal:
+    """Assets minus liabilities. Buckets you own do NOT reduce net worth (they're
+    money already inside your accounts) — but 'not_mine' buckets (cash you hold
+    for someone else) are subtracted, since that money isn't yours.
 
     Card debt here is what you owe the bank (paid_to_bank), not reimbursement
-    status — so paying a card reduces cash and debt together, leaving net worth
-    unchanged."""
+    status, and `transactions` should be scoped to your own profile so other
+    people's spending on your cards doesn't count against you."""
     liabilities = total_bank_debt(transactions) + other_liabilities(accounts)
-    return total_assets(accounts) - liabilities
+    return total_assets(accounts) - liabilities - not_mine_bucket_money(buckets)

@@ -17,6 +17,7 @@ class BucketCreate(BaseModel):
     account_id: Optional[str] = None
     is_active: bool = True
     is_completed: bool = False
+    kind: str = "set_aside"  # spendable | set_aside | not_mine
 
 
 class BucketUpdate(BaseModel):
@@ -30,6 +31,7 @@ class BucketUpdate(BaseModel):
     account_id: Optional[str] = None
     is_active: Optional[bool] = None
     is_completed: Optional[bool] = None
+    kind: Optional[str] = None
 
 
 class Bucket(BaseModel):
@@ -44,5 +46,6 @@ class Bucket(BaseModel):
     account_id: Optional[str] = None
     is_active: bool
     is_completed: bool
+    kind: str = "set_aside"
     created_at: datetime
     updated_at: datetime

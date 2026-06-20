@@ -2,12 +2,21 @@ import { useEffect, useState } from "react";
 import { bucketsApi, accountsApi, creditCardsApi } from "../api/client";
 import { money } from "../format";
 
+// How a bucket's money flows into net worth / real available money.
+const KINDS = [
+  { value: "spendable", label: "Mine · spendable", hint: "counts in net worth AND real available money" },
+  { value: "set_aside", label: "Mine · set aside", hint: "counts in net worth, NOT in real available money" },
+  { value: "not_mine", label: "Not mine (holding)", hint: "excluded from net worth AND real available money" },
+];
+const kindLabel = (k) => (KINDS.find((x) => x.value === k) || KINDS[1]).label;
+
 export default function BucketsPage() {
   const [buckets, setBuckets] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
   const [newName, setNewName] = useState("");
   const [newAccount, setNewAccount] = useState("");
+  const [newKind, setNewKind] = useState("set_aside");
   const [moves, setMoves] = useState({}); // accountId -> {from, to, amount}
   const [assign, setAssign] = useState({}); // bucketId -> accountId
   const [editNames, setEditNames] = useState({}); // bucketId -> name
@@ -54,7 +63,7 @@ export default function BucketsPage() {
       return;
     }
     try {
-      await bucketsApi.create({ name: newName.trim(), account_id: newAccount, current_amount: 0 });
+      await bucketsApi.create({ name: newName.trim(), account_id: newAccount, current_amount: 0, kind: newKind });
       setNewName("");
       setError(null);
       load();
@@ -91,6 +100,15 @@ export default function BucketsPage() {
   async function reassignBucket(bucketId, accountId) {
     try {
       await bucketsApi.update(bucketId, { account_id: accountId });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function changeKind(bucketId, kind) {
+    try {
+      await bucketsApi.update(bucketId, { kind });
       load();
     } catch (e) {
       setError(e.message);
@@ -189,6 +207,9 @@ export default function BucketsPage() {
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
         </select>
+        <select value={newKind} onChange={(e) => setNewKind(e.target.value)} title={KINDS.find((k) => k.value === newKind)?.hint}>
+          {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+        </select>
         <button type="submit">Add bucket</button>
       </form>
 
@@ -271,6 +292,12 @@ export default function BucketsPage() {
                     <button onClick={() => renameBucket(b.id)}>Rename</button>
                   </span>
                   <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {!b.credit_card_id && (
+                      <select value={b.kind || "set_aside"} title={KINDS.find((k) => k.value === (b.kind || "set_aside"))?.hint}
+                        onChange={(e) => changeKind(b.id, e.target.value)}>
+                        {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                      </select>
+                    )}
                     <select value={a.id} title="Move to account" onChange={(e) => reassignBucket(b.id, e.target.value)}>
                       {activeAccounts.concat(a.is_active === false ? [a] : []).map((acc) => (
                         <option key={acc.id} value={acc.id}>{acc.name}</option>
@@ -281,7 +308,12 @@ export default function BucketsPage() {
                 </div>
               ) : (
                 <div className="card" key={b.id}>
-                  <span>{b.name}{b.credit_card_id ? ` · 💳 ${cardName(b.credit_card_id)}` : ""}</span>
+                  <span>
+                    {b.name}
+                    {b.credit_card_id
+                      ? ` · 💳 ${cardName(b.credit_card_id)}`
+                      : b.kind && b.kind !== "set_aside" ? ` · ${kindLabel(b.kind)}` : ""}
+                  </span>
                   <strong>{money(b.current_amount)}</strong>
                 </div>
               )
