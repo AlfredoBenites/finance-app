@@ -32,23 +32,42 @@ class AllocateRequest(BaseModel):
     dest_bucket_id: str
 
 
-def _allocations(user_id: str):
-    """Group not-yet-allocated paid card charges by (profile_id, card_id)."""
+def _allocation_groups(user_id: str):
+    """Not-yet-allocated paid card charges grouped by (profile_id, card_id),
+    with each group's total owed and the individual lines behind it."""
     txns = (
         supabase.table("transactions")
-        .select("amount, credit_card_id, profile_id, reimbursement_allocated")
+        .select(
+            "amount, credit_card_id, profile_id, reimbursement_allocated, "
+            "merchant, transaction_date, category, notes"
+        )
         .eq("owner_id", user_id)
         .eq("is_paid_back", True)
+        .order("transaction_date")
         .execute()
         .data
     )
-    totals: dict[tuple, Decimal] = {}
+    groups: dict[tuple, dict] = {}
     for t in txns:
         if not t.get("credit_card_id") or t.get("reimbursement_allocated"):
             continue
         key = (t["profile_id"], t["credit_card_id"])
-        totals[key] = totals.get(key, Decimal("0")) - Decimal(str(t["amount"]))
-    return {k: v for k, v in totals.items() if v > 0}
+        g = groups.setdefault(key, {"total": Decimal("0"), "lines": []})
+        amt = Decimal(str(t["amount"]))
+        g["total"] += -amt  # purchases are negative; owed is positive
+        g["lines"].append({
+            "transaction_date": t["transaction_date"],
+            "merchant": t.get("merchant"),
+            "category": t.get("category"),
+            "notes": t.get("notes"),
+            "amount": float(amt),
+        })
+    return {k: v for k, v in groups.items() if v["total"] > 0}
+
+
+def _allocations(user_id: str):
+    """(profile_id, card_id) -> total owed. Used by allocate/dismiss validation."""
+    return {k: v["total"] for k, v in _allocation_groups(user_id).items()}
 
 
 @router.get("/reimbursements")
@@ -57,8 +76,8 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
 
     Each proposes moving the money from that profile's default bucket into the
     card's payoff bucket (both overridable in the UI)."""
-    totals = _allocations(user_id)
-    if not totals:
+    groups = _allocation_groups(user_id)
+    if not groups:
         return []
     profiles = {p["id"]: p for p in supabase.table("profiles").select("id, name, default_bucket_id").eq("owner_id", user_id).execute().data}
     cards = {c["id"]: c["name"] for c in supabase.table("credit_cards").select("id, name").eq("owner_id", user_id).execute().data}
@@ -66,7 +85,7 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
     bk_name = {b["id"]: b["name"] for b in bks}
     payoff = {b["credit_card_id"]: b["id"] for b in bks if b["credit_card_id"] and b["account_id"]}
     out = []
-    for (pid, cid), amount in totals.items():
+    for (pid, cid), g in groups.items():
         prof = profiles.get(pid, {})
         src = prof.get("default_bucket_id")
         dest = payoff.get(cid)
@@ -79,7 +98,8 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
             "source_bucket_name": bk_name.get(src),
             "dest_bucket_id": dest,
             "dest_bucket_name": bk_name.get(dest),
-            "amount": float(amount),
+            "amount": float(g["total"]),
+            "transactions": g["lines"],
         })
     return out
 

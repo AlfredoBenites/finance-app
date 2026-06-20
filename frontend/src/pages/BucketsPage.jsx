@@ -206,7 +206,7 @@ export default function BucketsPage() {
         const sel = allocSel[key] || { source: r.source_bucket_id || "", dest: r.dest_bucket_id || "" };
         const setSel = (field, value) => setAllocSel((s) => ({ ...s, [key]: { ...sel, [field]: value } }));
         return (
-          <div className="card" key={key} style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff" }}>
+          <div className="card" key={key} style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff", flexWrap: "wrap" }}>
             <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               Move <strong>{money(r.amount)}</strong> ({r.profile_name}'s {r.card_name}) from
               <select value={sel.source} onChange={(e) => setSel("source", e.target.value)}>
@@ -223,6 +223,21 @@ export default function BucketsPage() {
               <button onClick={() => allocate(r, sel)} disabled={busy}>Allocate</button>
               <button onClick={() => dismiss(r)} disabled={busy} title="Decline this suggestion">✕</button>
             </span>
+            {(r.transactions || []).length > 0 && (
+              <details style={{ flexBasis: "100%", marginTop: 6 }}>
+                <summary style={{ cursor: "pointer", fontSize: 13, color: "#1e3a8a" }}>
+                  {r.transactions.length} transaction{r.transactions.length === 1 ? "" : "s"} marked paid
+                </summary>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
+                  {r.transactions.map((t, i) => (
+                    <li key={i}>
+                      {t.transaction_date} · {t.merchant || "—"} · <strong>{money(-t.amount)}</strong>
+                      {t.notes ? ` · ${t.notes}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
           </div>
         );
       })}
