@@ -28,10 +28,20 @@ form {
   margin-bottom: 24px;
 }
 
-input {
+input,
+select {
+  box-sizing: border-box;
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 6px;
+  background: #fff;
+}
+
+/* Fixed width so a select doesn't grow (and reflow the row) when its options
+   load a moment after the page renders. Long labels truncate when closed but
+   show fully when the dropdown is open. */
+select {
+  width: 160px;
 }
 
 button {

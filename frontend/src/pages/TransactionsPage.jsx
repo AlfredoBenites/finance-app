@@ -41,6 +41,8 @@ export default function TransactionsPage() {
   const [filters, setFilters] = useState({
     profile_id: "", is_paid_back: "", search: "", year: CURRENT_YEAR,
   });
+  // Applied client-side on the loaded list. "card:<id>" or "account:<id>".
+  const [sourceFilter, setSourceFilter] = useState("");
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.name ?? "—";
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "—";
@@ -229,6 +231,14 @@ export default function TransactionsPage() {
     }
   }
 
+  const visibleTransactions = sourceFilter
+    ? transactions.filter((t) =>
+        sourceFilter.startsWith("card:")
+          ? t.credit_card_id === sourceFilter.slice(5)
+          : t.account_id === sourceFilter.slice(8)
+      )
+    : transactions;
+
   return (
     <div>
       <h1>Expenses</h1>
@@ -323,6 +333,19 @@ export default function TransactionsPage() {
           <option value="false">Unpaid only</option>
           <option value="true">Paid only</option>
         </select>
+        <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+          <option value="">All sources</option>
+          <optgroup label="Credit cards">
+            {cards.map((c) => (
+              <option key={c.id} value={`card:${c.id}`}>{c.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Accounts (bank / cash)">
+            {accounts.map((a) => (
+              <option key={a.id} value={`account:${a.id}`}>{a.name}</option>
+            ))}
+          </optgroup>
+        </select>
         <input
           placeholder="Search merchant"
           value={filters.search}
@@ -331,9 +354,9 @@ export default function TransactionsPage() {
       </div>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
-      {transactions.length === 0 && <p>No transactions match.</p>}
+      {visibleTransactions.length === 0 && <p>No transactions match.</p>}
 
-      {transactions.map((t) => (
+      {visibleTransactions.map((t) => (
         <div className="card" key={t.id}>
           <span>
             {t.transaction_date} · {t.merchant || "—"} · {t.category || "—"}
