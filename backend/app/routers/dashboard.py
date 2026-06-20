@@ -26,11 +26,12 @@ def get_dashboard(
     def owned(table, columns="*"):
         return supabase.table(table).select(columns).eq("owner_id", user_id).execute().data
 
-    transactions = owned("transactions")
+    all_transactions = owned("transactions")  # unfiltered; statement cycles ignore the year filter
+    transactions = all_transactions
     buckets = owned("buckets")
     accounts = owned("accounts")
     profiles = owned("profiles", "id, name, is_primary")
-    cards = owned("credit_cards", "id, name, due_day")
+    cards = owned("credit_cards", "id, name, due_day, statement_day")
     income_rows = owned("income", "amount, income_date, category")
 
     # Year scopes the transaction/income-derived numbers; account balances are
@@ -62,23 +63,38 @@ def get_dashboard(
     # you've SAVED toward it (paying the card via the Payments tab is what
     # reduces the debt). owed already excludes reimbursed charges.
     savings = calc.card_bucket_savings(buckets)
+
+    # Current statement balance per card (charges in the most-recently-closed
+    # billing cycle) for cards that have a statement closing day set. This is
+    # what's actually due to the bank — independent of reimbursement status.
+    today = date.today()
+    statement_by_card = {}
+    for c in cards:
+        sd = c.get("statement_day")
+        if sd:
+            card_txns = [t for t in all_transactions if t.get("credit_card_id") == c["id"]]
+            statement_by_card[c["id"]] = calc.statement_balance(card_txns, int(sd), today)
+
     debt_by_card = []
     total_debt = calc.Decimal("0")
-    for cid, owed_amt in debts.items():
+    card_ids = set(debts) | {cid for cid, v in statement_by_card.items() if v > 0}
+    for cid in card_ids:
+        owed_amt = debts.get(cid, calc.Decimal("0"))
         total_debt += owed_amt
+        stmt = statement_by_card.get(cid)
         debt_by_card.append({
             "credit_card_id": cid,
             "name": card_names.get(cid, "Unknown"),
             "owed": float(owed_amt),
             "saved": float(savings.get(cid, calc.Decimal("0"))),
             "balance": float(owed_amt),
+            "statement": float(stmt) if stmt is not None else None,
         })
     debt_by_card.sort(key=lambda d: -d["balance"])
 
     # Upcoming payment reminders: the full balance owed to the bank, due on each
     # card's due day. (Uses all profiles' charges — you pay the bank the total.)
-    full_debts = calc.debt_by_card(transactions)
-    today = date.today()
+    full_debts = calc.debt_by_card(all_transactions)
 
     def next_due(day):
         def on(y, m):
@@ -91,14 +107,19 @@ def get_dashboard(
 
     upcoming_payments = []
     for c in cards:
-        owed_amt = float(full_debts.get(c["id"], calc.Decimal("0")))
-        if c.get("due_day") and owed_amt > 0:
+        # With a statement day, the upcoming payment is the closed statement
+        # balance (what's due to the bank); otherwise fall back to total unpaid.
+        if c.get("statement_day"):
+            amt = float(statement_by_card.get(c["id"], calc.Decimal("0")))
+        else:
+            amt = float(full_debts.get(c["id"], calc.Decimal("0")))
+        if c.get("due_day") and amt > 0:
             nd = next_due(int(c["due_day"]))
             upcoming_payments.append({
                 "name": c["name"],
                 "due_date": nd.isoformat(),
                 "days_until": (nd - today).days,
-                "amount": owed_amt,
+                "amount": amt,
             })
     upcoming_payments.sort(key=lambda x: x["days_until"])
 

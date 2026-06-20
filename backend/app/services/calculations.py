@@ -6,6 +6,8 @@ Keeping them pure (no DB access) makes them easy to read and test.
 Sign convention reminder: purchases are stored negative, refunds positive.
 So "debt" and "amount owed" are the NEGATED sum of unpaid transaction amounts.
 """
+import calendar
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
@@ -60,6 +62,38 @@ def debt_by_card(transactions: list[dict]) -> dict[str, Decimal]:
             continue  # account purchase, not card debt
         totals[cid] = totals.get(cid, Decimal("0")) - _dec(t["amount"])
     return totals
+
+
+def statement_window(statement_day: int, today: date) -> tuple:
+    """The (open, close] dates of the most-recently-closed billing cycle.
+
+    close = the most recent statement_day on or before today; open = the
+    statement_day one month earlier. Days past a month's length clamp to its
+    last day (e.g. a 31 statement_day closes on Feb 28)."""
+    def on(y: int, m: int) -> date:
+        return date(y, m, min(statement_day, calendar.monthrange(y, m)[1]))
+
+    close = on(today.year, today.month)
+    if close > today:  # this month's close hasn't happened yet
+        y, m = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+        close = on(y, m)
+    y, m = (close.year - 1, 12) if close.month == 1 else (close.year, close.month - 1)
+    return on(y, m), close
+
+
+def statement_balance(transactions: list[dict], statement_day: int, today: date) -> Decimal:
+    """What's on the current statement: charges in the most-recently-closed
+    billing cycle (refunds in the window reduce it). Assumes prior statements
+    were paid in full. `transactions` should already be one card's rows."""
+    open_, close = statement_window(statement_day, today)
+    total = Decimal("0")
+    for t in transactions:
+        if not t.get("credit_card_id"):
+            continue
+        d = date.fromisoformat(str(t["transaction_date"]))
+        if open_ < d <= close:
+            total += -_dec(t["amount"])
+    return total
 
 
 def owed_by_profile(transactions: list[dict]) -> dict[str, Decimal]:

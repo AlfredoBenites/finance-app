@@ -160,3 +160,37 @@ def test_compute_cashback_refund_claws_back():
 def test_compute_cashback_rounds_to_cents():
     # 52.40 * 0.015 = 0.786 -> rounds to 0.79
     assert calc.compute_cashback(Decimal("-52.40"), Decimal("0.015")) == Decimal("0.79")
+
+
+# --- statement balance -------------------------------------------------------
+
+from datetime import date
+
+
+def _charge(amount, d, card="c1"):
+    return {"amount": amount, "transaction_date": d, "credit_card_id": card}
+
+
+def test_statement_window_picks_last_closed_cycle():
+    # statement closes on the 29th; today June 20 -> last close was May 29,
+    # cycle opens the prior close (Apr 29).
+    open_, close = calc.statement_window(29, date(2026, 6, 20))
+    assert (open_, close) == (date(2026, 4, 29), date(2026, 5, 29))
+
+
+def test_statement_balance_sums_only_the_closed_cycle():
+    txns = [
+        _charge("-100", "2026-04-29"),  # on/before open -> previous statement
+        _charge("-200", "2026-04-30"),  # in cycle
+        _charge("-300", "2026-05-29"),  # close day -> in cycle
+        _charge("50", "2026-05-15"),    # refund in cycle reduces it
+        _charge("-999", "2026-05-30"),  # after close -> next statement
+    ]
+    # cycle (Apr 29, May 29] = 200 + 300 - 50 = 450
+    assert calc.statement_balance(txns, 29, date(2026, 6, 20)) == Decimal("450")
+
+
+def test_statement_window_clamps_to_short_months():
+    # a 31 statement day in a 30-day month clamps to the last day
+    open_, close = calc.statement_window(31, date(2026, 5, 1))
+    assert close == date(2026, 4, 30)

@@ -9,6 +9,7 @@ export default function PaymentsPage() {
   const [accounts, setAccounts] = useState([]);
   const [buckets, setBuckets] = useState([]);
   const [owedByCard, setOwedByCard] = useState({});
+  const [statementByCard, setStatementByCard] = useState({});
   const [history, setHistory] = useState([]);
   const [error, setError] = useState(null);
 
@@ -31,6 +32,7 @@ export default function PaymentsPage() {
       setAccounts(a);
       setBuckets(b);
       setOwedByCard(Object.fromEntries((dash.debt_by_card || []).map((d) => [d.credit_card_id, d.owed])));
+      setStatementByCard(Object.fromEntries((dash.debt_by_card || []).map((d) => [d.credit_card_id, d.statement])));
       setHistory(hist);
     } catch (e) {
       setError(e.message);
@@ -43,7 +45,10 @@ export default function PaymentsPage() {
 
   function onCardChange(id) {
     setCardId(id);
-    setAmount(owedByCard[id] != null ? String(owedByCard[id]) : "");
+    // Prefer the current statement balance (what's due to the bank); fall back
+    // to total unpaid for cards without a statement closing day.
+    const prefill = statementByCard[id] != null ? statementByCard[id] : owedByCard[id];
+    setAmount(prefill != null ? String(prefill) : "");
   }
 
   async function handlePay(e) {
@@ -78,6 +83,8 @@ export default function PaymentsPage() {
       <p><small>
         Settle a card's charges by drawing money from an account (and a bucket).
         The card's debt drops, and the money leaves the bucket + account balance.
+        If a card has a statement closing day set, the amount pre-fills with its
+        current statement balance (what's due to the bank).
       </small></p>
 
       <form onSubmit={handlePay} style={{ flexWrap: "wrap" }}>
@@ -85,7 +92,10 @@ export default function PaymentsPage() {
           <option value="">Card…</option>
           {cards.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}{owedByCard[c.id] ? ` (owes ${money(owedByCard[c.id])})` : ""}
+              {c.name}
+              {statementByCard[c.id] != null
+                ? ` (statement ${money(statementByCard[c.id])})`
+                : owedByCard[c.id] ? ` (owes ${money(owedByCard[c.id])})` : ""}
             </option>
           ))}
         </select>
