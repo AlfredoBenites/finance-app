@@ -126,6 +126,47 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
     return {"ok": True, "allocated": float(amount)}
 
 
+class DismissRequest(BaseModel):
+    profile_id: str
+    credit_card_id: str
+
+
+def _mark_handled(user_id: str, profile_id=None, card_id=None):
+    """Mark paid card charges as allocated (handled) without moving money."""
+    rows = (
+        supabase.table("transactions")
+        .select("id, profile_id, credit_card_id, reimbursement_allocated")
+        .eq("owner_id", user_id)
+        .eq("is_paid_back", True)
+        .execute()
+        .data
+    )
+    for t in rows:
+        if not t.get("credit_card_id") or t.get("reimbursement_allocated"):
+            continue
+        if profile_id and t["profile_id"] != profile_id:
+            continue
+        if card_id and t["credit_card_id"] != card_id:
+            continue
+        supabase.table("transactions").update({"reimbursement_allocated": True}).eq(
+            "id", t["id"]
+        ).eq("owner_id", user_id).execute()
+
+
+@router.post("/dismiss-reimbursement")
+def dismiss_reimbursement(payload: DismissRequest, user_id: str = Depends(get_current_user_id)):
+    """Decline one suggestion (mark that profile+card's charges handled)."""
+    _mark_handled(user_id, payload.profile_id, payload.credit_card_id)
+    return {"ok": True}
+
+
+@router.post("/dismiss-all-reimbursements")
+def dismiss_all_reimbursements(user_id: str = Depends(get_current_user_id)):
+    """Decline all current suggestions."""
+    _mark_handled(user_id)
+    return {"ok": True}
+
+
 @router.post("/transfer")
 def transfer(payload: TransferRequest, user_id: str = Depends(get_current_user_id)):
     """Move money between buckets (and to/from unallocated) within one account.

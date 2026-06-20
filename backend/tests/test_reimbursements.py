@@ -43,6 +43,34 @@ def test_allocate_moves_source_to_dest_and_clears(api):
     assert not any(s["profile_id"] == mom for s in api.client.get("/api/buckets/reimbursements").json())
 
 
+def test_dismiss_clears_one_suggestion_without_moving_money(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -40,
+                    "profile_id": me, "credit_card_id": card, "is_paid_back": True})
+    r = api.client.post("/api/buckets/dismiss-reimbursement", json={"profile_id": mom, "credit_card_id": card})
+    assert r.status_code == 200
+    # money untouched
+    amounts = {b["id"]: float(b["current_amount"]) for b in api.client.get("/api/buckets").json()}
+    assert amounts[moms] == 500.0 and amounts[payoff] == 0.0
+    # Mom's suggestion gone, mine still there
+    sug = api.client.get("/api/buckets/reimbursements").json()
+    assert not any(s["profile_id"] == mom for s in sug)
+    assert any(s["profile_id"] == me for s in sug)
+
+
+def test_dismiss_all_clears_every_suggestion(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -40,
+                    "profile_id": me, "credit_card_id": card, "is_paid_back": True})
+    r = api.client.post("/api/buckets/dismiss-all-reimbursements")
+    assert r.status_code == 200
+    assert api.client.get("/api/buckets/reimbursements").json() == []
+
+
 def test_allocate_blocked_when_source_short(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -700,

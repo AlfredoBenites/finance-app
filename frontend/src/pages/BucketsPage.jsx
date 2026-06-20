@@ -115,6 +115,24 @@ export default function BucketsPage() {
     }
   }
 
+  async function dismiss(r) {
+    try {
+      await bucketsApi.dismissReimbursement({ profile_id: r.profile_id, credit_card_id: r.credit_card_id });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function dismissAll() {
+    try {
+      await bucketsApi.dismissAllReimbursements();
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function allocate(r, sel) {
     if (!sel.source || !sel.dest) {
       setError("Pick a source and destination bucket.");
@@ -163,6 +181,11 @@ export default function BucketsPage() {
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
 
+      {reimbursements.length > 0 && (
+        <div style={{ textAlign: "right", marginBottom: 4 }}>
+          <button onClick={dismissAll}>Dismiss all suggestions</button>
+        </div>
+      )}
       {reimbursements.map((r) => {
         const key = `${r.profile_id}:${r.credit_card_id}`;
         const sel = allocSel[key] || { source: r.source_bucket_id || "", dest: r.dest_bucket_id || "" };
@@ -181,7 +204,10 @@ export default function BucketsPage() {
                 {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </span>
-            <button onClick={() => allocate(r, sel)}>Allocate</button>
+            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button onClick={() => allocate(r, sel)}>Allocate</button>
+              <button onClick={() => dismiss(r)} title="Decline this suggestion">✕</button>
+            </span>
           </div>
         );
       })}
