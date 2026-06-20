@@ -9,18 +9,33 @@ priority.
 
 ## Features
 
-- **Profiles** — separate people whose spending is tracked independently. Profiles
-  are distinct but can share the same credit cards.
-- **Credit cards** — shared across profiles; balances are calculated from transactions.
-- **Transactions** — each belongs to one profile and one card, with per-transaction
-  cashback and a "paid me back" flag. Filter by profile, card, category, month,
-  paid/unpaid, and merchant search.
-- **Buckets** — money set aside for a purpose. Reduces available spending money but
-  not net worth.
-- **Accounts** — manually-entered bank/cash/investment balances (assets) and debts
-  (liabilities).
-- **Dashboard** — card debt, cashback earned/pending, bucket totals, real available
-  money, net worth, plus per-profile and per-card breakdowns.
+- **Auth & multi-tenancy** — email/password sign-in (Supabase Auth); each user's
+  data is private via row-level security. The frontend never touches the database
+  directly — it calls the backend, which uses the service-role key.
+- **Profiles** — separate people whose spending is tracked independently; they can
+  share the same credit cards. Mark one as "me" for a true personal net worth.
+- **Profile sharing** — share a profile read-only with another account by email
+  (Google-Docs style), so they can see what they owe.
+- **Credit cards** — shared across profiles; balances calculated from transactions;
+  per-category cashback rules that auto-fill on the expense form; statement due
+  dates with reminders; upgrade history (archive an old card, keep its data).
+- **Expenses** — each belongs to a profile and a credit card *or* a bank account,
+  with per-transaction cashback and a "paid back" flag. Filter by profile, card,
+  category, year, paid/unpaid, and merchant search.
+- **Income** — track money in (jobs, gigs, tips, gifts, cashback) per account.
+- **Accounts** — manual bank/cash/investment balances; close/archive accounts
+  without losing their history.
+- **Buckets (envelope budgeting)** — buckets live inside an account and carve up its
+  balance; move money between them, never more than the account actually holds.
+- **Pay a card** — settle a card's charges by drawing from a chosen account + bucket.
+- **Smart allocation** — marking a charge paid suggests moving the money from a
+  per-profile default bucket into the card's payoff bucket.
+- **Dashboard** — card debt, income, cashback earned/pending, bucket totals, real
+  available money, net worth, owed-by-profile, debt-by-card, and upcoming-payment
+  reminders. Year filter (defaults to the current year) plus "hide repayments" and
+  "only my debt" toggles.
+- **Data import** — one-off scripts import a full Google Sheets history (expenses +
+  income) with a dry-run reconciliation before anything is written.
 
 ## Tech stack
 
@@ -35,7 +50,7 @@ is the only thing that connects to the database.
 
 ```
 React (Vite)  --HTTP-->  FastAPI backend  --supabase-py-->  Supabase Postgres
-  frontend/                 backend/                          (5 tables, RLS on)
+  frontend/                 backend/                          (RLS on every table)
 ```
 
 Row Level Security is enabled on every table with no public policies, so the public
@@ -63,7 +78,8 @@ finance-app/
     ├── .env.local           VITE_API_BASE_URL (gitignored)
     └── src/
         ├── api/client.js    fetch wrappers for the backend
-        └── pages/           Dashboard, Profiles, Credit Cards, Transactions, Buckets, Accounts
+        └── pages/           Dashboard, Profiles, Credit Cards, Expenses, Income,
+                             Buckets, Pay a card, Accounts, Shared with me
 ```
 
 ## Prerequisites
@@ -76,15 +92,8 @@ finance-app/
 
 ### 1. Database
 
-In the Supabase **SQL Editor**, run the migration files in order:
-
-```
-backend/migrations/001_create_profiles.sql
-backend/migrations/002_create_credit_cards.sql
-backend/migrations/003_create_transactions.sql
-backend/migrations/004_create_buckets.sql
-backend/migrations/005_create_accounts.sql
-```
+In the Supabase **SQL Editor**, run every file in `backend/migrations/` in numeric
+order (`001_…` through `021_…`).
 
 ### 2. Backend environment
 
@@ -154,10 +163,10 @@ The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
 
 ## Known limitations / future work
 
-- Dashboard is global; per-profile dashboards are partially covered by the
-  profile summary view.
-- "Real available money" treats all active buckets as set-aside (no "core savings"
-  exemption field yet).
-- "Owed by profile" includes every profile (no is-owner flag).
-- Not yet built (deferred for later): authentication, Plaid/bank sync, recurring
-  expenses, charts, CSV/Sheets import.
+- Marking a charge "paid" means the person reimbursed you; it doesn't separately
+  model "owe the bank" vs "owed to you," so paying in the wrong order can need a
+  manual fix.
+- Reminders are in-app (shown on the dashboard); no email/push yet.
+- Not yet built (deferred): charts / "finance wrapped" summaries, a dedicated
+  monthly view, Plaid/bank sync (balances are tracked manually by choice),
+  recurring expenses, CSV export, dark mode.
