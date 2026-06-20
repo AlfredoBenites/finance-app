@@ -42,13 +42,16 @@ def get_dashboard(
         transactions = [t for t in transactions if str(t["transaction_date"]).startswith(prefix)]
         income_rows = [i for i in income_rows if str(i["income_date"]).startswith(prefix)]
 
-    # "only my debt": scope debt / net worth / available to your own profile, so
-    # money others owe you (e.g. Mom's charges) isn't counted as your debt.
-    debt_txns = transactions
-    if only_primary:
-        primary_id = next((p["id"] for p in profiles if p.get("is_primary")), None)
-        if primary_id is not None:
-            debt_txns = [t for t in transactions if t["profile_id"] == primary_id]
+    primary_id = next((p["id"] for p in profiles if p.get("is_primary")), None)
+    # Net worth & real-available are always YOUR money: scope to your own profile
+    # so other people's spending on your cards never counts against you.
+    my_txns = (
+        [t for t in transactions if t["profile_id"] == primary_id]
+        if primary_id is not None else transactions
+    )
+    # The displayed total card debt can optionally be narrowed the same way via
+    # the "only my debt" toggle (otherwise it's the full balance owed to banks).
+    debt_txns = my_txns if only_primary else transactions
 
     if exclude_repayments:
         income_rows = [i for i in income_rows if (i.get("category") or "") != "Repayment"]
@@ -133,10 +136,10 @@ def get_dashboard(
         "total_bucket_money": float(calc.total_bucket_money(buckets)),
         "liquid_cash": float(calc.liquid_cash(accounts)),
         "real_available_money": float(
-            calc.real_available_money(accounts, debt_txns, buckets)
+            calc.real_available_money(accounts, my_txns, buckets)
         ),
         "total_assets": float(calc.total_assets(accounts)),
-        "net_worth": float(calc.net_worth(accounts, debt_txns)),
+        "net_worth": float(calc.net_worth(accounts, my_txns, buckets)),
         "total_income": float(total_income),
         "owed_by_profile": [
             {"profile_id": pid, "name": profile_names.get(pid, "Unknown"), "amount": float(amt)}

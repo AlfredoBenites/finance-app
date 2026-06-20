@@ -129,6 +129,24 @@ def test_dashboard_only_my_debt_scopes_to_primary_profile(api):
     assert api.client.get("/api/dashboard?only_primary=true").json()["total_credit_card_debt"] == 100.0
 
 
+def test_net_worth_ignores_other_profiles_charges(api):
+    api.login(*USER_A)
+    me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    api.client.post(f"/api/profiles/{me}/make-primary")
+    mom = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    api.client.post("/api/accounts", json={"name": "Ally", "balance": 1000})  # asset
+    card = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                                               "profile_id": me, "credit_card_id": card})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -400,
+                                               "profile_id": mom, "credit_card_id": card})
+    d = api.client.get("/api/dashboard").json()
+    # net worth always personal: 1000 assets - 100 (my card debt). Mom's 400 excluded.
+    assert d["net_worth"] == 900.0
+    # but you still owe the bank the full 500 (you pay the issuer everything)
+    assert d["total_credit_card_debt"] == 500.0
+
+
 def test_dashboard_exclude_repayments(api):
     api.login(*USER_A)
     api.client.post("/api/income", json={"income_date": "2026-06-01", "source": "Job",
