@@ -23,11 +23,17 @@ function refreshSessionOnce() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// `retry` tracks the two independent one-shot retries: `auth` (refresh an
-// expired token) and `net` (a dropped/failed fetch). Pages like Pay-a-card fire
-// several requests at once, so a single transient network blip shouldn't take
-// down the whole page — retry it once before surfacing an error.
-async function request(path, options = {}, retry = { auth: true, net: true }) {
+// How many times to retry a dropped fetch before giving up. The local dev
+// server (single worker) can briefly reset a connection when a page fires
+// several requests at once, so a few backed-off retries make the rare blip
+// invisible. Backoff: 300ms, 600ms, 1200ms.
+const NET_RETRIES = 3;
+
+// `retry` tracks two independent retries: `auth` (refresh an expired token, once)
+// and `net` (a dropped/failed fetch, NET_RETRIES times with backoff). Pages like
+// Pay-a-card fire several requests at once, so a transient network blip shouldn't
+// take down the whole page.
+async function request(path, options = {}, retry = { auth: true, net: NET_RETRIES }) {
   // Attach the Supabase access token so the backend can identify the user.
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -44,9 +50,10 @@ async function request(path, options = {}, retry = { auth: true, net: true }) {
   } catch (err) {
     // fetch() itself rejected — a network-level failure (the browser shows this
     // as "Load failed" / "Failed to fetch"), not an error the server returned.
-    if (retry.net) {
-      await sleep(400);
-      return request(path, options, { ...retry, net: false });
+    if (retry.net > 0) {
+      const attempt = NET_RETRIES - retry.net; // 0, 1, 2
+      await sleep(300 * 2 ** attempt);
+      return request(path, options, { ...retry, net: retry.net - 1 });
     }
     throw new Error("Couldn't reach the server. Make sure the backend is running, then try again.");
   }
