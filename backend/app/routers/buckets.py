@@ -178,6 +178,111 @@ def dismiss_all_reimbursements(user_id: str = Depends(get_current_user_id)):
     return {"ok": True}
 
 
+# --- income -> bucket allocation --------------------------------------------
+
+class AllocateIncomeRequest(BaseModel):
+    income_id: str
+    bucket_id: str
+
+
+class DismissIncomeRequest(BaseModel):
+    income_id: str
+
+
+@router.get("/income-allocations")
+def list_income_allocations(user_id: str = Depends(get_current_user_id)):
+    """Income recorded into an account that hasn't been put in a bucket yet.
+
+    Each suggestion lets you drop the income into a bucket in the same account."""
+    rows = (
+        supabase.table("income")
+        .select("id, source, amount, account_id, income_date, bucket_allocated")
+        .eq("owner_id", user_id)
+        .order("income_date", desc=True)
+        .execute()
+        .data
+    )
+    acct_names = {
+        a["id"]: a["name"]
+        for a in supabase.table("accounts").select("id, name").eq("owner_id", user_id).execute().data
+    }
+    out = []
+    for r in rows:
+        if r.get("bucket_allocated") or not r.get("account_id"):
+            continue
+        out.append({
+            "income_id": r["id"],
+            "source": r["source"],
+            "amount": float(r["amount"]),
+            "account_id": r["account_id"],
+            "account_name": acct_names.get(r["account_id"], "Unknown"),
+            "income_date": r["income_date"],
+        })
+    return out
+
+
+@router.post("/allocate-income")
+def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_current_user_id)):
+    """Put a recorded income amount into a bucket: add it to the bucket AND to the
+    account's balance (the money lands in the account, earmarked in the bucket)."""
+    inc = (
+        supabase.table("income").select("id, amount, account_id, bucket_allocated")
+        .eq("id", payload.income_id).eq("owner_id", user_id).execute().data
+    )
+    if not inc:
+        raise HTTPException(status_code=404, detail="Income not found")
+    inc = inc[0]
+    if inc.get("bucket_allocated"):
+        raise HTTPException(status_code=400, detail="Already allocated")
+    amount = Decimal(str(inc["amount"]))
+
+    bk = (
+        supabase.table(TABLE).select("id, current_amount, account_id")
+        .eq("id", payload.bucket_id).eq("owner_id", user_id).execute().data
+    )
+    if not bk:
+        raise HTTPException(status_code=404, detail="Bucket not found")
+    bk = bk[0]
+    if bk["account_id"] != inc["account_id"]:
+        raise HTTPException(status_code=400, detail="Pick a bucket in the same account the income went into")
+
+    acc = (
+        supabase.table("accounts").select("balance")
+        .eq("id", inc["account_id"]).eq("owner_id", user_id).execute().data
+    )
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    supabase.table("accounts").update(
+        {"balance": str(Decimal(str(acc[0]["balance"])) + amount)}
+    ).eq("id", inc["account_id"]).eq("owner_id", user_id).execute()
+    supabase.table(TABLE).update(
+        {"current_amount": str(Decimal(str(bk["current_amount"])) + amount)}
+    ).eq("id", bk["id"]).eq("owner_id", user_id).execute()
+    supabase.table("income").update({"bucket_allocated": True}).eq("id", inc["id"]).eq("owner_id", user_id).execute()
+    return {"ok": True, "allocated": float(amount)}
+
+
+@router.post("/dismiss-income")
+def dismiss_income(payload: DismissIncomeRequest, user_id: str = Depends(get_current_user_id)):
+    """Decline a single income suggestion (mark handled, move nothing)."""
+    r = supabase.table("income").update({"bucket_allocated": True}).eq(
+        "id", payload.income_id
+    ).eq("owner_id", user_id).execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="Income not found")
+    return {"ok": True}
+
+
+@router.post("/dismiss-all-income")
+def dismiss_all_income(user_id: str = Depends(get_current_user_id)):
+    """Decline all income suggestions."""
+    supabase.table("income").update({"bucket_allocated": True}).eq(
+        "owner_id", user_id
+    ).eq("bucket_allocated", False).execute()
+    return {"ok": True}
+
+
 @router.post("/transfer")
 def transfer(payload: TransferRequest, user_id: str = Depends(get_current_user_id)):
     """Move money between buckets (and to/from unallocated) within one account.

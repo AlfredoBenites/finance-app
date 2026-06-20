@@ -23,6 +23,8 @@ export default function BucketsPage() {
   const [editMode, setEditMode] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
   const [allocSel, setAllocSel] = useState({}); // "profile:card" -> {source, dest}
+  const [incomeAllocs, setIncomeAllocs] = useState([]);
+  const [incomeSel, setIncomeSel] = useState({}); // income_id -> bucket_id
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -31,16 +33,18 @@ export default function BucketsPage() {
 
   async function load() {
     try {
-      const [b, a, c, r] = await Promise.all([
+      const [b, a, c, r, inc] = await Promise.all([
         bucketsApi.list(),
         accountsApi.list(),
         creditCardsApi.list(),
         bucketsApi.reimbursements(),
+        bucketsApi.incomeAllocations(),
       ]);
       setBuckets(b);
       setAccounts(a);
       setCards(c);
       setReimbursements(r);
+      setIncomeAllocs(inc);
       setEditNames(Object.fromEntries(b.map((x) => [x.id, x.name])));
     } catch (e) {
       setError(e.message);
@@ -160,6 +164,51 @@ export default function BucketsPage() {
     }
   }
 
+  async function allocateIncome(r) {
+    const bucketId = incomeSel[r.income_id];
+    if (!bucketId) {
+      setError("Pick a bucket for this income.");
+      return;
+    }
+    if (busy) return;
+    setBusy(true);
+    try {
+      await bucketsApi.allocateIncome({ income_id: r.income_id, bucket_id: bucketId });
+      setError(null);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismissIncome(r) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await bucketsApi.dismissIncome({ income_id: r.income_id });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismissAllIncome() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await bucketsApi.dismissAllIncome();
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function allocate(r, sel) {
     if (!sel.source || !sel.dest) {
       setError("Pick a source and destination bucket.");
@@ -214,6 +263,32 @@ export default function BucketsPage() {
       </form>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
+
+      {incomeAllocs.length > 0 && (
+        <div style={{ textAlign: "right", marginBottom: 4 }}>
+          <button onClick={dismissAllIncome} disabled={busy}>
+            {busy ? "Working…" : "Dismiss all income"}
+          </button>
+        </div>
+      )}
+      {incomeAllocs.map((r) => {
+        const accountBuckets = buckets.filter((b) => b.account_id === r.account_id);
+        return (
+          <div className="card" key={r.income_id} style={{ borderColor: "#16a34a", borderWidth: 2, background: "#f0fdf4", flexWrap: "wrap" }}>
+            <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              Put <strong>{money(r.amount)}</strong> ({r.source}, into {r.account_name}) in bucket
+              <select value={incomeSel[r.income_id] || ""} onChange={(e) => setIncomeSel((s) => ({ ...s, [r.income_id]: e.target.value }))}>
+                <option value="">bucket…</option>
+                {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </span>
+            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button onClick={() => allocateIncome(r)} disabled={busy}>Allocate</button>
+              <button onClick={() => dismissIncome(r)} disabled={busy} title="Decline this suggestion">✕</button>
+            </span>
+          </div>
+        );
+      })}
 
       {reimbursements.length > 0 && (
         <div style={{ textAlign: "right", marginBottom: 4 }}>

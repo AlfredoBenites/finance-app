@@ -74,6 +74,48 @@ def test_dismiss_all_clears_every_suggestion(api):
     assert api.client.get("/api/buckets/reimbursements").json() == []
 
 
+def test_income_allocation_adds_to_bucket_and_account_balance(api):
+    api.login(*USER_A)
+    acct = api.client.post("/api/accounts", json={"name": "Ally", "balance": 100}).json()["id"]
+    moms = api.client.post("/api/buckets", json={"name": "Moms money", "account_id": acct, "current_amount": 0}).json()["id"]
+    inc = api.client.post("/api/income", json={"income_date": "2026-06-20", "source": "Mom's Payment",
+                                               "amount": 500, "account_id": acct}).json()["id"]
+    # the income shows as a suggestion
+    sug = api.client.get("/api/buckets/income-allocations").json()
+    assert len(sug) == 1 and sug[0]["amount"] == 500.0
+
+    r = api.client.post("/api/buckets/allocate-income", json={"income_id": inc, "bucket_id": moms})
+    assert r.status_code == 200
+    # bucket and account balance both went up by 500
+    amt = next(b["current_amount"] for b in api.client.get("/api/buckets").json() if b["id"] == moms)
+    bal = next(a["balance"] for a in api.client.get("/api/accounts").json() if a["id"] == acct)
+    assert float(amt) == 500.0 and float(bal) == 600.0
+    # suggestion clears
+    assert api.client.get("/api/buckets/income-allocations").json() == []
+
+
+def test_income_allocation_rejects_bucket_in_other_account(api):
+    api.login(*USER_A)
+    a1 = api.client.post("/api/accounts", json={"name": "Ally", "balance": 100}).json()["id"]
+    a2 = api.client.post("/api/accounts", json={"name": "Chase", "balance": 100}).json()["id"]
+    other = api.client.post("/api/buckets", json={"name": "x", "account_id": a2, "current_amount": 0}).json()["id"]
+    inc = api.client.post("/api/income", json={"income_date": "2026-06-20", "source": "Pay",
+                                               "amount": 50, "account_id": a1}).json()["id"]
+    r = api.client.post("/api/buckets/allocate-income", json={"income_id": inc, "bucket_id": other})
+    assert r.status_code == 400
+
+
+def test_dismiss_income_clears_without_moving(api):
+    api.login(*USER_A)
+    acct = api.client.post("/api/accounts", json={"name": "Ally", "balance": 100}).json()["id"]
+    inc = api.client.post("/api/income", json={"income_date": "2026-06-20", "source": "Pay",
+                                               "amount": 50, "account_id": acct}).json()["id"]
+    api.client.post("/api/buckets/dismiss-income", json={"income_id": inc})
+    assert api.client.get("/api/buckets/income-allocations").json() == []
+    bal = next(a["balance"] for a in api.client.get("/api/accounts").json() if a["id"] == acct)
+    assert float(bal) == 100.0  # untouched
+
+
 def test_allocate_blocked_when_source_short(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -700,
