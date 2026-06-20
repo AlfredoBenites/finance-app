@@ -12,6 +12,7 @@ export default function BucketsPage() {
   const [assign, setAssign] = useState({}); // bucketId -> accountId
   const [editNames, setEditNames] = useState({}); // bucketId -> name
   const [editMode, setEditMode] = useState(false);
+  const [reimbursements, setReimbursements] = useState([]);
   const [error, setError] = useState(null);
 
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "";
@@ -19,14 +20,16 @@ export default function BucketsPage() {
 
   async function load() {
     try {
-      const [b, a, c] = await Promise.all([
+      const [b, a, c, r] = await Promise.all([
         bucketsApi.list(),
         accountsApi.list(),
         creditCardsApi.list(),
+        bucketsApi.reimbursements(),
       ]);
       setBuckets(b);
       setAccounts(a);
       setCards(c);
+      setReimbursements(r);
       setEditNames(Object.fromEntries(b.map((x) => [x.id, x.name])));
     } catch (e) {
       setError(e.message);
@@ -111,6 +114,16 @@ export default function BucketsPage() {
     }
   }
 
+  async function allocate(cardId) {
+    try {
+      await bucketsApi.allocateReimbursement(cardId);
+      setError(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   const setMove = (accountId, field, value) =>
     setMoves((s) => ({ ...s, [accountId]: { ...s[accountId], [field]: value } }));
 
@@ -139,6 +152,20 @@ export default function BucketsPage() {
       </form>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
+
+      {reimbursements.map((r) => (
+        <div
+          className="card"
+          key={r.credit_card_id}
+          style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff" }}
+        >
+          <span>
+            You've been reimbursed <strong>{money(r.amount)}</strong> for {r.card_name} charges
+            — move it into <strong>{r.bucket_name}</strong> (from {r.account_name})?
+          </span>
+          <button onClick={() => allocate(r.credit_card_id)}>Allocate</button>
+        </div>
+      ))}
 
       {accounts.map((a) => {
         const accBuckets = bucketsFor(a.id);

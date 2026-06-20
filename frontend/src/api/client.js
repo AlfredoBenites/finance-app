@@ -65,6 +65,9 @@ export const bucketsApi = {
   // from/to are a bucket id or "unallocated".
   transfer: (data) =>
     request("/api/buckets/transfer", { method: "POST", body: JSON.stringify(data) }),
+  reimbursements: () => request("/api/buckets/reimbursements"),
+  allocateReimbursement: (cardId) =>
+    request(`/api/buckets/allocate-reimbursement?card_id=${cardId}`, { method: "POST" }),
 };
 
 export const accountsApi = {
