@@ -115,14 +115,7 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
                 supabase.table("accounts").update({"balance": str(Decimal(str(a.data[0]["balance"])) + delta)}).eq("id", acc_id).eq("owner_id", user_id).execute()
 
     # Mark the (profile, card) charges as allocated so they stop being suggested.
-    txns = (
-        supabase.table("transactions").select("id, reimbursement_allocated")
-        .eq("owner_id", user_id).eq("credit_card_id", payload.credit_card_id)
-        .eq("profile_id", payload.profile_id).eq("is_paid_back", True).execute().data
-    )
-    for t in txns:
-        if not t.get("reimbursement_allocated"):
-            supabase.table("transactions").update({"reimbursement_allocated": True}).eq("id", t["id"]).eq("owner_id", user_id).execute()
+    _mark_handled(user_id, payload.profile_id, payload.credit_card_id)
     return {"ok": True, "allocated": float(amount)}
 
 
@@ -132,25 +125,23 @@ class DismissRequest(BaseModel):
 
 
 def _mark_handled(user_id: str, profile_id=None, card_id=None):
-    """Mark paid card charges as allocated (handled) without moving money."""
-    rows = (
+    """Mark paid charges as allocated (handled) without moving money.
+
+    A single bulk UPDATE — not one request per row — so dismissing stays fast
+    even with thousands of paid transactions. Setting the flag on a paid bank
+    charge (no card) is harmless: those are never suggested anyway.
+    """
+    q = (
         supabase.table("transactions")
-        .select("id, profile_id, credit_card_id, reimbursement_allocated")
+        .update({"reimbursement_allocated": True})
         .eq("owner_id", user_id)
         .eq("is_paid_back", True)
-        .execute()
-        .data
     )
-    for t in rows:
-        if not t.get("credit_card_id") or t.get("reimbursement_allocated"):
-            continue
-        if profile_id and t["profile_id"] != profile_id:
-            continue
-        if card_id and t["credit_card_id"] != card_id:
-            continue
-        supabase.table("transactions").update({"reimbursement_allocated": True}).eq(
-            "id", t["id"]
-        ).eq("owner_id", user_id).execute()
+    if profile_id:
+        q = q.eq("profile_id", profile_id)
+    if card_id:
+        q = q.eq("credit_card_id", card_id)
+    q.execute()
 
 
 @router.post("/dismiss-reimbursement")

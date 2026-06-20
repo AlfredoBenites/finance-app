@@ -14,6 +14,7 @@ export default function BucketsPage() {
   const [editMode, setEditMode] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
   const [allocSel, setAllocSel] = useState({}); // "profile:card" -> {source, dest}
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "";
@@ -116,20 +117,28 @@ export default function BucketsPage() {
   }
 
   async function dismiss(r) {
+    if (busy) return;
+    setBusy(true);
     try {
       await bucketsApi.dismissReimbursement({ profile_id: r.profile_id, credit_card_id: r.credit_card_id });
-      load();
+      await load();
     } catch (e) {
       setError(e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function dismissAll() {
+    if (busy) return;
+    setBusy(true);
     try {
       await bucketsApi.dismissAllReimbursements();
-      load();
+      await load();
     } catch (e) {
       setError(e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -138,6 +147,8 @@ export default function BucketsPage() {
       setError("Pick a source and destination bucket.");
       return;
     }
+    if (busy) return;
+    setBusy(true);
     try {
       await bucketsApi.allocateReimbursement({
         profile_id: r.profile_id,
@@ -146,9 +157,11 @@ export default function BucketsPage() {
         dest_bucket_id: sel.dest,
       });
       setError(null);
-      load();
+      await load();
     } catch (e) {
       setError(e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -183,7 +196,9 @@ export default function BucketsPage() {
 
       {reimbursements.length > 0 && (
         <div style={{ textAlign: "right", marginBottom: 4 }}>
-          <button onClick={dismissAll}>Dismiss all suggestions</button>
+          <button onClick={dismissAll} disabled={busy}>
+            {busy ? "Working…" : "Dismiss all suggestions"}
+          </button>
         </div>
       )}
       {reimbursements.map((r) => {
@@ -205,8 +220,8 @@ export default function BucketsPage() {
               </select>
             </span>
             <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={() => allocate(r, sel)}>Allocate</button>
-              <button onClick={() => dismiss(r)} title="Decline this suggestion">✕</button>
+              <button onClick={() => allocate(r, sel)} disabled={busy}>Allocate</button>
+              <button onClick={() => dismiss(r)} disabled={busy} title="Decline this suggestion">✕</button>
             </span>
           </div>
         );
