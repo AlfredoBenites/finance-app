@@ -1,5 +1,6 @@
 """CRUD endpoints for credit cards. Scoped to the logged-in user."""
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 
 from postgrest.exceptions import APIError
@@ -21,6 +22,105 @@ TABLE = "credit_cards"
 class UpgradeRequest(BaseModel):
     new_card_id: str
     upgraded_on: Optional[date] = None
+
+
+class PaymentRequest(BaseModel):
+    account_id: str
+    bucket_id: Optional[str] = None
+    amount: Optional[Decimal] = None  # defaults to the full unpaid balance
+    paid_on: Optional[date] = None
+
+
+@router.get("/payments")
+def list_payments(user_id: str = Depends(get_current_user_id)):
+    """Card payment history, newest first, with card/account/bucket names."""
+    rows = supabase.table("card_payments").select("*").eq("owner_id", user_id).execute().data
+    cards = {c["id"]: c["name"] for c in supabase.table(TABLE).select("id, name").eq("owner_id", user_id).execute().data}
+    accts = {a["id"]: a["name"] for a in supabase.table("accounts").select("id, name").eq("owner_id", user_id).execute().data}
+    bks = {b["id"]: b["name"] for b in supabase.table("buckets").select("id, name").eq("owner_id", user_id).execute().data}
+    return [
+        {
+            "id": r["id"],
+            "card": cards.get(r["credit_card_id"], "Unknown"),
+            "account": accts.get(r["account_id"], "—"),
+            "bucket": bks.get(r["bucket_id"], "—") if r.get("bucket_id") else "—",
+            "amount": float(r["amount"]),
+            "paid_on": r["paid_on"],
+        }
+        for r in sorted(rows, key=lambda r: (r.get("paid_on") or "", r["created_at"]), reverse=True)
+    ]
+
+
+@router.post("/{card_id}/pay")
+def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_current_user_id)):
+    """Pay a card: settle its unpaid charges, draw the money from an account
+    (and optionally a bucket), and record the payment."""
+    card = supabase.table(TABLE).select("id").eq("id", card_id).eq("owner_id", user_id).execute()
+    if not card.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+
+    txns = (
+        supabase.table("transactions")
+        .select("id, amount")
+        .eq("owner_id", user_id)
+        .eq("credit_card_id", card_id)
+        .eq("is_paid_back", False)
+        .order("transaction_date")
+        .execute()
+        .data
+    )
+    unpaid_total = -sum((Decimal(str(t["amount"])) for t in txns), Decimal("0"))
+    amount = payload.amount if payload.amount is not None else unpaid_total
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Nothing to pay on this card")
+
+    acct = supabase.table("accounts").select("balance").eq("id", payload.account_id).eq("owner_id", user_id).execute()
+    if not acct.data:
+        raise HTTPException(status_code=404, detail="Account not found")
+    balance = Decimal(str(acct.data[0]["balance"]))
+    if balance < amount:
+        raise HTTPException(status_code=400, detail="Account balance is less than the payment")
+
+    # Settle charges: all of them if paying in full, else oldest-first up to amount.
+    paid_on = (payload.paid_on or date.today()).isoformat()
+    if amount >= unpaid_total:
+        to_settle = [t["id"] for t in txns]
+    else:
+        to_settle, cum = [], Decimal("0")
+        for t in txns:
+            charge = -Decimal(str(t["amount"]))
+            if cum + charge <= amount:
+                cum += charge
+                to_settle.append(t["id"])
+            else:
+                break
+    for tid in to_settle:
+        supabase.table("transactions").update(
+            {"is_paid_back": True, "paid_back_date": paid_on}
+        ).eq("id", tid).eq("owner_id", user_id).execute()
+
+    # Draw the money: from the bucket (down to 0) and the account balance.
+    if payload.bucket_id:
+        b = supabase.table("buckets").select("current_amount").eq("id", payload.bucket_id).eq("owner_id", user_id).execute()
+        if b.data:
+            cur = Decimal(str(b.data[0]["current_amount"]))
+            new_bucket = cur - amount if cur - amount > 0 else Decimal("0")
+            supabase.table("buckets").update({"current_amount": str(new_bucket)}).eq(
+                "id", payload.bucket_id
+            ).eq("owner_id", user_id).execute()
+    supabase.table("accounts").update({"balance": str(balance - amount)}).eq(
+        "id", payload.account_id
+    ).eq("owner_id", user_id).execute()
+
+    supabase.table("card_payments").insert({
+        "owner_id": user_id,
+        "credit_card_id": card_id,
+        "account_id": payload.account_id,
+        "bucket_id": payload.bucket_id,
+        "amount": str(amount),
+        "paid_on": paid_on,
+    }).execute()
+    return {"ok": True, "paid": float(amount), "charges_settled": len(to_settle)}
 
 
 @router.get("/upgrades")

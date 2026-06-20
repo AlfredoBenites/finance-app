@@ -58,20 +58,20 @@ def get_dashboard(
     owed = calc.owed_by_profile(transactions)
     debts = calc.debt_by_card(debt_txns)
 
-    # Each card's payoff-bucket savings reduce its displayed (remaining) debt.
+    # Debt is what's owed on each card; the payoff bucket is shown as how much
+    # you've SAVED toward it (paying the card via the Payments tab is what
+    # reduces the debt). owed already excludes reimbursed charges.
     savings = calc.card_bucket_savings(buckets)
     debt_by_card = []
-    net_card_debt = calc.Decimal("0")
+    total_debt = calc.Decimal("0")
     for cid, owed_amt in debts.items():
-        saved = savings.get(cid, calc.Decimal("0"))
-        remaining = max(calc.Decimal("0"), owed_amt - saved)
-        net_card_debt += remaining
+        total_debt += owed_amt
         debt_by_card.append({
             "credit_card_id": cid,
             "name": card_names.get(cid, "Unknown"),
             "owed": float(owed_amt),
-            "saved": float(saved),
-            "balance": float(remaining),
+            "saved": float(savings.get(cid, calc.Decimal("0"))),
+            "balance": float(owed_amt),
         })
     debt_by_card.sort(key=lambda d: -d["balance"])
 
@@ -104,7 +104,7 @@ def get_dashboard(
 
     return {
         "upcoming_payments": upcoming_payments,
-        "total_credit_card_debt": float(net_card_debt),
+        "total_credit_card_debt": float(total_debt),
         "total_cashback_earned": float(calc.cashback_earned(transactions)),
         "total_cashback_pending": float(calc.cashback_pending(transactions)),
         "total_bucket_money": float(calc.total_bucket_money(buckets)),
