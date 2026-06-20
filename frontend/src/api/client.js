@@ -4,6 +4,21 @@ import { supabase } from "../auth/supabaseClient";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+// Supabase rotates refresh tokens, so two refreshes firing at once race and one
+// fails. When several requests load a page in parallel and all see an expired
+// token, funnel them through a single shared refresh instead.
+let refreshInFlight = null;
+function refreshSessionOnce() {
+  if (!refreshInFlight) {
+    refreshInFlight = supabase.auth
+      .refreshSession()
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
 async function request(path, options = {}, retried = false) {
   // Attach the Supabase access token so the backend can identify the user.
   const { data } = await supabase.auth.getSession();
@@ -20,7 +35,7 @@ async function request(path, options = {}, retried = false) {
   // The access token can expire while a tab sits idle. On the first 401,
   // force a token refresh and retry once before surfacing an error.
   if (res.status === 401 && !retried) {
-    await supabase.auth.refreshSession();
+    await refreshSessionOnce();
     return request(path, options, true);
   }
 
