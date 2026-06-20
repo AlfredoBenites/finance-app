@@ -50,3 +50,23 @@ def test_transaction_with_two_payment_sources_is_rejected(api):
               "credit_card_id": "card-1", "account_id": "acct-1"},
     )
     assert r.status_code == 400
+
+
+def test_account_transfer_moves_balance(api):
+    api.login(*USER_A)
+    a = api.client.post("/api/accounts", json={"name": "Capital One", "balance": 1000}).json()["id"]
+    b = api.client.post("/api/accounts", json={"name": "Ally HYSA", "balance": 200}).json()["id"]
+    r = api.client.post("/api/accounts/transfer", json={"from_account_id": a, "to_account_id": b, "amount": 300})
+    assert r.status_code == 200
+    bals = {x["name"]: float(x["balance"]) for x in api.client.get("/api/accounts").json()}
+    assert bals["Capital One"] == 700.0 and bals["Ally HYSA"] == 500.0
+
+
+def test_account_transfer_blocked_when_money_is_allocated(api):
+    api.login(*USER_A)
+    a = api.client.post("/api/accounts", json={"name": "Capital One", "balance": 1000}).json()["id"]
+    b = api.client.post("/api/accounts", json={"name": "Ally", "balance": 0}).json()["id"]
+    # allocate 900 into a bucket -> only 100 unallocated
+    api.client.post("/api/buckets", json={"name": "saved", "account_id": a, "current_amount": 900})
+    r = api.client.post("/api/accounts/transfer", json={"from_account_id": a, "to_account_id": b, "amount": 300})
+    assert r.status_code == 400
