@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { profilesApi, sharesApi } from "../api/client";
+import { profilesApi, sharesApi, bucketsApi } from "../api/client";
 
 import { money } from "../format";
 
 export default function ProfilesPage() {
   const [profiles, setProfiles] = useState([]);
+  const [buckets, setBuckets] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -21,7 +22,17 @@ export default function ProfilesPage() {
 
   useEffect(() => {
     loadProfiles();
+    bucketsApi.list().then(setBuckets).catch(() => {});
   }, []);
+
+  async function setDefaultBucket(id, bucketId) {
+    try {
+      await profilesApi.update(id, { default_bucket_id: bucketId || null });
+      loadProfiles();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -111,6 +122,14 @@ export default function ProfilesPage() {
         <div className="card" key={p.id}>
           <span>{p.name}{p.is_primary ? " (me)" : ""}</span>
           <span style={{ display: "flex", gap: 6 }}>
+            <select
+              value={p.default_bucket_id || ""}
+              title="Default money bucket (where this person's money is kept)"
+              onChange={(e) => setDefaultBucket(p.id, e.target.value)}
+            >
+              <option value="">Money bucket…</option>
+              {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
             {!p.is_primary && (
               <button onClick={() => handleMakePrimary(p.id)}>This is me</button>
             )}

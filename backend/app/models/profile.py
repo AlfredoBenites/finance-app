@@ -18,6 +18,7 @@ class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
     avatar_initials: Optional[str] = None
+    default_bucket_id: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -29,5 +30,6 @@ class Profile(BaseModel):
     avatar_initials: Optional[str] = None
     is_active: bool
     is_primary: bool = False
+    default_bucket_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
