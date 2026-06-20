@@ -194,3 +194,21 @@ def test_statement_window_clamps_to_short_months():
     # a 31 statement day in a 30-day month clamps to the last day
     open_, close = calc.statement_window(31, date(2026, 5, 1))
     assert close == date(2026, 4, 30)
+
+
+def _payment(amount, paid_on):
+    return {"amount": amount, "paid_on": paid_on}
+
+
+def test_statement_due_subtracts_payments_after_close():
+    txns = [_charge("-200", "2026-04-30"), _charge("-300", "2026-05-29")]  # cycle = 500
+    # a payment during the cycle (pays the PRIOR statement) doesn't count;
+    # a payment after close does.
+    payments = [_payment("100", "2026-05-10"), _payment("400", "2026-06-05")]
+    assert calc.statement_due(txns, payments, 29, date(2026, 6, 20)) == Decimal("100")
+
+
+def test_statement_due_never_goes_negative():
+    txns = [_charge("-500", "2026-05-10")]  # cycle = 500
+    payments = [_payment("999", "2026-06-01")]  # overpaid
+    assert calc.statement_due(txns, payments, 29, date(2026, 6, 20)) == Decimal("0")
