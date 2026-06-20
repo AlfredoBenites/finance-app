@@ -24,6 +24,7 @@ const EMPTY_FORM = {
   profile_id: "",
   paymentSource: "", // "card:<id>" or "account:<id>"
   cashbackPct: "",
+  notes: "",
 };
 
 export default function TransactionsPage() {
@@ -163,6 +164,7 @@ export default function TransactionsPage() {
       profile_id: t.profile_id,
       paymentSource: t.credit_card_id ? `card:${t.credit_card_id}` : `account:${t.account_id}`,
       cashbackPct: t.cashback_rate != null ? String(Number(t.cashback_rate) * 100) : "",
+      notes: t.notes ?? "",
     });
   }
 
@@ -192,6 +194,7 @@ export default function TransactionsPage() {
       credit_card_id: isCard ? sourceId : null,
       account_id: isCard ? null : sourceId,
       cashback_rate: rate,
+      notes: form.notes.trim() || null,
     };
     try {
       if (editingId) await transactionsApi.update(editingId, payload);
@@ -305,6 +308,11 @@ export default function TransactionsPage() {
           onChange={(e) => setField("cashbackPct", e.target.value)}
           disabled={!form.paymentSource.startsWith("card:")}
         />
+        <input
+          placeholder="Note (optional)"
+          value={form.notes}
+          onChange={(e) => setField("notes", e.target.value)}
+        />
         <button type="submit">{editingId ? "Save" : "Add"}</button>
         {editingId && (
           <button type="button" onClick={cancelEdit}>Cancel</button>
@@ -366,6 +374,12 @@ export default function TransactionsPage() {
               {t.cashback_amount != null ? ` · CB ${money(t.cashback_amount)}` : ""} ·{" "}
               {t.is_paid_back ? "paid back" : "unpaid"}
             </small>
+            {t.notes ? (
+              <>
+                <br />
+                <small style={{ color: "#6b7280" }}>📝 {t.notes}</small>
+              </>
+            ) : null}
           </span>
           <span style={{ display: "flex", gap: 6 }}>
             <button onClick={() => startEdit(t)}>Edit</button>
