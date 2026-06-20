@@ -132,18 +132,19 @@ def test_card_upgrade_archives_old_and_records_history(api):
     assert not any(b.get("credit_card_id") == old for b in buckets)
 
 
-def test_card_payoff_bucket_reduces_displayed_debt(api):
+def test_card_payoff_bucket_shows_as_saved_without_reducing_debt(api):
     api.login(*USER_A)
     pid = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
     card = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -500,
                                                "profile_id": pid, "credit_card_id": card})
-    # set aside $200 toward this card
+    # set aside $200 toward this card — shown as 'saved', but the debt is unchanged
+    # (paying via the Payments tab is what reduces the debt).
     api.client.post("/api/buckets", json={"name": "extra", "current_amount": 200, "credit_card_id": card})
     d = api.client.get("/api/dashboard").json()
-    assert d["total_credit_card_debt"] == 300.0
+    assert d["total_credit_card_debt"] == 500.0
     row = next(c for c in d["debt_by_card"] if c["name"] == "Visa")
-    assert row["owed"] == 500.0 and row["saved"] == 200.0 and row["balance"] == 300.0
+    assert row["owed"] == 500.0 and row["saved"] == 200.0 and row["balance"] == 500.0
 
 
 def test_dashboard_is_scoped_to_the_user(api):

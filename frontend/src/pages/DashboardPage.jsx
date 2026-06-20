@@ -125,9 +125,9 @@ export default function DashboardPage() {
           <span>
             {c.name}
             <br />
-            <small>owed {money(c.owed)} · saved {money(c.saved)}</small>
+            <small>saved {money(c.saved)} in its bucket</small>
           </span>
-          <strong>{money(c.balance)} left</strong>
+          <strong>{money(c.balance)} owed</strong>
         </div>
       ))}
     </div>
