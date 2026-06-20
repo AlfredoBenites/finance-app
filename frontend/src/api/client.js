@@ -70,6 +70,10 @@ export const bucketsApi = {
   reimbursements: () => request("/api/buckets/reimbursements"),
   allocateReimbursement: (data) =>
     request("/api/buckets/allocate-reimbursement", { method: "POST", body: JSON.stringify(data) }),
+  dismissReimbursement: (data) =>
+    request("/api/buckets/dismiss-reimbursement", { method: "POST", body: JSON.stringify(data) }),
+  dismissAllReimbursements: () =>
+    request("/api/buckets/dismiss-all-reimbursements", { method: "POST" }),
 };
 
 export const accountsApi = {
