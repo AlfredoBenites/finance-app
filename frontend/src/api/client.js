@@ -4,7 +4,7 @@ import { supabase } from "../auth/supabaseClient";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-async function request(path, options = {}) {
+async function request(path, options = {}, retried = false) {
   // Attach the Supabase access token so the backend can identify the user.
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -16,6 +16,14 @@ async function request(path, options = {}) {
     },
     ...options,
   });
+
+  // The access token can expire while a tab sits idle. On the first 401,
+  // force a token refresh and retry once before surfacing an error.
+  if (res.status === 401 && !retried) {
+    await supabase.auth.refreshSession();
+    return request(path, options, true);
+  }
+
   if (!res.ok) {
     // FastAPI returns { detail: "..." } on errors — surface it to the user.
     let detail;
