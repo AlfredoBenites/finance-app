@@ -61,6 +61,29 @@ def test_profile_summary_shows_debt_per_card(api):
     assert debts == {"Visa": 100.0, "Amex": 50.0}
 
 
+def test_profile_statement_groups_unpaid_charges_by_card(api):
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    visa = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
+    amex = api.client.post("/api/credit-cards", json={"name": "Amex"}).json()["id"]
+    # two unpaid Visa charges, one unpaid Amex, and one PAID Visa charge (excluded)
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                                               "profile_id": pid, "credit_card_id": visa})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-03", "amount": -25,
+                                               "profile_id": pid, "credit_card_id": visa})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -50,
+                                               "profile_id": pid, "credit_card_id": amex})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-04", "amount": -999,
+                                               "profile_id": pid, "credit_card_id": visa, "is_paid_back": True})
+    st = api.client.get(f"/api/profiles/{pid}/statement").json()
+    assert st["profile_name"] == "Mom"
+    assert st["total_owed"] == 175.0
+    owed = {c["card_name"]: c["owed"] for c in st["cards"]}
+    assert owed == {"Visa": 125.0, "Amex": 50.0}
+    visa_card = next(c for c in st["cards"] if c["card_name"] == "Visa")
+    assert len(visa_card["transactions"]) == 2  # the paid one is excluded
+
+
 def test_profile_summary_shows_cashback_per_card(api):
     api.login(*USER_A)
     pid = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]

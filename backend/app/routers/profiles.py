@@ -2,6 +2,7 @@
 
 All endpoints require a logged-in user and operate only on that user's rows.
 """
+from datetime import date
 from decimal import Decimal
 
 from postgrest.exceptions import APIError
@@ -191,4 +192,62 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
         "debt_by_card": debt_by_card,
         "cashback_by_card": cashback_by_card,
         "transactions": txns,
+    }
+
+
+@router.get("/{profile_id}/statement")
+def profile_statement(profile_id: str, user_id: str = Depends(get_current_user_id)):
+    """What this profile still owes, per card, with the unpaid charges behind each
+    total. The frontend turns this into a printable statement to share."""
+    profile = (
+        supabase.table(TABLE)
+        .select("name")
+        .eq("id", profile_id)
+        .eq("owner_id", user_id)
+        .execute()
+    )
+    if not profile.data:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    txns = (
+        supabase.table("transactions")
+        .select("*")
+        .eq("profile_id", profile_id)
+        .eq("owner_id", user_id)
+        .order("transaction_date")
+        .execute()
+        .data
+    )
+    card_names = {
+        c["id"]: c["name"]
+        for c in supabase.table("credit_cards").select("id, name").eq("owner_id", user_id).execute().data
+    }
+
+    by_card: dict = {}
+    for t in txns:
+        cid = t.get("credit_card_id")
+        if not cid or t.get("is_paid_back"):
+            continue  # only unpaid card charges count toward what's still owed
+        entry = by_card.setdefault(
+            cid, {"card_name": card_names.get(cid, "Unknown"), "owed": Decimal("0"), "transactions": []}
+        )
+        amt = calc._dec(t["amount"])
+        entry["owed"] += -amt  # purchases are negative; owed is positive
+        entry["transactions"].append({
+            "transaction_date": t["transaction_date"],
+            "merchant": t.get("merchant"),
+            "category": t.get("category"),
+            "notes": t.get("notes"),
+            "amount": float(amt),
+        })
+
+    cards = sorted(by_card.values(), key=lambda c: -c["owed"])
+    for c in cards:
+        c["owed"] = float(c["owed"])
+
+    return {
+        "profile_name": profile.data[0]["name"],
+        "generated_on": date.today().isoformat(),
+        "total_owed": sum(c["owed"] for c in cards),
+        "cards": cards,
     }

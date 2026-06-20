@@ -87,6 +87,7 @@ export const profilesApi = {
     request(`/api/profiles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/profiles/${id}`, { method: "DELETE" }),
   summary: (id) => request(`/api/profiles/${id}/summary`),
+  statement: (id) => request(`/api/profiles/${id}/statement`),
   makePrimary: (id) => request(`/api/profiles/${id}/make-primary`, { method: "POST" }),
 };
 
