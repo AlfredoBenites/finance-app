@@ -20,8 +20,9 @@ class TransactionCreate(BaseModel):
     credit_card_id: Optional[str] = None
     account_id: Optional[str] = None
     cashback_rate: Optional[Decimal] = None
-    is_paid_back: bool = False
+    is_paid_back: bool = False  # a person reimbursed you
     paid_back_date: Optional[date] = None
+    paid_to_bank: bool = False  # you paid the card issuer
     notes: Optional[str] = None
 
 
@@ -36,6 +37,7 @@ class TransactionUpdate(BaseModel):
     cashback_rate: Optional[Decimal] = None
     is_paid_back: Optional[bool] = None
     paid_back_date: Optional[date] = None
+    paid_to_bank: Optional[bool] = None
     notes: Optional[str] = None
 
 
@@ -52,6 +54,7 @@ class Transaction(BaseModel):
     cashback_amount: Optional[Decimal] = None
     is_paid_back: bool
     paid_back_date: Optional[date] = None
+    paid_to_bank: bool = False
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime

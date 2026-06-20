@@ -212,3 +212,18 @@ def test_statement_due_never_goes_negative():
     txns = [_charge("-500", "2026-05-10")]  # cycle = 500
     payments = [_payment("999", "2026-06-01")]  # overpaid
     assert calc.statement_due(txns, payments, 29, date(2026, 6, 20)) == Decimal("0")
+
+
+# --- bank debt vs reimbursement ---------------------------------------------
+
+def test_bank_debt_uses_paid_to_bank_not_reimbursement():
+    txns = [
+        # reimbursed by a person, but NOT yet paid to the bank -> still bank debt
+        {"amount": "-100", "credit_card_id": "c1", "is_paid_back": True, "paid_to_bank": False},
+        # paid to the bank (person hasn't reimbursed) -> not bank debt
+        {"amount": "-50", "credit_card_id": "c1", "is_paid_back": False, "paid_to_bank": True},
+    ]
+    assert calc.total_bank_debt(txns) == Decimal("100")
+    assert calc.bank_debt_by_card(txns) == {"c1": Decimal("100")}
+    # the reimbursement view (debt_by_card) is the opposite split
+    assert calc.debt_by_card(txns) == {"c1": Decimal("50")}
