@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { profilesApi, sharesApi, bucketsApi } from "../api/client";
 
 import { money } from "../format";
+import { writeStatement } from "../statement";
 
 export default function ProfilesPage() {
   const [profiles, setProfiles] = useState([]);
@@ -80,6 +81,24 @@ export default function ProfilesPage() {
     }
   }
 
+  async function downloadStatement(id) {
+    // Open the window now, inside the click, so pop-up blockers allow it;
+    // fill it once the data loads.
+    const win = window.open("", "_blank");
+    if (!win) {
+      setError("Allow pop-ups for this site to open the statement.");
+      return;
+    }
+    try {
+      setError(null);
+      const s = await profilesApi.statement(id);
+      writeStatement(win, s);
+    } catch (e) {
+      win.close();
+      setError(e.message);
+    }
+  }
+
   async function handleShare(e) {
     e.preventDefault();
     if (!shareEmail.trim() || !summary) return;
@@ -134,6 +153,7 @@ export default function ProfilesPage() {
               <button onClick={() => handleMakePrimary(p.id)}>This is me</button>
             )}
             <button onClick={() => viewSummary(p.id)}>View</button>
+            <button onClick={() => downloadStatement(p.id)} title="Open a printable statement (Save as PDF)">Statement</button>
             <button className="danger" onClick={() => handleDelete(p.id)}>
               Delete
             </button>
