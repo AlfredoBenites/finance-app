@@ -69,10 +69,14 @@ def main():
         owed = -sum((float(r["amount"]) for r in owed_rows), 0.0)
         print(f"{c['name']}: {basis}")
         print(f"  marking {len(rows)} charge(s) paid_to_bank; bank debt left (open cycle): ${owed:,.2f}")
-        if not args.dry_run and rows:
+        if not args.dry_run:
+            # paid through the last closed statement; the open cycle is still owed
             supabase.table("transactions").update({"paid_to_bank": True}).eq("owner_id", owner).eq(
                 "credit_card_id", c["id"]
             ).lte("transaction_date", cutoff).execute()
+            supabase.table("transactions").update({"paid_to_bank": False}).eq("owner_id", owner).eq(
+                "credit_card_id", c["id"]
+            ).gt("transaction_date", cutoff).execute()
 
     print("\nDONE" + (" (dry run — nothing written)" if args.dry_run else ""))
 
