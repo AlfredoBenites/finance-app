@@ -32,6 +32,7 @@ def get_dashboard(
     accounts = owned("accounts")
     profiles = owned("profiles", "id, name, is_primary")
     cards = owned("credit_cards", "id, name, due_day, statement_day")
+    card_payments = owned("card_payments", "credit_card_id, amount, paid_on")
     income_rows = owned("income", "amount, income_date, category")
 
     # Year scopes the transaction/income-derived numbers; account balances are
@@ -73,7 +74,8 @@ def get_dashboard(
         sd = c.get("statement_day")
         if sd:
             card_txns = [t for t in all_transactions if t.get("credit_card_id") == c["id"]]
-            statement_by_card[c["id"]] = calc.statement_balance(card_txns, int(sd), today)
+            card_pays = [p for p in card_payments if p.get("credit_card_id") == c["id"]]
+            statement_by_card[c["id"]] = calc.statement_due(card_txns, card_pays, int(sd), today)
 
     debt_by_card = []
     total_debt = calc.Decimal("0")

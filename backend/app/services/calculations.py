@@ -96,6 +96,23 @@ def statement_balance(transactions: list[dict], statement_day: int, today: date)
     return total
 
 
+def statement_due(transactions: list[dict], payments: list[dict], statement_day: int, today: date) -> Decimal:
+    """What's still owed on the current statement: charges in the most-recently
+    closed cycle minus payments credited after it closed, clamped at zero.
+
+    So it drops to $0 once the statement is paid (never negative), and rolls to
+    the next cycle's charges automatically when that cycle closes. `transactions`
+    and `payments` should already be one card's rows."""
+    _open, close = statement_window(statement_day, today)
+    charges = statement_balance(transactions, statement_day, today)
+    paid_after = sum(
+        (_dec(p.get("amount")) for p in payments if str(p.get("paid_on") or "") > close.isoformat()),
+        Decimal("0"),
+    )
+    due = charges - paid_after
+    return due if due > Decimal("0") else Decimal("0")
+
+
 def owed_by_profile(transactions: list[dict]) -> dict[str, Decimal]:
     """Map profile_id -> amount that profile still owes (SPEC 9.2)."""
     totals: dict[str, Decimal] = {}
