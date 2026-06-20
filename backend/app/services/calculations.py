@@ -54,12 +54,38 @@ def total_card_debt(transactions: list[dict]) -> Decimal:
 
 
 def debt_by_card(transactions: list[dict]) -> dict[str, Decimal]:
-    """Map credit_card_id -> outstanding balance (SPEC 9.1)."""
+    """Map credit_card_id -> amount NOT yet reimbursed by a person (per-profile
+    'owed to you'). Uses is_paid_back. For what you owe the bank, see
+    bank_debt_by_card."""
     totals: dict[str, Decimal] = {}
     for t in unpaid(transactions):
         cid = t.get("credit_card_id")
         if not cid:
             continue  # account purchase, not card debt
+        totals[cid] = totals.get(cid, Decimal("0")) - _dec(t["amount"])
+    return totals
+
+
+def not_paid_to_bank(transactions: list[dict]) -> list[dict]:
+    return [t for t in transactions if not t.get("paid_to_bank")]
+
+
+def total_bank_debt(transactions: list[dict]) -> Decimal:
+    """What you owe the card issuer(s): negated sum of charges not yet paid to
+    the bank. Independent of whether a person has reimbursed you."""
+    return -sum(
+        (_dec(t["amount"]) for t in not_paid_to_bank(transactions) if t.get("credit_card_id")),
+        Decimal("0"),
+    )
+
+
+def bank_debt_by_card(transactions: list[dict]) -> dict[str, Decimal]:
+    """Map credit_card_id -> balance owed to the bank (charges not paid_to_bank)."""
+    totals: dict[str, Decimal] = {}
+    for t in not_paid_to_bank(transactions):
+        cid = t.get("credit_card_id")
+        if not cid:
+            continue
         totals[cid] = totals.get(cid, Decimal("0")) - _dec(t["amount"])
     return totals
 
@@ -209,12 +235,16 @@ def real_available_money(
     """
     return (
         liquid_cash(accounts)
-        - total_card_debt(transactions)
+        - total_bank_debt(transactions)
         - non_card_bucket_money(buckets)
     )
 
 
 def net_worth(accounts: list[dict], transactions: list[dict]) -> Decimal:
-    """Assets minus liabilities. Buckets do NOT reduce net worth (SPEC 9.8)."""
-    liabilities = total_card_debt(transactions) + other_liabilities(accounts)
+    """Assets minus liabilities. Buckets do NOT reduce net worth (SPEC 9.8).
+
+    Card debt here is what you owe the bank (paid_to_bank), not reimbursement
+    status — so paying a card reduces cash and debt together, leaving net worth
+    unchanged."""
+    liabilities = total_bank_debt(transactions) + other_liabilities(accounts)
     return total_assets(accounts) - liabilities

@@ -64,7 +64,7 @@ def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_c
         .select("id, amount")
         .eq("owner_id", user_id)
         .eq("credit_card_id", card_id)
-        .eq("is_paid_back", False)
+        .eq("paid_to_bank", False)
         .order("transaction_date")
         .execute()
         .data
@@ -81,7 +81,9 @@ def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_c
     if balance < amount:
         raise HTTPException(status_code=400, detail="Account balance is less than the payment")
 
-    # Settle charges: all of them if paying in full, else oldest-first up to amount.
+    # Mark charges paid TO THE BANK: all of them if paying in full, else
+    # oldest-first up to the amount. This does NOT touch is_paid_back (whether a
+    # person reimbursed you) — paying the issuer and being reimbursed are separate.
     paid_on = (payload.paid_on or date.today()).isoformat()
     if amount >= unpaid_total:
         to_settle = [t["id"] for t in txns]
@@ -96,7 +98,7 @@ def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_c
                 break
     for tid in to_settle:
         supabase.table("transactions").update(
-            {"is_paid_back": True, "paid_back_date": paid_on}
+            {"paid_to_bank": True}
         ).eq("id", tid).eq("owner_id", user_id).execute()
 
     # Draw the money: from the bucket (down to 0) and the account balance.

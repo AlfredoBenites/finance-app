@@ -57,12 +57,12 @@ def get_dashboard(
     profile_names = {p["id"]: p["name"] for p in profiles}
     card_names = {c["id"]: c["name"] for c in cards}
 
+    # "owed by profile" is the per-person reimbursement view (who owes YOU).
     owed = calc.owed_by_profile(transactions)
-    debts = calc.debt_by_card(debt_txns)
-
-    # Debt is what's owed on each card; the payoff bucket is shown as how much
-    # you've SAVED toward it (paying the card via the Payments tab is what
-    # reduces the debt). owed already excludes reimbursed charges.
+    # Card debt is what you owe the BANK (charges not yet paid to the issuer),
+    # independent of reimbursement. The payoff bucket shows how much you've SAVED
+    # toward it.
+    debts = calc.bank_debt_by_card(debt_txns)
     savings = calc.card_bucket_savings(buckets)
 
     # Current statement balance per card (charges in the most-recently-closed
@@ -96,7 +96,7 @@ def get_dashboard(
 
     # Upcoming payment reminders: the full balance owed to the bank, due on each
     # card's due day. (Uses all profiles' charges — you pay the bank the total.)
-    full_debts = calc.debt_by_card(all_transactions)
+    full_debts = calc.bank_debt_by_card(all_transactions)
 
     def next_due(day):
         def on(y, m):

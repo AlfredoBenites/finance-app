@@ -163,9 +163,10 @@ The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
 
 ## Known limitations / future work
 
-- Marking a charge "paid" means the person reimbursed you; it doesn't separately
-  model "owe the bank" vs "owed to you," so paying in the wrong order can need a
-  manual fix.
+- Each charge tracks two independent states: **reimbursed** (a person paid you
+  back — you toggle it) and **paid to bank** (you paid the card issuer — set by
+  Pay-a-card). Card debt / net worth use "paid to bank"; "owed by profile" and
+  the bucket-allocation banner use "reimbursed."
 - Reminders are in-app (shown on the dashboard); no email/push yet.
 - Not yet built (deferred): charts / "finance wrapped" summaries, a dedicated
   monthly view, Plaid/bank sync (balances are tracked manually by choice),
