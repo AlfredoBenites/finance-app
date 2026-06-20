@@ -124,6 +124,13 @@ export const bucketsApi = {
     request("/api/buckets/dismiss-reimbursement", { method: "POST", body: JSON.stringify(data) }),
   dismissAllReimbursements: () =>
     request("/api/buckets/dismiss-all-reimbursements", { method: "POST" }),
+  incomeAllocations: () => request("/api/buckets/income-allocations"),
+  allocateIncome: (data) =>
+    request("/api/buckets/allocate-income", { method: "POST", body: JSON.stringify(data) }),
+  dismissIncome: (data) =>
+    request("/api/buckets/dismiss-income", { method: "POST", body: JSON.stringify(data) }),
+  dismissAllIncome: () =>
+    request("/api/buckets/dismiss-all-income", { method: "POST" }),
 };
 
 export const accountsApi = {

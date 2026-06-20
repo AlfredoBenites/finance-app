@@ -13,6 +13,7 @@ class IncomeCreate(BaseModel):
     amount: Decimal
     account_id: str  # required: which account the money landed in
     notes: Optional[str] = None
+    bucket_allocated: bool = False
 
 
 class IncomeUpdate(BaseModel):
@@ -22,6 +23,7 @@ class IncomeUpdate(BaseModel):
     amount: Optional[Decimal] = None
     account_id: Optional[str] = None
     notes: Optional[str] = None
+    bucket_allocated: Optional[bool] = None
 
 
 class Income(BaseModel):
@@ -32,5 +34,6 @@ class Income(BaseModel):
     amount: Decimal
     account_id: Optional[str] = None
     notes: Optional[str] = None
+    bucket_allocated: bool = False
     created_at: datetime
     updated_at: datetime
