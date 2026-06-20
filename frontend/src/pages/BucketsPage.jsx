@@ -13,6 +13,7 @@ export default function BucketsPage() {
   const [editNames, setEditNames] = useState({}); // bucketId -> name
   const [editMode, setEditMode] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
+  const [allocSel, setAllocSel] = useState({}); // "profile:card" -> {source, dest}
   const [error, setError] = useState(null);
 
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "";
@@ -114,9 +115,18 @@ export default function BucketsPage() {
     }
   }
 
-  async function allocate(cardId) {
+  async function allocate(r, sel) {
+    if (!sel.source || !sel.dest) {
+      setError("Pick a source and destination bucket.");
+      return;
+    }
     try {
-      await bucketsApi.allocateReimbursement(cardId);
+      await bucketsApi.allocateReimbursement({
+        profile_id: r.profile_id,
+        credit_card_id: r.credit_card_id,
+        source_bucket_id: sel.source,
+        dest_bucket_id: sel.dest,
+      });
       setError(null);
       load();
     } catch (e) {
@@ -153,19 +163,28 @@ export default function BucketsPage() {
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
 
-      {reimbursements.map((r) => (
-        <div
-          className="card"
-          key={r.credit_card_id}
-          style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff" }}
-        >
-          <span>
-            You've been reimbursed <strong>{money(r.amount)}</strong> for {r.card_name} charges
-            — move it into <strong>{r.bucket_name}</strong> (from {r.account_name})?
-          </span>
-          <button onClick={() => allocate(r.credit_card_id)}>Allocate</button>
-        </div>
-      ))}
+      {reimbursements.map((r) => {
+        const key = `${r.profile_id}:${r.credit_card_id}`;
+        const sel = allocSel[key] || { source: r.source_bucket_id || "", dest: r.dest_bucket_id || "" };
+        const setSel = (field, value) => setAllocSel((s) => ({ ...s, [key]: { ...sel, [field]: value } }));
+        return (
+          <div className="card" key={key} style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff" }}>
+            <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              Move <strong>{money(r.amount)}</strong> ({r.profile_name}'s {r.card_name}) from
+              <select value={sel.source} onChange={(e) => setSel("source", e.target.value)}>
+                <option value="">bucket…</option>
+                {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              to
+              <select value={sel.dest} onChange={(e) => setSel("dest", e.target.value)}>
+                <option value="">bucket…</option>
+                {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </span>
+            <button onClick={() => allocate(r, sel)}>Allocate</button>
+          </div>
+        );
+      })}
 
       {accounts.map((a) => {
         const accBuckets = bucketsFor(a.id);

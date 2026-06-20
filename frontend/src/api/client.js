@@ -34,6 +34,8 @@ export const profilesApi = {
   list: () => request("/api/profiles"),
   create: (data) =>
     request("/api/profiles", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, data) =>
+    request(`/api/profiles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/profiles/${id}`, { method: "DELETE" }),
   summary: (id) => request(`/api/profiles/${id}/summary`),
   makePrimary: (id) => request(`/api/profiles/${id}/make-primary`, { method: "POST" }),
@@ -66,8 +68,8 @@ export const bucketsApi = {
   transfer: (data) =>
     request("/api/buckets/transfer", { method: "POST", body: JSON.stringify(data) }),
   reimbursements: () => request("/api/buckets/reimbursements"),
-  allocateReimbursement: (cardId) =>
-    request(`/api/buckets/allocate-reimbursement?card_id=${cardId}`, { method: "POST" }),
+  allocateReimbursement: (data) =>
+    request("/api/buckets/allocate-reimbursement", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export const accountsApi = {

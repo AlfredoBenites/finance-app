@@ -25,103 +25,104 @@ class TransferRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-def _reimbursements(user_id: str):
-    """Group not-yet-allocated reimbursements (others' paid card charges) by card.
+class AllocateRequest(BaseModel):
+    profile_id: str
+    credit_card_id: str
+    source_bucket_id: str
+    dest_bucket_id: str
 
-    Returns dict card_id -> Decimal total, plus the primary profile id.
-    """
-    primary = (
-        supabase.table("profiles").select("id").eq("owner_id", user_id).eq("is_primary", True).execute().data
-    )
-    primary_id = primary[0]["id"] if primary else None
+
+def _allocations(user_id: str):
+    """Group not-yet-allocated paid card charges by (profile_id, card_id)."""
     txns = (
         supabase.table("transactions")
-        .select("amount, credit_card_id, profile_id, is_paid_back, reimbursement_allocated")
+        .select("amount, credit_card_id, profile_id, reimbursement_allocated")
         .eq("owner_id", user_id)
         .eq("is_paid_back", True)
         .execute()
         .data
     )
-    totals: dict[str, Decimal] = {}
+    totals: dict[tuple, Decimal] = {}
     for t in txns:
         if not t.get("credit_card_id") or t.get("reimbursement_allocated"):
             continue
-        if primary_id is not None and t.get("profile_id") == primary_id:
-            continue  # your own charge paid = you paid the bank, not a reimbursement
-        totals[t["credit_card_id"]] = totals.get(t["credit_card_id"], Decimal("0")) - Decimal(str(t["amount"]))
-    return {cid: amt for cid, amt in totals.items() if amt > 0}
+        key = (t["profile_id"], t["credit_card_id"])
+        totals[key] = totals.get(key, Decimal("0")) - Decimal(str(t["amount"]))
+    return {k: v for k, v in totals.items() if v > 0}
 
 
 @router.get("/reimbursements")
 def list_reimbursements(user_id: str = Depends(get_current_user_id)):
-    """Suggestions: reimbursed money not yet moved into a card's payoff bucket."""
-    totals = _reimbursements(user_id)
+    """Suggestions: paid charges not yet moved into a card's payoff bucket.
+
+    Each proposes moving the money from that profile's default bucket into the
+    card's payoff bucket (both overridable in the UI)."""
+    totals = _allocations(user_id)
     if not totals:
         return []
+    profiles = {p["id"]: p for p in supabase.table("profiles").select("id, name, default_bucket_id").eq("owner_id", user_id).execute().data}
     cards = {c["id"]: c["name"] for c in supabase.table("credit_cards").select("id, name").eq("owner_id", user_id).execute().data}
-    accts = {a["id"]: a["name"] for a in supabase.table("accounts").select("id, name").eq("owner_id", user_id).execute().data}
     bks = supabase.table(TABLE).select("id, name, credit_card_id, account_id").eq("owner_id", user_id).execute().data
+    bk_name = {b["id"]: b["name"] for b in bks}
+    payoff = {b["credit_card_id"]: b["id"] for b in bks if b["credit_card_id"] and b["account_id"]}
     out = []
-    for cid, amount in totals.items():
-        bucket = next((b for b in bks if b["credit_card_id"] == cid and b["account_id"]), None)
-        if not bucket:
-            continue  # no payoff bucket assigned to an account yet
+    for (pid, cid), amount in totals.items():
+        prof = profiles.get(pid, {})
+        src = prof.get("default_bucket_id")
+        dest = payoff.get(cid)
         out.append({
+            "profile_id": pid,
+            "profile_name": prof.get("name", "Unknown"),
             "credit_card_id": cid,
             "card_name": cards.get(cid, "Unknown"),
-            "bucket_id": bucket["id"],
-            "bucket_name": bucket["name"],
-            "account_id": bucket["account_id"],
-            "account_name": accts.get(bucket["account_id"], "—"),
+            "source_bucket_id": src,
+            "source_bucket_name": bk_name.get(src),
+            "dest_bucket_id": dest,
+            "dest_bucket_name": bk_name.get(dest),
             "amount": float(amount),
         })
     return out
 
 
 @router.post("/allocate-reimbursement")
-def allocate_reimbursement(card_id: str, user_id: str = Depends(get_current_user_id)):
-    """Move a card's reimbursed money into its payoff bucket (from unallocated)."""
-    amount = _reimbursements(user_id).get(card_id)
+def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_current_user_id)):
+    """Move a (profile, card)'s money from a source bucket into a dest bucket."""
+    amount = _allocations(user_id).get((payload.profile_id, payload.credit_card_id))
     if not amount:
-        raise HTTPException(status_code=400, detail="Nothing to allocate for this card")
-    bucket = (
-        supabase.table(TABLE)
-        .select("id, current_amount, account_id")
-        .eq("owner_id", user_id)
-        .eq("credit_card_id", card_id)
-        .execute()
-        .data
-    )
-    bucket = next((b for b in bucket if b["account_id"]), None)
-    if not bucket:
-        raise HTTPException(status_code=400, detail="Assign this card's payoff bucket to an account first")
+        raise HTTPException(status_code=400, detail="Nothing to allocate")
+    if payload.source_bucket_id == payload.dest_bucket_id:
+        raise HTTPException(status_code=400, detail="Source and destination must differ")
 
-    acct = supabase.table("accounts").select("balance").eq("id", bucket["account_id"]).eq("owner_id", user_id).execute()
-    balance = Decimal(str(acct.data[0]["balance"]))
-    siblings = supabase.table(TABLE).select("current_amount").eq("owner_id", user_id).eq("account_id", bucket["account_id"]).execute().data
-    unallocated = balance - sum((Decimal(str(b["current_amount"])) for b in siblings), Decimal("0"))
-    if unallocated < amount:
-        raise HTTPException(
-            status_code=400,
-            detail="Update the account balance to reflect the reimbursement, then allocate.",
-        )
+    def get_bucket(bid):
+        r = supabase.table(TABLE).select("id, current_amount, account_id").eq("id", bid).eq("owner_id", user_id).execute()
+        if not r.data:
+            raise HTTPException(status_code=404, detail="Bucket not found")
+        return r.data[0]
 
-    supabase.table(TABLE).update(
-        {"current_amount": str(Decimal(str(bucket["current_amount"])) + amount)}
-    ).eq("id", bucket["id"]).eq("owner_id", user_id).execute()
-    # Mark those charges as allocated so they stop being suggested.
-    primary = supabase.table("profiles").select("id").eq("owner_id", user_id).eq("is_primary", True).execute().data
-    primary_id = primary[0]["id"] if primary else None
+    src = get_bucket(payload.source_bucket_id)
+    dest = get_bucket(payload.dest_bucket_id)
+    src_amt = Decimal(str(src["current_amount"]))
+    if src_amt < amount:
+        raise HTTPException(status_code=400, detail="Source bucket doesn't have that much")
+
+    supabase.table(TABLE).update({"current_amount": str(src_amt - amount)}).eq("id", src["id"]).eq("owner_id", user_id).execute()
+    supabase.table(TABLE).update({"current_amount": str(Decimal(str(dest["current_amount"])) + amount)}).eq("id", dest["id"]).eq("owner_id", user_id).execute()
+    # A cross-account move also shifts the two account balances.
+    if src["account_id"] and dest["account_id"] and src["account_id"] != dest["account_id"]:
+        for acc_id, delta in ((src["account_id"], -amount), (dest["account_id"], amount)):
+            a = supabase.table("accounts").select("balance").eq("id", acc_id).eq("owner_id", user_id).execute()
+            if a.data:
+                supabase.table("accounts").update({"balance": str(Decimal(str(a.data[0]["balance"])) + delta)}).eq("id", acc_id).eq("owner_id", user_id).execute()
+
+    # Mark the (profile, card) charges as allocated so they stop being suggested.
     txns = (
-        supabase.table("transactions").select("id, profile_id, reimbursement_allocated")
-        .eq("owner_id", user_id).eq("credit_card_id", card_id).eq("is_paid_back", True).execute().data
+        supabase.table("transactions").select("id, reimbursement_allocated")
+        .eq("owner_id", user_id).eq("credit_card_id", payload.credit_card_id)
+        .eq("profile_id", payload.profile_id).eq("is_paid_back", True).execute().data
     )
     for t in txns:
-        if t.get("reimbursement_allocated"):
-            continue
-        if primary_id is not None and t.get("profile_id") == primary_id:
-            continue
-        supabase.table("transactions").update({"reimbursement_allocated": True}).eq("id", t["id"]).eq("owner_id", user_id).execute()
+        if not t.get("reimbursement_allocated"):
+            supabase.table("transactions").update({"reimbursement_allocated": True}).eq("id", t["id"]).eq("owner_id", user_id).execute()
     return {"ok": True, "allocated": float(amount)}
 
 
