@@ -70,3 +70,20 @@ def test_account_transfer_blocked_when_money_is_allocated(api):
     api.client.post("/api/buckets", json={"name": "saved", "account_id": a, "current_amount": 900})
     r = api.client.post("/api/accounts/transfer", json={"from_account_id": a, "to_account_id": b, "amount": 300})
     assert r.status_code == 400
+
+
+def test_account_transfer_between_buckets_cross_account(api):
+    api.login(*USER_A)
+    a = api.client.post("/api/accounts", json={"name": "Capital One", "balance": 500}).json()["id"]
+    b = api.client.post("/api/accounts", json={"name": "Ally", "balance": 0}).json()["id"]
+    src_bucket = api.client.post("/api/buckets", json={"name": "bonus", "account_id": a, "current_amount": 500}).json()["id"]
+    dst_bucket = api.client.post("/api/buckets", json={"name": "invest", "account_id": b, "current_amount": 0}).json()["id"]
+    # all of a's money is in src_bucket (0 unallocated); pull from the bucket -> dst bucket
+    r = api.client.post("/api/accounts/transfer", json={
+        "from_account_id": a, "to_account_id": b, "amount": 300,
+        "from_bucket_id": src_bucket, "to_bucket_id": dst_bucket})
+    assert r.status_code == 200
+    bals = {x["name"]: float(x["balance"]) for x in api.client.get("/api/accounts").json()}
+    assert bals["Capital One"] == 200.0 and bals["Ally"] == 300.0
+    amts = {x["id"]: float(x["current_amount"]) for x in api.client.get("/api/buckets").json()}
+    assert amts[src_bucket] == 200.0 and amts[dst_bucket] == 300.0

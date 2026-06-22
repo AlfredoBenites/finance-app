@@ -1,23 +1,26 @@
 import { useEffect, useState } from "react";
-import { accountsApi } from "../api/client";
+import { accountsApi, bucketsApi } from "../api/client";
 import { money } from "../format";
 
 const ACCOUNT_TYPES = ["checking", "savings", "cash", "investment", "roth_ira"];
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);
+  const [buckets, setBuckets] = useState([]);
   const [name, setName] = useState("");
   const [type, setType] = useState(ACCOUNT_TYPES[0]);
   const [balance, setBalance] = useState("");
   const [isAsset, setIsAsset] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [edit, setEdit] = useState({});
-  const [xfer, setXfer] = useState({ from: "", to: "", amount: "" });
+  const [xfer, setXfer] = useState({ from: "", to: "", amount: "", fromBucket: "unallocated", toBucket: "unallocated" });
   const [error, setError] = useState(null);
 
   async function load() {
     try {
-      setAccounts(await accountsApi.list());
+      const [a, b] = await Promise.all([accountsApi.list(), bucketsApi.list()]);
+      setAccounts(a);
+      setBuckets(b);
     } catch (e) {
       setError(e.message);
     }
@@ -38,8 +41,10 @@ export default function AccountsPage() {
         from_account_id: xfer.from,
         to_account_id: xfer.to,
         amount: Number(xfer.amount),
+        from_bucket_id: xfer.fromBucket || "unallocated",
+        to_bucket_id: xfer.toBucket || "unallocated",
       });
-      setXfer({ from: "", to: "", amount: "" });
+      setXfer({ from: "", to: "", amount: "", fromBucket: "unallocated", toBucket: "unallocated" });
       setError(null);
       load();
     } catch (e) {
@@ -133,14 +138,22 @@ export default function AccountsPage() {
         <input type="number" step="0.01" style={{ width: 90 }} value={xfer.amount}
           onChange={(e) => setXfer((s) => ({ ...s, amount: e.target.value }))} placeholder="$" />
         <small>from</small>
-        <select value={xfer.from} onChange={(e) => setXfer((s) => ({ ...s, from: e.target.value }))}>
+        <select value={xfer.from} onChange={(e) => setXfer((s) => ({ ...s, from: e.target.value, fromBucket: "unallocated" }))}>
           <option value="">account…</option>
           {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
+        <select value={xfer.fromBucket} onChange={(e) => setXfer((s) => ({ ...s, fromBucket: e.target.value }))} title="Pull from this bucket (or unallocated)">
+          <option value="unallocated">Unallocated</option>
+          {buckets.filter((b) => b.account_id === xfer.from).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
         <small>to</small>
-        <select value={xfer.to} onChange={(e) => setXfer((s) => ({ ...s, to: e.target.value }))}>
+        <select value={xfer.to} onChange={(e) => setXfer((s) => ({ ...s, to: e.target.value, toBucket: "unallocated" }))}>
           <option value="">account…</option>
           {activeAccounts.filter((a) => a.id !== xfer.from).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select value={xfer.toBucket} onChange={(e) => setXfer((s) => ({ ...s, toBucket: e.target.value }))} title="Drop into this bucket (or unallocated)">
+          <option value="unallocated">Unallocated</option>
+          {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         <button type="submit">Transfer</button>
       </form>
