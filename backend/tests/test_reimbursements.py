@@ -94,6 +94,20 @@ def test_income_allocation_adds_to_bucket_and_account_balance(api):
     assert api.client.get("/api/buckets/income-allocations").json() == []
 
 
+def test_income_allocation_to_unallocated_bumps_balance_only(api):
+    api.login(*USER_A)
+    acct = api.client.post("/api/accounts", json={"name": "Ally", "balance": 100}).json()["id"]
+    bucket = api.client.post("/api/buckets", json={"name": "b", "account_id": acct, "current_amount": 0}).json()["id"]
+    inc = api.client.post("/api/income", json={"income_date": "2026-06-20", "source": "Pay",
+                                               "amount": 500, "account_id": acct}).json()["id"]
+    r = api.client.post("/api/buckets/allocate-income", json={"income_id": inc, "bucket_id": "unallocated"})
+    assert r.status_code == 200
+    bal = next(a["balance"] for a in api.client.get("/api/accounts").json() if a["id"] == acct)
+    amt = next(b["current_amount"] for b in api.client.get("/api/buckets").json() if b["id"] == bucket)
+    assert float(bal) == 600.0 and float(amt) == 0.0  # balance up, no bucket earmarked
+    assert api.client.get("/api/buckets/income-allocations").json() == []
+
+
 def test_income_allocation_rejects_bucket_in_other_account(api):
     api.login(*USER_A)
     a1 = api.client.post("/api/accounts", json={"name": "Ally", "balance": 100}).json()["id"]

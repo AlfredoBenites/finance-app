@@ -279,6 +279,7 @@ export default function BucketsPage() {
               Put <strong>{money(r.amount)}</strong> ({r.source}, into {r.account_name}) in bucket
               <select value={incomeSel[r.income_id] || ""} onChange={(e) => setIncomeSel((s) => ({ ...s, [r.income_id]: e.target.value }))}>
                 <option value="">bucket…</option>
+                <option value="unallocated">Unallocated (just the balance)</option>
                 {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </span>

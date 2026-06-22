@@ -223,8 +223,8 @@ def list_income_allocations(user_id: str = Depends(get_current_user_id)):
 
 @router.post("/allocate-income")
 def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_current_user_id)):
-    """Put a recorded income amount into a bucket: add it to the bucket AND to the
-    account's balance (the money lands in the account, earmarked in the bucket)."""
+    """Land a recorded income amount in its account's balance, optionally earmarked
+    in a bucket. bucket_id 'unallocated' adds it to the balance only (not earmarked)."""
     inc = (
         supabase.table("income").select("id, amount, account_id, bucket_allocated")
         .eq("id", payload.income_id).eq("owner_id", user_id).execute().data
@@ -236,15 +236,17 @@ def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_c
         raise HTTPException(status_code=400, detail="Already allocated")
     amount = Decimal(str(inc["amount"]))
 
-    bk = (
-        supabase.table(TABLE).select("id, current_amount, account_id")
-        .eq("id", payload.bucket_id).eq("owner_id", user_id).execute().data
-    )
-    if not bk:
-        raise HTTPException(status_code=404, detail="Bucket not found")
-    bk = bk[0]
-    if bk["account_id"] != inc["account_id"]:
-        raise HTTPException(status_code=400, detail="Pick a bucket in the same account the income went into")
+    bk = None
+    if payload.bucket_id and payload.bucket_id != UNALLOCATED:
+        rows = (
+            supabase.table(TABLE).select("id, current_amount, account_id")
+            .eq("id", payload.bucket_id).eq("owner_id", user_id).execute().data
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Bucket not found")
+        bk = rows[0]
+        if bk["account_id"] != inc["account_id"]:
+            raise HTTPException(status_code=400, detail="Pick a bucket in the same account the income went into")
 
     acc = (
         supabase.table("accounts").select("balance")
@@ -253,12 +255,14 @@ def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_c
     if not acc:
         raise HTTPException(status_code=404, detail="Account not found")
 
+    # the money lands in the account either way; a bucket also earmarks it
     supabase.table("accounts").update(
         {"balance": str(Decimal(str(acc[0]["balance"])) + amount)}
     ).eq("id", inc["account_id"]).eq("owner_id", user_id).execute()
-    supabase.table(TABLE).update(
-        {"current_amount": str(Decimal(str(bk["current_amount"])) + amount)}
-    ).eq("id", bk["id"]).eq("owner_id", user_id).execute()
+    if bk:
+        supabase.table(TABLE).update(
+            {"current_amount": str(Decimal(str(bk["current_amount"])) + amount)}
+        ).eq("id", bk["id"]).eq("owner_id", user_id).execute()
     supabase.table("income").update({"bucket_allocated": True}).eq("id", inc["id"]).eq("owner_id", user_id).execute()
     return {"ok": True, "allocated": float(amount)}
 
