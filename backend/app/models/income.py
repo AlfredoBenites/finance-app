@@ -35,5 +35,6 @@ class Income(BaseModel):
     account_id: Optional[str] = None
     notes: Optional[str] = None
     bucket_allocated: bool = False
+    allocated_bucket_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
