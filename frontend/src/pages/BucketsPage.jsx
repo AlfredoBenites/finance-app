@@ -343,7 +343,7 @@ export default function BucketsPage() {
         const accBuckets = bucketsFor(a.id);
         if (accBuckets.length === 0) return null;
         const alloc = allocated(a.id);
-        const unalloc = Number(a.balance) - alloc;
+        const unalloc = Math.round((Number(a.balance) - alloc) * 100) / 100;
         const m = moves[a.id] || {};
         const options = [{ id: "unallocated", name: "Unallocated" }, ...accBuckets];
         return (

@@ -147,6 +147,28 @@ def test_dismiss_income_clears_without_moving(api):
     assert float(bal) == 100.0  # untouched
 
 
+def test_income_update_changes_amount_and_date(api):
+    api.login(*USER_A)
+    acct = api.client.post("/api/accounts", json={"name": "Ally", "balance": 0}).json()["id"]
+    inc = api.client.post("/api/income", json={"income_date": "2026-06-20", "source": "Pay",
+                                               "amount": 100, "account_id": acct}).json()["id"]
+    r = api.client.put(f"/api/income/{inc}", json={"amount": 250, "income_date": "2026-06-25"})
+    assert r.status_code == 200
+    got = api.client.get("/api/income").json()[0]
+    assert float(got["amount"]) == 250.0 and got["income_date"] == "2026-06-25"
+
+
+def test_marking_reimbursed_reopens_suggestion(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    tid = api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True}).json()["id"]
+    api.client.post("/api/buckets/dismiss-reimbursement", json={"profile_id": mom, "credit_card_id": card})
+    assert api.client.get("/api/buckets/reimbursements").json() == []  # dismissed
+    # re-marking reimbursed clears the allocated flag -> suggestion returns
+    api.client.put(f"/api/transactions/{tid}", json={"is_paid_back": True, "reimbursement_allocated": False})
+    assert any(s["profile_id"] == mom for s in api.client.get("/api/buckets/reimbursements").json())
+
+
 def test_allocate_blocked_when_source_short(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -700,

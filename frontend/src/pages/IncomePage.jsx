@@ -24,6 +24,7 @@ export default function IncomePage() {
   // All income (any year) used only to populate the source/category dropdowns.
   const [pool, setPool] = useState([]);
   const [form, setForm] = useState(EMPTY);
+  const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState(null);
   const [year, setYear] = useState(CURRENT_YEAR);
   const [hideRepayments, setHideRepayments] = usePersistedState("income.hideRepayments", false);
@@ -81,21 +82,42 @@ export default function IncomePage() {
     setField("source", value);
   }
 
+  function startEdit(i) {
+    setEditingId(i.id);
+    setError(null);
+    setForm({
+      income_date: i.income_date,
+      source: i.source ?? "",
+      category: i.category ?? INCOME_TYPES[0],
+      amount: String(Math.abs(Number(i.amount))),
+      account_id: i.account_id ?? "",
+      notes: i.notes ?? "",
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setForm(EMPTY);
+  }
+
   async function handleAdd(e) {
     e.preventDefault();
     if (!form.source.trim() || !form.amount || !form.account_id) {
       setError("Source, amount, and account are required.");
       return;
     }
+    const payload = {
+      income_date: form.income_date,
+      source: form.source.trim(),
+      category: form.category,
+      amount: Math.abs(Number(form.amount)),
+      account_id: form.account_id || null,
+      notes: form.notes.trim() || null,
+    };
     try {
-      await incomeApi.create({
-        income_date: form.income_date,
-        source: form.source.trim(),
-        category: form.category,
-        amount: Math.abs(Number(form.amount)),
-        account_id: form.account_id || null,
-        notes: form.notes.trim() || null,
-      });
+      if (editingId) await incomeApi.update(editingId, payload);
+      else await incomeApi.create(payload);
+      setEditingId(null);
       setForm({ ...EMPTY, income_date: form.income_date });
       setError(null);
       load();
@@ -192,7 +214,8 @@ export default function IncomePage() {
           value={form.notes}
           onChange={(e) => setField("notes", e.target.value)}
         />
-        <button type="submit">Add</button>
+        <button type="submit">{editingId ? "Save" : "Add"}</button>
+        {editingId && <button type="button" onClick={cancelEdit}>Cancel</button>}
       </form>
 
       {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
@@ -224,6 +247,7 @@ export default function IncomePage() {
             </small>
           </span>
           <span style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => startEdit(i)}>Edit</button>
             {i.allocated_bucket_id && (
               <button onClick={() => undoAllocation(i.id)} title="Reverse the bucket/balance this income added">
                 Undo allocation

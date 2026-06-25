@@ -213,10 +213,13 @@ export default function TransactionsPage() {
   }
 
   async function togglePaid(t) {
+    const markingReimbursed = !t.is_paid_back;
     try {
       await transactionsApi.update(t.id, {
-        is_paid_back: !t.is_paid_back,
-        paid_back_date: !t.is_paid_back ? today() : null,
+        is_paid_back: markingReimbursed,
+        paid_back_date: markingReimbursed ? today() : null,
+        // marking reimbursed re-opens the "move money to the card" suggestion
+        ...(markingReimbursed ? { reimbursement_allocated: false } : {}),
       });
       loadTransactions();
     } catch (e) {
