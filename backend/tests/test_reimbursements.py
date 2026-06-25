@@ -194,6 +194,24 @@ def test_marking_reimbursed_reopens_suggestion(api):
     assert any(s["profile_id"] == mom for s in api.client.get("/api/buckets/reimbursements").json())
 
 
+def test_allocate_only_selected_transactions(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    t1 = api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True}).json()["id"]
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -60,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True})
+    # allocate ONLY the $100 charge
+    r = api.client.post("/api/buckets/allocate-reimbursement", json={
+        "profile_id": mom, "credit_card_id": card, "source_bucket_id": moms,
+        "dest_bucket_id": payoff, "transaction_ids": [t1]})
+    assert r.status_code == 200 and r.json()["allocated"] == 100.0
+    amounts = {b["id"]: float(b["current_amount"]) for b in api.client.get("/api/buckets").json()}
+    assert amounts[moms] == 400.0 and amounts[payoff] == 100.0  # only $100 moved
+    # the $60 charge is still suggested
+    mom_sug = next(s for s in api.client.get("/api/buckets/reimbursements").json() if s["profile_id"] == mom)
+    assert mom_sug["amount"] == 60.0
+
+
 def test_allocate_blocked_when_source_short(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -700,

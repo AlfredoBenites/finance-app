@@ -23,6 +23,7 @@ export default function BucketsPage() {
   const [editMode, setEditMode] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
   const [allocSel, setAllocSel] = useState({}); // "profile:card" -> {source, dest}
+  const [txnSel, setTxnSel] = useState({}); // "profile:card" -> {txnId: checked}
   const [incomeAllocs, setIncomeAllocs] = useState([]);
   const [incomeSel, setIncomeSel] = useState({}); // income_id -> bucket_id
   const [busy, setBusy] = useState(false);
@@ -44,6 +45,11 @@ export default function BucketsPage() {
       setAccounts(a);
       setCards(c);
       setReimbursements(r);
+      // default every charge to selected
+      setTxnSel(Object.fromEntries(r.map((x) => [
+        `${x.profile_id}:${x.credit_card_id}`,
+        Object.fromEntries((x.transactions || []).map((t) => [t.id, true])),
+      ])));
       setIncomeAllocs(inc);
       setEditNames(Object.fromEntries(b.map((x) => [x.id, x.name])));
     } catch (e) {
@@ -209,7 +215,7 @@ export default function BucketsPage() {
     }
   }
 
-  async function allocate(r, sel) {
+  async function allocate(r, sel, transactionIds) {
     if (!sel.source || !sel.dest) {
       setError("Pick a source and destination bucket.");
       return;
@@ -222,6 +228,7 @@ export default function BucketsPage() {
         credit_card_id: r.credit_card_id,
         source_bucket_id: sel.source,
         dest_bucket_id: sel.dest,
+        transaction_ids: transactionIds,
       });
       setError(null);
       await load();
@@ -302,10 +309,15 @@ export default function BucketsPage() {
         const key = `${r.profile_id}:${r.credit_card_id}`;
         const sel = allocSel[key] || { source: r.source_bucket_id || "", dest: r.dest_bucket_id || "" };
         const setSel = (field, value) => setAllocSel((s) => ({ ...s, [key]: { ...sel, [field]: value } }));
+        const lines = r.transactions || [];
+        const picked = txnSel[key] || {};
+        const chosen = lines.filter((t) => picked[t.id]);
+        const selAmount = chosen.reduce((s, t) => s - Number(t.amount), 0);
+        const toggleTxn = (id) => setTxnSel((s) => ({ ...s, [key]: { ...s[key], [id]: !s[key]?.[id] } }));
         return (
           <div className="card" key={key} style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff", flexWrap: "wrap" }}>
             <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              {r.own ? "Set aside" : "Move"} <strong>{money(r.amount)}</strong> ({r.profile_name}'s {r.card_name}) from
+              {r.own ? "Set aside" : "Move"} <strong>{money(selAmount)}</strong> ({r.profile_name}'s {r.card_name}) from
               <select value={sel.source} onChange={(e) => setSel("source", e.target.value)}>
                 <option value="">bucket…</option>
                 {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -317,19 +329,22 @@ export default function BucketsPage() {
               </select>
             </span>
             <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={() => allocate(r, sel)} disabled={busy}>Allocate</button>
+              <button onClick={() => allocate(r, sel, chosen.map((t) => t.id))} disabled={busy || chosen.length === 0}>Allocate</button>
               <button onClick={() => dismiss(r)} disabled={busy} title="Decline this suggestion">✕</button>
             </span>
-            {(r.transactions || []).length > 0 && (
+            {lines.length > 0 && (
               <details style={{ flexBasis: "100%", marginTop: 6 }}>
                 <summary style={{ cursor: "pointer", fontSize: 13, color: "#1e3a8a" }}>
-                  {r.transactions.length} transaction{r.transactions.length === 1 ? "" : "s"} marked paid
+                  {chosen.length} of {lines.length} transaction{lines.length === 1 ? "" : "s"} selected
                 </summary>
-                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13 }}>
-                  {r.transactions.map((t, i) => (
-                    <li key={i}>
-                      {t.transaction_date} · {t.merchant || "—"} · <strong>{money(-t.amount)}</strong>
-                      {t.notes ? ` · ${t.notes}` : ""}
+                <ul style={{ margin: "6px 0 0", paddingLeft: 4, fontSize: 13, listStyle: "none" }}>
+                  {lines.map((t) => (
+                    <li key={t.id}>
+                      <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input type="checkbox" checked={!!picked[t.id]} onChange={() => toggleTxn(t.id)} />
+                        {t.transaction_date} · {t.merchant || "—"} · <strong>{money(-t.amount)}</strong>
+                        {t.notes ? ` · ${t.notes}` : ""}
+                      </label>
                     </li>
                   ))}
                 </ul>

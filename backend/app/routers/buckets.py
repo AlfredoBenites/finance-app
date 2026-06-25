@@ -1,5 +1,6 @@
 """CRUD endpoints for buckets. Scoped to the logged-in user."""
 from decimal import Decimal
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,8 @@ class AllocateRequest(BaseModel):
     credit_card_id: str
     source_bucket_id: str
     dest_bucket_id: str
+    # optional: only allocate these specific charges (else the whole group)
+    transaction_ids: Optional[list] = None
 
 
 def _allocation_groups(user_id: str):
@@ -47,7 +50,7 @@ def _allocation_groups(user_id: str):
     txns = (
         supabase.table("transactions")
         .select(
-            "amount, credit_card_id, profile_id, reimbursement_allocated, "
+            "id, amount, credit_card_id, profile_id, reimbursement_allocated, "
             "is_paid_back, paid_to_bank, merchant, transaction_date, category, notes"
         )
         .eq("owner_id", user_id)
@@ -70,6 +73,7 @@ def _allocation_groups(user_id: str):
         amt = Decimal(str(t["amount"]))
         g["total"] += -amt  # purchases are negative; owed is positive
         g["lines"].append({
+            "id": t["id"],
             "transaction_date": t["transaction_date"],
             "merchant": t.get("merchant"),
             "category": t.get("category"),
@@ -126,9 +130,21 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
 
 @router.post("/allocate-reimbursement")
 def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_current_user_id)):
-    """Move a (profile, card)'s money from a source bucket into a dest bucket."""
-    amount = _allocations(user_id).get((payload.profile_id, payload.credit_card_id))
-    if not amount:
+    """Move a (profile, card)'s money from a source bucket into a dest bucket.
+
+    If transaction_ids is given, only those charges are allocated (and the amount
+    is their sum); otherwise the whole group is."""
+    group = _allocation_groups(user_id).get((payload.profile_id, payload.credit_card_id))
+    if not group:
+        raise HTTPException(status_code=400, detail="Nothing to allocate")
+    if payload.transaction_ids:
+        chosen = [ln for ln in group["lines"] if ln["id"] in set(payload.transaction_ids)]
+        if not chosen:
+            raise HTTPException(status_code=400, detail="None of those charges are available to allocate")
+        amount = -sum((Decimal(str(ln["amount"])) for ln in chosen), Decimal("0"))
+    else:
+        amount = group["total"]
+    if amount <= 0:
         raise HTTPException(status_code=400, detail="Nothing to allocate")
     if payload.source_bucket_id == payload.dest_bucket_id:
         raise HTTPException(status_code=400, detail="Source and destination must differ")
@@ -154,8 +170,12 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
             if a.data:
                 supabase.table("accounts").update({"balance": str(Decimal(str(a.data[0]["balance"])) + delta)}).eq("id", acc_id).eq("owner_id", user_id).execute()
 
-    # Mark the (profile, card) charges as allocated so they stop being suggested.
-    _mark_handled(user_id, payload.profile_id, payload.credit_card_id)
+    # Mark the allocated charges so they stop being suggested.
+    if payload.transaction_ids:
+        for tid in (ln["id"] for ln in chosen):
+            supabase.table("transactions").update({"reimbursement_allocated": True}).eq("id", tid).eq("owner_id", user_id).execute()
+    else:
+        _mark_handled(user_id, payload.profile_id, payload.credit_card_id)
     return {"ok": True, "allocated": float(amount)}
 
 
