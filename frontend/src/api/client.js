@@ -117,6 +117,7 @@ export const bucketsApi = {
   // from/to are a bucket id or "unallocated".
   transfer: (data) =>
     request("/api/buckets/transfer", { method: "POST", body: JSON.stringify(data) }),
+  moves: () => request("/api/buckets/moves"),
   reimbursements: () => request("/api/buckets/reimbursements"),
   allocateReimbursement: (data) =>
     request("/api/buckets/allocate-reimbursement", { method: "POST", body: JSON.stringify(data) }),
@@ -144,6 +145,7 @@ export const accountsApi = {
   remove: (id) => request(`/api/accounts/${id}`, { method: "DELETE" }),
   transfer: (data) =>
     request("/api/accounts/transfer", { method: "POST", body: JSON.stringify(data) }),
+  transfers: () => request("/api/accounts/transfers"),
 };
 
 export const dashboardApi = {

@@ -10,6 +10,7 @@ from app.auth import get_current_user_id
 from app.database import supabase
 from app.db_errors import is_foreign_key_violation
 from app.models.account import Account, AccountCreate, AccountUpdate
+from app.services.money_log import log_move
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
@@ -51,7 +52,7 @@ def create_account(payload: AccountCreate, user_id: str = Depends(get_current_us
 
 def _bucket_in_account(user_id, bucket_id, account_id):
     """Fetch a bucket and confirm it belongs to the account. Returns the row."""
-    b = supabase.table("buckets").select("id, current_amount, account_id").eq("id", bucket_id).eq("owner_id", user_id).execute().data
+    b = supabase.table("buckets").select("id, name, current_amount, account_id").eq("id", bucket_id).eq("owner_id", user_id).execute().data
     if not b:
         raise HTTPException(status_code=404, detail="Bucket not found")
     if b[0]["account_id"] != account_id:
@@ -72,7 +73,7 @@ def transfer_between_accounts(payload: AccountTransfer, user_id: str = Depends(g
         raise HTTPException(status_code=400, detail="Pick two different accounts")
 
     src = supabase.table(TABLE).select("balance, name").eq("id", payload.from_account_id).eq("owner_id", user_id).execute().data
-    dst = supabase.table(TABLE).select("balance").eq("id", payload.to_account_id).eq("owner_id", user_id).execute().data
+    dst = supabase.table(TABLE).select("balance, name").eq("id", payload.to_account_id).eq("owner_id", user_id).execute().data
     if not src or not dst:
         raise HTTPException(status_code=404, detail="Account not found")
     src_balance = Decimal(str(src[0]["balance"]))
@@ -103,7 +104,25 @@ def transfer_between_accounts(payload: AccountTransfer, user_id: str = Depends(g
         supabase.table("buckets").update({"current_amount": str(Decimal(str(from_bucket["current_amount"])) - amount)}).eq("id", from_bucket["id"]).eq("owner_id", user_id).execute()
     if to_bucket:
         supabase.table("buckets").update({"current_amount": str(Decimal(str(to_bucket["current_amount"])) + amount)}).eq("id", to_bucket["id"]).eq("owner_id", user_id).execute()
+
+    src_label = src[0]["name"] + (f" / {from_bucket['name']}" if from_bucket else "")
+    dst_label = dst[0]["name"] + (f" / {to_bucket['name']}" if to_bucket else "")
+    log_move(user_id, "account", amount, f"{src_label} → {dst_label}")
     return {"ok": True, "transferred": float(amount)}
+
+
+@router.get("/transfers")
+def list_transfers(user_id: str = Depends(get_current_user_id)):
+    """History of account-to-account transfers, newest first."""
+    return (
+        supabase.table("money_moves")
+        .select("id, amount, summary, created_at")
+        .eq("owner_id", user_id)
+        .eq("scope", "account")
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
 
 
 @router.get("/{account_id}", response_model=Account)

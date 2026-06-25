@@ -26,6 +26,7 @@ export default function BucketsPage() {
   const [txnSel, setTxnSel] = useState({}); // "profile:card" -> {txnId: checked}
   const [incomeAllocs, setIncomeAllocs] = useState([]);
   const [incomeSel, setIncomeSel] = useState({}); // income_id -> bucket_id
+  const [moveHistory, setMoveHistory] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -34,16 +35,18 @@ export default function BucketsPage() {
 
   async function load() {
     try {
-      const [b, a, c, r, inc] = await Promise.all([
+      const [b, a, c, r, inc, mv] = await Promise.all([
         bucketsApi.list(),
         accountsApi.list(),
         creditCardsApi.list(),
         bucketsApi.reimbursements(),
         bucketsApi.incomeAllocations(),
+        bucketsApi.moves(),
       ]);
       setBuckets(b);
       setAccounts(a);
       setCards(c);
+      setMoveHistory(mv);
       setReimbursements(r);
       // default every charge to selected
       setTxnSel(Object.fromEntries(r.map((x) => [
@@ -446,6 +449,18 @@ export default function BucketsPage() {
                 </select>
                 <button onClick={() => assignAccount(b.id)}>Assign</button>
               </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {moveHistory.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h2>Move history</h2>
+          {moveHistory.map((m) => (
+            <div className="card" key={m.id}>
+              <span><small>{(m.created_at || "").slice(0, 10)} · {m.summary}</small></span>
+              <strong>{money(m.amount)}</strong>
             </div>
           ))}
         </div>
