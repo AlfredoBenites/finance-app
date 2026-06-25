@@ -38,6 +38,7 @@ class TransactionUpdate(BaseModel):
     is_paid_back: Optional[bool] = None
     paid_back_date: Optional[date] = None
     paid_to_bank: Optional[bool] = None
+    reimbursement_allocated: Optional[bool] = None
     notes: Optional[str] = None
 
 

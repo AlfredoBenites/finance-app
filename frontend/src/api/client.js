@@ -161,6 +161,8 @@ export const incomeApi = {
   list: (year) => request(`/api/income${year ? `?year=${year}` : ""}`),
   create: (data) =>
     request("/api/income", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, data) =>
+    request(`/api/income/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/income/${id}`, { method: "DELETE" }),
 };
 
