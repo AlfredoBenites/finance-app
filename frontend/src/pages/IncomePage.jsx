@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { incomeApi, accountsApi } from "../api/client";
+import { incomeApi, accountsApi, bucketsApi } from "../api/client";
 import { INCOME_TYPES } from "../constants";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 import usePersistedState from "../hooks/usePersistedState";
@@ -115,6 +115,15 @@ export default function IncomePage() {
     }
   }
 
+  async function undoAllocation(id) {
+    try {
+      await bucketsApi.undoIncomeAllocation({ income_id: id });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   // Dropdown options: known defaults + everything used before + the current
   // (possibly just-added) value, so a freshly typed entry stays selected.
   const categoryOptions = uniqSorted([...INCOME_TYPES, ...pool.map((e) => e.category), form.category]);
@@ -211,11 +220,19 @@ export default function IncomePage() {
             <small>
               {money(i.amount)} · into {accountName(i.account_id)}
               {i.notes ? ` · ${i.notes}` : ""}
+              {i.allocated_bucket_id ? " · 🪣 allocated" : ""}
             </small>
           </span>
-          <button className="danger" onClick={() => handleDelete(i.id)}>
-            Delete
-          </button>
+          <span style={{ display: "flex", gap: 6 }}>
+            {i.allocated_bucket_id && (
+              <button onClick={() => undoAllocation(i.id)} title="Reverse the bucket/balance this income added">
+                Undo allocation
+              </button>
+            )}
+            <button className="danger" onClick={() => handleDelete(i.id)}>
+              Delete
+            </button>
+          </span>
         </div>
       ))}
     </div>

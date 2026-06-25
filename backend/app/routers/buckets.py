@@ -263,8 +263,43 @@ def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_c
         supabase.table(TABLE).update(
             {"current_amount": str(Decimal(str(bk["current_amount"])) + amount)}
         ).eq("id", bk["id"]).eq("owner_id", user_id).execute()
-    supabase.table("income").update({"bucket_allocated": True}).eq("id", inc["id"]).eq("owner_id", user_id).execute()
+    supabase.table("income").update(
+        {"bucket_allocated": True, "allocated_bucket_id": payload.bucket_id}
+    ).eq("id", inc["id"]).eq("owner_id", user_id).execute()
     return {"ok": True, "allocated": float(amount)}
+
+
+@router.post("/undo-income-allocation")
+def undo_income_allocation(payload: DismissIncomeRequest, user_id: str = Depends(get_current_user_id)):
+    """Reverse a previously-allocated income: take the amount back out of the
+    account balance (and the bucket, if any), and re-surface the suggestion."""
+    inc = (
+        supabase.table("income").select("id, amount, account_id, allocated_bucket_id")
+        .eq("id", payload.income_id).eq("owner_id", user_id).execute().data
+    )
+    if not inc:
+        raise HTTPException(status_code=404, detail="Income not found")
+    inc = inc[0]
+    target = inc.get("allocated_bucket_id")
+    if not target:
+        raise HTTPException(status_code=400, detail="This income wasn't allocated through the suggestion — nothing to undo")
+    amount = Decimal(str(inc["amount"]))
+
+    acc = supabase.table("accounts").select("balance").eq("id", inc["account_id"]).eq("owner_id", user_id).execute().data
+    if acc:
+        supabase.table("accounts").update(
+            {"balance": str(Decimal(str(acc[0]["balance"])) - amount)}
+        ).eq("id", inc["account_id"]).eq("owner_id", user_id).execute()
+    if target != UNALLOCATED:
+        bk = supabase.table(TABLE).select("current_amount").eq("id", target).eq("owner_id", user_id).execute().data
+        if bk:
+            supabase.table(TABLE).update(
+                {"current_amount": str(Decimal(str(bk[0]["current_amount"])) - amount)}
+            ).eq("id", target).eq("owner_id", user_id).execute()
+    supabase.table("income").update(
+        {"bucket_allocated": False, "allocated_bucket_id": None}
+    ).eq("id", inc["id"]).eq("owner_id", user_id).execute()
+    return {"ok": True}
 
 
 @router.post("/dismiss-income")
