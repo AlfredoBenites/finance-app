@@ -305,7 +305,7 @@ export default function BucketsPage() {
         return (
           <div className="card" key={key} style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff", flexWrap: "wrap" }}>
             <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              Move <strong>{money(r.amount)}</strong> ({r.profile_name}'s {r.card_name}) from
+              {r.own ? "Set aside" : "Move"} <strong>{money(r.amount)}</strong> ({r.profile_name}'s {r.card_name}) from
               <select value={sel.source} onChange={(e) => setSel("source", e.target.value)}>
                 <option value="">bucket…</option>
                 {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
