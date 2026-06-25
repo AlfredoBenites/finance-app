@@ -33,16 +33,24 @@ class AllocateRequest(BaseModel):
 
 
 def _allocation_groups(user_id: str):
-    """Not-yet-allocated paid card charges grouped by (profile_id, card_id),
-    with each group's total owed and the individual lines behind it."""
+    """Charges to suggest moving into a card's payoff bucket, grouped by
+    (profile_id, card_id):
+
+    - YOUR own card charges not yet paid to the bank — so you set the money aside
+      to pay the card (regardless of reimbursement).
+    - OTHER people's charges that they've reimbursed you for.
+    """
+    primary_id = next(
+        (p["id"] for p in supabase.table("profiles").select("id, is_primary").eq("owner_id", user_id).execute().data if p.get("is_primary")),
+        None,
+    )
     txns = (
         supabase.table("transactions")
         .select(
             "amount, credit_card_id, profile_id, reimbursement_allocated, "
-            "merchant, transaction_date, category, notes"
+            "is_paid_back, paid_to_bank, merchant, transaction_date, category, notes"
         )
         .eq("owner_id", user_id)
-        .eq("is_paid_back", True)
         .order("transaction_date")
         .execute()
         .data
@@ -51,8 +59,14 @@ def _allocation_groups(user_id: str):
     for t in txns:
         if not t.get("credit_card_id") or t.get("reimbursement_allocated"):
             continue
+        is_own = t["profile_id"] == primary_id
+        if is_own:
+            if t.get("paid_to_bank"):
+                continue  # already paid to the bank — nothing to set aside
+        elif not t.get("is_paid_back"):
+            continue  # others' charges: only once they've reimbursed you
         key = (t["profile_id"], t["credit_card_id"])
-        g = groups.setdefault(key, {"total": Decimal("0"), "lines": []})
+        g = groups.setdefault(key, {"total": Decimal("0"), "lines": [], "own": is_own})
         amt = Decimal(str(t["amount"]))
         g["total"] += -amt  # purchases are negative; owed is positive
         g["lines"].append({
@@ -81,19 +95,25 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
         return []
     profiles = {p["id"]: p for p in supabase.table("profiles").select("id, name, default_bucket_id").eq("owner_id", user_id).execute().data}
     cards = {c["id"]: c["name"] for c in supabase.table("credit_cards").select("id, name").eq("owner_id", user_id).execute().data}
-    bks = supabase.table(TABLE).select("id, name, credit_card_id, account_id").eq("owner_id", user_id).execute().data
+    bks = supabase.table(TABLE).select("id, name, credit_card_id, account_id, current_amount").eq("owner_id", user_id).execute().data
     bk_name = {b["id"]: b["name"] for b in bks}
+    bk_balance = {b["id"]: Decimal(str(b["current_amount"])) for b in bks}
     payoff = {b["credit_card_id"]: b["id"] for b in bks if b["credit_card_id"] and b["account_id"]}
     out = []
     for (pid, cid), g in groups.items():
         prof = profiles.get(pid, {})
         src = prof.get("default_bucket_id")
+        # "only if I have money available": for your OWN charges, only suggest
+        # when the source bucket can actually cover the amount.
+        if g["own"] and bk_balance.get(src, Decimal("0")) < g["total"]:
+            continue
         dest = payoff.get(cid)
         out.append({
             "profile_id": pid,
             "profile_name": prof.get("name", "Unknown"),
             "credit_card_id": cid,
             "card_name": cards.get(cid, "Unknown"),
+            "own": g["own"],
             "source_bucket_id": src,
             "source_bucket_name": bk_name.get(src),
             "dest_bucket_id": dest,

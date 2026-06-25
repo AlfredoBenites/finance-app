@@ -10,10 +10,12 @@ def _setup(api):
     acct = api.client.post("/api/accounts", json={"name": "Ally", "balance": 1000}).json()["id"]
     card = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
     moms = api.client.post("/api/buckets", json={"name": "Moms money", "account_id": acct, "current_amount": 500}).json()["id"]
+    mine = api.client.post("/api/buckets", json={"name": "My money", "account_id": acct, "current_amount": 500}).json()["id"]
     payoff = next(b["id"] for b in api.client.get("/api/buckets").json() if b["credit_card_id"] == card)
     api.client.put(f"/api/buckets/{payoff}", json={"account_id": acct})
-    # Mom's default money bucket
+    # default money buckets (your own charges need a funded source to be suggested)
     api.client.put(f"/api/profiles/{mom}", json={"default_bucket_id": moms})
+    api.client.put(f"/api/profiles/{me}", json={"default_bucket_id": mine})
     return me, mom, acct, card, moms, payoff
 
 
@@ -145,6 +147,29 @@ def test_dismiss_income_clears_without_moving(api):
     assert api.client.get("/api/buckets/income-allocations").json() == []
     bal = next(a["balance"] for a in api.client.get("/api/accounts").json() if a["id"] == acct)
     assert float(bal) == 100.0  # untouched
+
+
+def test_own_charge_suggested_when_source_has_money(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    # your own charge, NOT reimbursed, NOT paid to bank -> suggest setting money aside
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": me, "credit_card_id": card})
+    mine = next((s for s in api.client.get("/api/buckets/reimbursements").json() if s["profile_id"] == me), None)
+    assert mine and mine["amount"] == 100.0 and mine["own"] is True  # My money (500) covers it
+
+
+def test_own_charge_hidden_when_source_short(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -600,
+                    "profile_id": me, "credit_card_id": card})  # My money only has 500
+    assert not any(s["profile_id"] == me for s in api.client.get("/api/buckets/reimbursements").json())
+
+
+def test_own_charge_hidden_once_paid_to_bank(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": me, "credit_card_id": card, "paid_to_bank": True})
+    assert not any(s["profile_id"] == me for s in api.client.get("/api/buckets/reimbursements").json())
 
 
 def test_income_update_changes_amount_and_date(api):
