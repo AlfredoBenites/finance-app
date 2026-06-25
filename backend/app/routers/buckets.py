@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user_id
 from app.database import supabase
 from app.models.bucket import Bucket, BucketCreate, BucketUpdate
+from app.services.money_log import log_move
 
 router = APIRouter(prefix="/api/buckets", tags=["buckets"])
 
@@ -150,7 +151,7 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
         raise HTTPException(status_code=400, detail="Source and destination must differ")
 
     def get_bucket(bid):
-        r = supabase.table(TABLE).select("id, current_amount, account_id").eq("id", bid).eq("owner_id", user_id).execute()
+        r = supabase.table(TABLE).select("id, name, current_amount, account_id").eq("id", bid).eq("owner_id", user_id).execute()
         if not r.data:
             raise HTTPException(status_code=404, detail="Bucket not found")
         return r.data[0]
@@ -176,6 +177,7 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
             supabase.table("transactions").update({"reimbursement_allocated": True}).eq("id", tid).eq("owner_id", user_id).execute()
     else:
         _mark_handled(user_id, payload.profile_id, payload.credit_card_id)
+    log_move(user_id, "bucket", amount, f"{src['name']} → {dest['name']} (allocate to card)")
     return {"ok": True, "allocated": float(amount)}
 
 
@@ -266,7 +268,7 @@ def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_c
     """Land a recorded income amount in its account's balance, optionally earmarked
     in a bucket. bucket_id 'unallocated' adds it to the balance only (not earmarked)."""
     inc = (
-        supabase.table("income").select("id, amount, account_id, bucket_allocated")
+        supabase.table("income").select("id, amount, account_id, bucket_allocated, source")
         .eq("id", payload.income_id).eq("owner_id", user_id).execute().data
     )
     if not inc:
@@ -279,7 +281,7 @@ def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_c
     bk = None
     if payload.bucket_id and payload.bucket_id != UNALLOCATED:
         rows = (
-            supabase.table(TABLE).select("id, current_amount, account_id")
+            supabase.table(TABLE).select("id, name, current_amount, account_id")
             .eq("id", payload.bucket_id).eq("owner_id", user_id).execute().data
         )
         if not rows:
@@ -306,7 +308,22 @@ def allocate_income(payload: AllocateIncomeRequest, user_id: str = Depends(get_c
     supabase.table("income").update(
         {"bucket_allocated": True, "allocated_bucket_id": payload.bucket_id}
     ).eq("id", inc["id"]).eq("owner_id", user_id).execute()
+    log_move(user_id, "bucket", amount, f"Income '{inc.get('source', '')}' → {bk['name'] if bk else 'Unallocated'}")
     return {"ok": True, "allocated": float(amount)}
+
+
+@router.get("/moves")
+def list_bucket_moves(user_id: str = Depends(get_current_user_id)):
+    """History of money moved within/among buckets, newest first."""
+    return (
+        supabase.table("money_moves")
+        .select("id, amount, summary, created_at")
+        .eq("owner_id", user_id)
+        .eq("scope", "bucket")
+        .order("created_at", desc=True)
+        .execute()
+        .data
+    )
 
 
 @router.post("/undo-income-allocation")
@@ -376,7 +393,7 @@ def transfer(payload: TransferRequest, user_id: str = Depends(get_current_user_i
 
     acct = (
         supabase.table("accounts")
-        .select("balance")
+        .select("balance, name")
         .eq("id", payload.account_id)
         .eq("owner_id", user_id)
         .execute()
@@ -387,13 +404,14 @@ def transfer(payload: TransferRequest, user_id: str = Depends(get_current_user_i
 
     rows = (
         supabase.table(TABLE)
-        .select("id, current_amount")
+        .select("id, name, current_amount")
         .eq("owner_id", user_id)
         .eq("account_id", payload.account_id)
         .execute()
         .data
     )
     amounts = {r["id"]: Decimal(str(r["current_amount"])) for r in rows}
+    bucket_name = {r["id"]: r["name"] for r in rows}
     unallocated = balance - sum(amounts.values(), Decimal("0"))
     amt = payload.amount
 
@@ -418,6 +436,9 @@ def transfer(payload: TransferRequest, user_id: str = Depends(get_current_user_i
         supabase.table(TABLE).update({"current_amount": str(amounts[payload.to] + amt)}).eq(
             "id", payload.to
         ).eq("owner_id", user_id).execute()
+
+    label = lambda x: "Unallocated" if x == UNALLOCATED else bucket_name.get(x, "?")
+    log_move(user_id, "bucket", amt, f"{acct.data[0]['name']}: {label(payload.source)} → {label(payload.to)}")
     return {"ok": True}
 
 

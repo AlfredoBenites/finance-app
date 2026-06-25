@@ -7,6 +7,7 @@ const ACCOUNT_TYPES = ["checking", "savings", "cash", "investment", "roth_ira"];
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState([]);
   const [buckets, setBuckets] = useState([]);
+  const [transfers, setTransfers] = useState([]);
   const [name, setName] = useState("");
   const [type, setType] = useState(ACCOUNT_TYPES[0]);
   const [balance, setBalance] = useState("");
@@ -18,9 +19,10 @@ export default function AccountsPage() {
 
   async function load() {
     try {
-      const [a, b] = await Promise.all([accountsApi.list(), bucketsApi.list()]);
+      const [a, b, tr] = await Promise.all([accountsApi.list(), bucketsApi.list(), accountsApi.transfers()]);
       setAccounts(a);
       setBuckets(b);
+      setTransfers(tr);
     } catch (e) {
       setError(e.message);
     }
@@ -199,6 +201,18 @@ export default function AccountsPage() {
             <div className="card" key={a.id}>
               <span><small>{a.name} · {a.account_type} · {money(a.balance)} (closed)</small></span>
               <button onClick={() => setClosed(a.id, false)}>Reopen</button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {transfers.length > 0 && (
+        <>
+          <h2>Transfer history</h2>
+          {transfers.map((t) => (
+            <div className="card" key={t.id}>
+              <span><small>{(t.created_at || "").slice(0, 10)} · {t.summary}</small></span>
+              <strong>{money(t.amount)}</strong>
             </div>
           ))}
         </>

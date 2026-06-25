@@ -87,3 +87,24 @@ def test_account_transfer_between_buckets_cross_account(api):
     assert bals["Capital One"] == 200.0 and bals["Ally"] == 300.0
     amts = {x["id"]: float(x["current_amount"]) for x in api.client.get("/api/buckets").json()}
     assert amts[src_bucket] == 200.0 and amts[dst_bucket] == 300.0
+
+
+def test_account_transfer_recorded_in_history(api):
+    api.login(*USER_A)
+    a = api.client.post("/api/accounts", json={"name": "Cap One", "balance": 100}).json()["id"]
+    b = api.client.post("/api/accounts", json={"name": "Ally", "balance": 0}).json()["id"]
+    api.client.post("/api/accounts/transfer", json={"from_account_id": a, "to_account_id": b, "amount": 40})
+    hist = api.client.get("/api/accounts/transfers").json()
+    assert len(hist) == 1 and float(hist[0]["amount"]) == 40.0
+    assert "Cap One" in hist[0]["summary"] and "Ally" in hist[0]["summary"]
+
+
+def test_bucket_move_recorded_in_history(api):
+    api.login(*USER_A)
+    acct = api.client.post("/api/accounts", json={"name": "Ally", "balance": 500}).json()["id"]
+    b1 = api.client.post("/api/buckets", json={"name": "Savings", "account_id": acct, "current_amount": 300}).json()["id"]
+    b2 = api.client.post("/api/buckets", json={"name": "Vacation", "account_id": acct, "current_amount": 0}).json()["id"]
+    api.client.post("/api/buckets/transfer", json={"account_id": acct, "from": b1, "to": b2, "amount": 100})
+    hist = api.client.get("/api/buckets/moves").json()
+    assert len(hist) == 1 and float(hist[0]["amount"]) == 100.0
+    assert "Savings" in hist[0]["summary"] and "Vacation" in hist[0]["summary"]
