@@ -155,6 +155,16 @@ export const accountsApi = {
   transfers: () => request("/api/accounts/transfers"),
 };
 
+export const holdingsApi = {
+  list: () => request("/api/holdings"),
+  create: (data) =>
+    request("/api/holdings", { method: "POST", body: JSON.stringify(data) }),
+  update: (id, data) =>
+    request(`/api/holdings/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  remove: (id) => request(`/api/holdings/${id}`, { method: "DELETE" }),
+  refreshPrices: () => request("/api/holdings/refresh-prices", { method: "POST" }),
+};
+
 export const dashboardApi = {
   get: ({ year, onlyPrimary, excludeRepayments } = {}) => {
     const p = new URLSearchParams();

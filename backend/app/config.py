@@ -14,6 +14,7 @@ ROOT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env.local"
 class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
+    finnhub_api_key: str = ""  # stock quotes; crypto uses CoinGecko (no key)
 
     model_config = SettingsConfigDict(
         env_file=ROOT_ENV_FILE,
