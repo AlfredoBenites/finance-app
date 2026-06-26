@@ -35,6 +35,8 @@ class _Query:
         self._op = "select"
         self._payload = None
         self._eq = []
+        self._like = []  # (col, needle) ANDed
+        self._or = []  # list of OR-groups, each a list of (col, needle)
 
     def select(self, *_args, **_kwargs):
         self._op = "select"
@@ -58,10 +60,19 @@ class _Query:
         self._eq.append((col, val))
         return self
 
-    # Operators the app calls but these tests don't filter on — accept and ignore.
-    def ilike(self, *_a, **_k):
+    def ilike(self, col, pattern):
+        self._like.append((col, str(pattern).strip("%*").lower()))
         return self
 
+    def or_(self, expr):
+        group = []
+        for item in expr.split(","):
+            col, _op, pat = item.split(".", 2)
+            group.append((col, pat.strip("%*").lower()))
+        self._or.append(group)
+        return self
+
+    # Operators the app calls but these tests don't filter on — accept and ignore.
     def gte(self, *_a, **_k):
         return self
 
@@ -71,8 +82,19 @@ class _Query:
     def order(self, *_a, **_k):
         return self
 
+    @staticmethod
+    def _contains(row, col, needle):
+        return needle in str(row.get(col) or "").lower()
+
     def _matches(self, row):
-        return all(row.get(col) == val for col, val in self._eq)
+        if not all(row.get(col) == val for col, val in self._eq):
+            return False
+        if not all(self._contains(row, c, n) for c, n in self._like):
+            return False
+        for group in self._or:
+            if not any(self._contains(row, c, n) for c, n in group):
+                return False
+        return True
 
     def execute(self):
         rows = self._store.setdefault(self._table, [])

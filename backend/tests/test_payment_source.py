@@ -108,3 +108,20 @@ def test_bucket_move_recorded_in_history(api):
     hist = api.client.get("/api/buckets/moves").json()
     assert len(hist) == 1 and float(hist[0]["amount"]) == 100.0
     assert "Savings" in hist[0]["summary"] and "Vacation" in hist[0]["summary"]
+
+
+def test_search_matches_merchant_or_notes(api):
+    api.login(*USER_A)
+    pid = _profile(api)
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -50,
+                    "merchant": "Publix", "notes": "for the beach trip", "profile_id": pid, "credit_card_id": "c1"})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -20,
+                    "merchant": "Beach Shop", "notes": "sunscreen", "profile_id": pid, "credit_card_id": "c1"})
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-03", "amount": -10,
+                    "merchant": "Gas", "notes": "commute", "profile_id": pid, "credit_card_id": "c1"})
+    # "beach" matches the note on Publix and the merchant on Beach Shop -> 2
+    got = api.client.get("/api/transactions?search=beach").json()
+    merchants = sorted(t["merchant"] for t in got)
+    assert merchants == ["Beach Shop", "Publix"]
+    # a note-only term
+    assert [t["merchant"] for t in api.client.get("/api/transactions?search=sunscreen").json()] == ["Beach Shop"]

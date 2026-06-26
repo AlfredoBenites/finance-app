@@ -35,7 +35,7 @@ def list_transactions(
     is_paid_back: Optional[bool] = None,
     year: Optional[int] = Query(default=None, description="Filter by year, e.g. 2026"),
     month: Optional[str] = Query(default=None, description="Filter by month, format YYYY-MM"),
-    search: Optional[str] = Query(default=None, description="Merchant name contains"),
+    search: Optional[str] = Query(default=None, description="Merchant or notes contains"),
 ):
     query = supabase.table(TABLE).select("*").eq("owner_id", user_id)
 
@@ -61,7 +61,9 @@ def list_transactions(
             raise HTTPException(status_code=400, detail="month must be formatted YYYY-MM")
         query = query.gte("transaction_date", start).lt("transaction_date", end)
     if search is not None:
-        query = query.ilike("merchant", f"%{search}%")
+        # match the term in the merchant OR the notes
+        term = search.replace(",", " ")  # commas are structural in the or() filter
+        query = query.or_(f"merchant.ilike.*{term}*,notes.ilike.*{term}*")
 
     result = query.order("transaction_date", desc=True).execute()
     return result.data
