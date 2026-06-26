@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { holdingsApi, accountsApi } from "../api/client";
 import { money } from "../format";
 
-const EMPTY = { account_id: "", symbol: "", kind: "stock", shares: "", manual_price: "" };
+const EMPTY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" };
 
 // shares can be fractional + crypto prices are tiny, so don't force 2 decimals
 const price = (n) =>
@@ -43,6 +43,7 @@ export default function InvestmentsPage() {
       account_id: form.account_id,
       symbol: form.symbol.trim().toUpperCase(),
       kind: form.kind,
+      category: form.category.trim() || null,
       shares: Number(form.shares),
       manual_price: form.manual_price === "" ? null : Number(form.manual_price),
     };
@@ -65,6 +66,7 @@ export default function InvestmentsPage() {
       account_id: h.account_id,
       symbol: h.symbol,
       kind: h.kind,
+      category: h.category ?? "",
       shares: String(h.shares),
       manual_price: h.manual_price != null ? String(h.manual_price) : "",
     });
@@ -95,8 +97,14 @@ export default function InvestmentsPage() {
   }
 
   const total = holdings.reduce((s, h) => s + (value(h) || 0), 0);
-  const byAccount = {};
-  for (const h of holdings) byAccount[h.account_id] = (byAccount[h.account_id] || 0) + (value(h) || 0);
+  // group: account -> category -> holdings
+  const grouped = {};
+  for (const h of holdings) {
+    const cat = h.category || "Uncategorized";
+    grouped[h.account_id] = grouped[h.account_id] || {};
+    (grouped[h.account_id][cat] = grouped[h.account_id][cat] || []).push(h);
+  }
+  const sum = (list) => list.reduce((s, h) => s + (value(h) || 0), 0);
 
   return (
     <div>
@@ -122,6 +130,10 @@ export default function InvestmentsPage() {
           <option value="crypto">Crypto</option>
         </select>
         <input placeholder="Symbol (AAPL, BTC)" value={form.symbol} onChange={(e) => setField("symbol", e.target.value)} />
+        <input placeholder="Category (Roth IRA, Crypto…)" list="holding-categories" value={form.category} onChange={(e) => setField("category", e.target.value)} />
+        <datalist id="holding-categories">
+          {[...new Set(holdings.map((h) => h.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}
+        </datalist>
         <input type="number" step="any" placeholder="Shares" value={form.shares} onChange={(e) => setField("shares", e.target.value)} />
         <input type="number" step="any" placeholder="Manual price (optional)" value={form.manual_price} onChange={(e) => setField("manual_price", e.target.value)} />
         <button type="submit">{editingId ? "Save" : "Add holding"}</button>
@@ -136,36 +148,44 @@ export default function InvestmentsPage() {
       </div>
 
       {holdings.length === 0 && <p>No holdings yet.</p>}
-      {holdings.map((h) => (
-        <div className="card" key={h.id}>
-          <span>
-            <strong>{h.symbol}</strong> · {h.kind} · {Number(h.shares)} shares · in {accountName(h.account_id)}
-            <br />
-            <small>
-              {h.manual_price != null ? "manual " : ""}price {price(effPrice(h))}
-              {h.last_price != null && h.manual_price == null && h.price_updated_at
-                ? ` · updated ${(h.price_updated_at || "").slice(0, 10)}` : ""}
-              {" · value "}<strong>{value(h) == null ? "—" : money(value(h))}</strong>
-            </small>
-          </span>
-          <span style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => startEdit(h)}>Edit</button>
-            <button className="danger" onClick={() => handleDelete(h.id)}>Delete</button>
-          </span>
-        </div>
-      ))}
 
-      {Object.keys(byAccount).length > 1 && (
-        <>
-          <h2>By account</h2>
-          {Object.entries(byAccount).map(([id, v]) => (
-            <div className="card" key={id}>
-              <span>{accountName(id)}</span>
-              <strong>{money(v)}</strong>
+      {Object.entries(grouped).map(([accId, cats]) => {
+        const accHoldings = Object.values(cats).flat();
+        return (
+          <div key={accId} style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "2px solid #2563eb" }}>
+              <h2 style={{ margin: "0 0 4px" }}>{accountName(accId)}</h2>
+              <strong>{money(sum(accHoldings))}</strong>
             </div>
-          ))}
-        </>
-      )}
+            {Object.entries(cats).map(([cat, list]) => (
+              <div key={cat}>
+                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0 2px", color: "#6b7280" }}>
+                  <small><strong>{cat}</strong></small>
+                  <small>{money(sum(list))}</small>
+                </div>
+                {list.map((h) => (
+                  <div className="card" key={h.id}>
+                    <span>
+                      <strong>{h.symbol}</strong> · {h.kind} · {Number(h.shares)} shares
+                      <br />
+                      <small>
+                        {h.manual_price != null ? "manual " : ""}price {price(effPrice(h))}
+                        {h.last_price != null && h.manual_price == null && h.price_updated_at
+                          ? ` · updated ${(h.price_updated_at || "").slice(0, 10)}` : ""}
+                        {" · value "}<strong>{value(h) == null ? "—" : money(value(h))}</strong>
+                      </small>
+                    </span>
+                    <span style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => startEdit(h)}>Edit</button>
+                      <button className="danger" onClick={() => handleDelete(h.id)}>Delete</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
