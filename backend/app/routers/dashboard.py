@@ -30,6 +30,21 @@ def get_dashboard(
     transactions = all_transactions
     buckets = owned("buckets")
     accounts = owned("accounts")
+    # An account holding investments is valued at the sum of its holdings
+    # (shares x manual-or-last price), overriding its manual balance.
+    holdings = owned("holdings", "account_id, shares, last_price, manual_price")
+    holdings_value = {}
+    for h in holdings:
+        price = h.get("manual_price")
+        price = price if price is not None else h.get("last_price")
+        if price is not None:
+            holdings_value[h["account_id"]] = holdings_value.get(h["account_id"], calc.Decimal("0")) + (
+                calc._dec(h.get("shares")) * calc._dec(price)
+            )
+    accounts = [
+        {**a, "balance": str(holdings_value[a["id"]])} if a["id"] in holdings_value else a
+        for a in accounts
+    ]
     profiles = owned("profiles", "id, name, is_primary")
     cards = owned("credit_cards", "id, name, due_day, statement_day")
     card_payments = owned("card_payments", "credit_card_id, amount, paid_on")

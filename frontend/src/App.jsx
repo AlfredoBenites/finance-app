@@ -10,6 +10,7 @@ import AccountsPage from "./pages/AccountsPage";
 import SharedWithMePage from "./pages/SharedWithMePage";
 import IncomePage from "./pages/IncomePage";
 import PaymentsPage from "./pages/PaymentsPage";
+import InvestmentsPage from "./pages/InvestmentsPage";
 
 const PAGES = [
   ["dashboard", "Dashboard"],
@@ -20,6 +21,7 @@ const PAGES = [
   ["buckets", "Buckets"],
   ["payments", "Pay a card"],
   ["accounts", "Accounts"],
+  ["investments", "Investments"],
   ["shared", "Shared with me"],
 ];
 
@@ -60,6 +62,7 @@ export default function App() {
       {page === "buckets" && <BucketsPage />}
       {page === "payments" && <PaymentsPage />}
       {page === "accounts" && <AccountsPage />}
+      {page === "investments" && <InvestmentsPage />}
       {page === "shared" && <SharedWithMePage />}
     </div>
   );
