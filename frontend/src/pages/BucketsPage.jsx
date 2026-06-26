@@ -26,6 +26,8 @@ export default function BucketsPage() {
   const [txnSel, setTxnSel] = useState({}); // "profile:card" -> {txnId: checked}
   const [incomeAllocs, setIncomeAllocs] = useState([]);
   const [incomeSel, setIncomeSel] = useState({}); // income_id -> bucket_id
+  const [acctExpenses, setAcctExpenses] = useState([]);
+  const [expenseSel, setExpenseSel] = useState({}); // transaction_id -> bucket_id
   const [moveHistory, setMoveHistory] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -35,18 +37,20 @@ export default function BucketsPage() {
 
   async function load() {
     try {
-      const [b, a, c, r, inc, mv] = await Promise.all([
+      const [b, a, c, r, inc, mv, exp] = await Promise.all([
         bucketsApi.list(),
         accountsApi.list(),
         creditCardsApi.list(),
         bucketsApi.reimbursements(),
         bucketsApi.incomeAllocations(),
         bucketsApi.moves(),
+        bucketsApi.accountExpenses(),
       ]);
       setBuckets(b);
       setAccounts(a);
       setCards(c);
       setMoveHistory(mv);
+      setAcctExpenses(exp);
       setReimbursements(r);
       // default every charge to selected
       setTxnSel(Object.fromEntries(r.map((x) => [
@@ -218,6 +222,51 @@ export default function BucketsPage() {
     }
   }
 
+  async function deductExpense(r) {
+    const bucketId = expenseSel[r.transaction_id];
+    if (!bucketId) {
+      setError("Pick where to subtract this expense from.");
+      return;
+    }
+    if (busy) return;
+    setBusy(true);
+    try {
+      await bucketsApi.deductExpense({ transaction_id: r.transaction_id, bucket_id: bucketId });
+      setError(null);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismissExpense(r) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await bucketsApi.dismissExpense({ transaction_id: r.transaction_id });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismissAllExpenses() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await bucketsApi.dismissAllExpenses();
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function allocate(r, sel, transactionIds) {
     if (!sel.source || !sel.dest) {
       setError("Pick a source and destination bucket.");
@@ -296,6 +345,34 @@ export default function BucketsPage() {
             <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button onClick={() => allocateIncome(r)} disabled={busy}>Allocate</button>
               <button onClick={() => dismissIncome(r)} disabled={busy} title="Decline this suggestion">✕</button>
+            </span>
+          </div>
+        );
+      })}
+
+      {acctExpenses.length > 0 && (
+        <div style={{ textAlign: "right", marginBottom: 4 }}>
+          <button onClick={dismissAllExpenses} disabled={busy}>
+            {busy ? "Working…" : "Dismiss all expenses"}
+          </button>
+        </div>
+      )}
+      {acctExpenses.map((r) => {
+        const accountBuckets = buckets.filter((b) => b.account_id === r.account_id);
+        const isPurchase = Number(r.amount) < 0;
+        return (
+          <div className="card" key={r.transaction_id} style={{ borderColor: "#d97706", borderWidth: 2, background: "#fff7ed", flexWrap: "wrap" }}>
+            <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {isPurchase ? "Subtract" : "Add"} <strong>{money(Math.abs(Number(r.amount)))}</strong> ({r.merchant || "—"}, from {r.account_name}) {isPurchase ? "from" : "to"}
+              <select value={expenseSel[r.transaction_id] || ""} onChange={(e) => setExpenseSel((s) => ({ ...s, [r.transaction_id]: e.target.value }))}>
+                <option value="">bucket…</option>
+                <option value="unallocated">Unallocated (just the balance)</option>
+                {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </span>
+            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button onClick={() => deductExpense(r)} disabled={busy}>Apply</button>
+              <button onClick={() => dismissExpense(r)} disabled={busy} title="Decline this suggestion">✕</button>
             </span>
           </div>
         );

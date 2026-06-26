@@ -379,6 +379,113 @@ def dismiss_all_income(user_id: str = Depends(get_current_user_id)):
     return {"ok": True}
 
 
+# --- bank/cash expense -> subtract from a bucket -----------------------------
+
+class DeductExpenseRequest(BaseModel):
+    transaction_id: str
+    bucket_id: str  # a bucket id, or "unallocated"
+
+
+class DismissExpenseRequest(BaseModel):
+    transaction_id: str
+
+
+@router.get("/account-expenses")
+def list_account_expenses(user_id: str = Depends(get_current_user_id)):
+    """Bank/cash purchases not yet subtracted from a bucket. Each lets you take
+    the money out of a bucket in that account (or just its unallocated balance)."""
+    rows = (
+        supabase.table("transactions")
+        .select("id, merchant, amount, account_id, transaction_date, account_deducted")
+        .eq("owner_id", user_id)
+        .order("transaction_date", desc=True)
+        .execute()
+        .data
+    )
+    acct_names = {
+        a["id"]: a["name"]
+        for a in supabase.table("accounts").select("id, name").eq("owner_id", user_id).execute().data
+    }
+    out = []
+    for t in rows:
+        if t.get("account_deducted") or not t.get("account_id"):
+            continue
+        out.append({
+            "transaction_id": t["id"],
+            "merchant": t.get("merchant"),
+            "amount": float(t["amount"]),  # negative for a purchase
+            "account_id": t["account_id"],
+            "account_name": acct_names.get(t["account_id"], "Unknown"),
+            "transaction_date": t["transaction_date"],
+        })
+    return out
+
+
+@router.post("/deduct-expense")
+def deduct_expense(payload: DeductExpenseRequest, user_id: str = Depends(get_current_user_id)):
+    """Apply a bank/cash expense to the account balance (and a bucket, if chosen).
+    bucket_id 'unallocated' touches the balance only."""
+    t = (
+        supabase.table("transactions").select("id, merchant, amount, account_id, account_deducted")
+        .eq("id", payload.transaction_id).eq("owner_id", user_id).execute().data
+    )
+    if not t:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    t = t[0]
+    if t.get("account_deducted"):
+        raise HTTPException(status_code=400, detail="Already handled")
+    if not t.get("account_id"):
+        raise HTTPException(status_code=400, detail="Not an account expense")
+    amount = Decimal(str(t["amount"]))  # negative for a purchase
+
+    bk = None
+    if payload.bucket_id and payload.bucket_id != UNALLOCATED:
+        rows = (
+            supabase.table(TABLE).select("id, name, current_amount, account_id")
+            .eq("id", payload.bucket_id).eq("owner_id", user_id).execute().data
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="Bucket not found")
+        bk = rows[0]
+        if bk["account_id"] != t["account_id"]:
+            raise HTTPException(status_code=400, detail="Pick a bucket in the account the expense was paid from")
+
+    acc = supabase.table("accounts").select("balance").eq("id", t["account_id"]).eq("owner_id", user_id).execute().data
+    if not acc:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    supabase.table("accounts").update(
+        {"balance": str(Decimal(str(acc[0]["balance"])) + amount)}
+    ).eq("id", t["account_id"]).eq("owner_id", user_id).execute()
+    if bk:
+        supabase.table(TABLE).update(
+            {"current_amount": str(Decimal(str(bk["current_amount"])) + amount)}
+        ).eq("id", bk["id"]).eq("owner_id", user_id).execute()
+    supabase.table("transactions").update({"account_deducted": True}).eq("id", t["id"]).eq("owner_id", user_id).execute()
+    log_move(user_id, "bucket", -amount, f"Expense '{t.get('merchant') or ''}' from {bk['name'] if bk else 'Unallocated'}")
+    return {"ok": True}
+
+
+@router.post("/dismiss-expense")
+def dismiss_expense(payload: DismissExpenseRequest, user_id: str = Depends(get_current_user_id)):
+    """Decline one expense suggestion (mark handled, move nothing)."""
+    r = supabase.table("transactions").update({"account_deducted": True}).eq(
+        "id", payload.transaction_id
+    ).eq("owner_id", user_id).execute()
+    if not r.data:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return {"ok": True}
+
+
+@router.post("/dismiss-all-expenses")
+def dismiss_all_expenses(user_id: str = Depends(get_current_user_id)):
+    """Decline all expense suggestions."""
+    supabase.table("transactions").update({"account_deducted": True}).eq(
+        "owner_id", user_id
+    ).eq("account_deducted", False).execute()
+    return {"ok": True}
+
+
 @router.post("/transfer")
 def transfer(payload: TransferRequest, user_id: str = Depends(get_current_user_id)):
     """Move money between buckets (and to/from unallocated) within one account.

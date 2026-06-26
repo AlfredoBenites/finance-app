@@ -134,6 +134,13 @@ export const bucketsApi = {
     request("/api/buckets/dismiss-all-income", { method: "POST" }),
   undoIncomeAllocation: (data) =>
     request("/api/buckets/undo-income-allocation", { method: "POST", body: JSON.stringify(data) }),
+  accountExpenses: () => request("/api/buckets/account-expenses"),
+  deductExpense: (data) =>
+    request("/api/buckets/deduct-expense", { method: "POST", body: JSON.stringify(data) }),
+  dismissExpense: (data) =>
+    request("/api/buckets/dismiss-expense", { method: "POST", body: JSON.stringify(data) }),
+  dismissAllExpenses: () =>
+    request("/api/buckets/dismiss-all-expenses", { method: "POST" }),
 };
 
 export const accountsApi = {
