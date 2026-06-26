@@ -220,3 +220,22 @@ def test_allocate_blocked_when_source_short(api):
     r = api.client.post("/api/buckets/allocate-reimbursement", json={
         "profile_id": mom, "credit_card_id": card, "source_bucket_id": moms, "dest_bucket_id": payoff})
     assert r.status_code == 400
+
+
+def test_account_expense_deducts_from_bucket_and_balance(api):
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    acct = api.client.post("/api/accounts", json={"name": "Ally Checking", "balance": 500}).json()["id"]
+    gym = api.client.post("/api/buckets", json={"name": "Gym", "account_id": acct, "current_amount": 100}).json()["id"]
+    tid = api.client.post("/api/transactions", json={"transaction_date": "2026-06-25", "amount": -40,
+                    "merchant": "YouFit", "profile_id": pid, "account_id": acct}).json()["id"]
+    # shows as a suggestion
+    sug = api.client.get("/api/buckets/account-expenses").json()
+    assert len(sug) == 1 and sug[0]["amount"] == -40.0
+    # apply it to the Gym bucket
+    r = api.client.post("/api/buckets/deduct-expense", json={"transaction_id": tid, "bucket_id": gym})
+    assert r.status_code == 200
+    amt = next(b["current_amount"] for b in api.client.get("/api/buckets").json() if b["id"] == gym)
+    bal = next(a["balance"] for a in api.client.get("/api/accounts").json() if a["id"] == acct)
+    assert float(amt) == 60.0 and float(bal) == 460.0  # both down by 40
+    assert api.client.get("/api/buckets/account-expenses").json() == []  # cleared

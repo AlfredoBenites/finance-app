@@ -23,6 +23,7 @@ class TransactionCreate(BaseModel):
     is_paid_back: bool = False  # a person reimbursed you
     paid_back_date: Optional[date] = None
     paid_to_bank: bool = False  # you paid the card issuer
+    account_deducted: bool = False  # a bank/cash expense subtracted from a bucket
     notes: Optional[str] = None
 
 
@@ -39,6 +40,7 @@ class TransactionUpdate(BaseModel):
     paid_back_date: Optional[date] = None
     paid_to_bank: Optional[bool] = None
     reimbursement_allocated: Optional[bool] = None
+    account_deducted: Optional[bool] = None
     notes: Optional[str] = None
 
 
@@ -56,6 +58,7 @@ class Transaction(BaseModel):
     is_paid_back: bool
     paid_back_date: Optional[date] = None
     paid_to_bank: bool = False
+    account_deducted: bool = False
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
