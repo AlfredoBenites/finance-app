@@ -358,7 +358,7 @@ export default function TransactionsPage() {
           </optgroup>
         </select>
         <input
-          placeholder="Search merchant"
+          placeholder="Search merchant or notes"
           value={filters.search}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
