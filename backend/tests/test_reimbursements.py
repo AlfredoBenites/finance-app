@@ -212,6 +212,20 @@ def test_allocate_only_selected_transactions(api):
     assert mom_sug["amount"] == 60.0
 
 
+def test_allocating_marks_charge_paid(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    # an own, not-yet-paid card charge
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
+                    "profile_id": me, "credit_card_id": card})
+    sug = next(s for s in api.client.get("/api/buckets/reimbursements").json() if s["profile_id"] == me)
+    api.client.post("/api/buckets/allocate-reimbursement", json={
+        "profile_id": me, "credit_card_id": card,
+        "source_bucket_id": sug["source_bucket_id"], "dest_bucket_id": sug["dest_bucket_id"]})
+    t = api.client.get("/api/transactions").json()[0]
+    assert t["is_paid_back"] is True  # completing the suggestion marks it paid
+    assert not any(s["profile_id"] == me for s in api.client.get("/api/buckets/reimbursements").json())
+
+
 def test_allocate_blocked_when_source_short(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -700,

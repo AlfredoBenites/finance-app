@@ -46,6 +46,8 @@ export default function TransactionsPage() {
   const [sourceFilter, setSourceFilter] = useState("");
 
   const profileName = (id) => profiles.find((p) => p.id === id)?.name ?? "—";
+  const primaryId = profiles.find((p) => p.is_primary)?.id;
+  const isOwn = (t) => t.profile_id === primaryId;
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "—";
   const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "—";
   const sourceName = (t) =>
@@ -377,7 +379,9 @@ export default function TransactionsPage() {
               {t.cashback_amount != null ? ` · CB ${money(t.cashback_amount)}` : ""}
               {t.credit_card_id ? ` · 🏦 ${t.paid_to_bank ? "paid to bank" : "owed to bank"}` : ""}
               {" · "}
-              {t.is_paid_back ? "✓ reimbursed" : "not reimbursed"}
+              {isOwn(t)
+                ? (t.is_paid_back ? "✓ paid" : "not paid")
+                : (t.is_paid_back ? "✓ reimbursed" : "not reimbursed")}
             </small>
             {t.notes ? (
               <>
@@ -388,8 +392,10 @@ export default function TransactionsPage() {
           </span>
           <span style={{ display: "flex", gap: 6 }}>
             <button onClick={() => startEdit(t)}>Edit</button>
-            <button onClick={() => togglePaid(t)} title="Whether a person has reimbursed you for this charge">
-              {t.is_paid_back ? "Undo reimbursed" : "Mark reimbursed"}
+            <button onClick={() => togglePaid(t)} title={isOwn(t) ? "Whether you've handled/paid this charge" : "Whether this person has reimbursed you"}>
+              {isOwn(t)
+                ? (t.is_paid_back ? "Undo paid" : "Mark paid")
+                : (t.is_paid_back ? "Undo reimbursed" : "Mark reimbursed")}
             </button>
             <button className="danger" onClick={() => handleDelete(t.id)}>Delete</button>
           </span>

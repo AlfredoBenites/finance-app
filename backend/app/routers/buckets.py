@@ -1,4 +1,5 @@
 """CRUD endpoints for buckets. Scoped to the logged-in user."""
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -171,12 +172,14 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
             if a.data:
                 supabase.table("accounts").update({"balance": str(Decimal(str(a.data[0]["balance"])) + delta)}).eq("id", acc_id).eq("owner_id", user_id).execute()
 
-    # Mark the allocated charges so they stop being suggested.
-    if payload.transaction_ids:
-        for tid in (ln["id"] for ln in chosen):
-            supabase.table("transactions").update({"reimbursement_allocated": True}).eq("id", tid).eq("owner_id", user_id).execute()
-    else:
-        _mark_handled(user_id, payload.profile_id, payload.credit_card_id)
+    # Mark the allocated charges handled AND paid, so they leave the suggestion
+    # and show as paid/reimbursed in Expenses.
+    to_mark = chosen if payload.transaction_ids else group["lines"]
+    paid_on = date.today().isoformat()
+    for ln in to_mark:
+        supabase.table("transactions").update(
+            {"reimbursement_allocated": True, "is_paid_back": True, "paid_back_date": paid_on}
+        ).eq("id", ln["id"]).eq("owner_id", user_id).execute()
     log_move(user_id, "bucket", amount, f"{src['name']} → {dest['name']} (allocate to card)")
     return {"ok": True, "allocated": float(amount)}
 
