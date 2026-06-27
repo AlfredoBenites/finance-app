@@ -148,6 +148,22 @@ def test_real_available_keeps_spendable_buckets_but_drops_others():
     assert calc.real_available_money(accounts, [], buckets) == Decimal("750")
 
 
+def test_real_available_payoff_bucket_and_unsettled_charges_no_double_count():
+    accounts = [acct("1000", "checking")]
+    # a card payoff bucket holds $200 set aside for the card
+    buckets = [bucket("200", kind="set_aside", card="visa")]
+    txns = [
+        # already set aside (allocated) -> covered by the payoff bucket, NOT re-subtracted
+        {"amount": "-200", "credit_card_id": "visa", "paid_to_bank": False, "reimbursement_allocated": True},
+        # not set aside yet -> subtracted
+        {"amount": "-100", "credit_card_id": "visa", "paid_to_bank": False, "reimbursement_allocated": False},
+        # already paid to the bank -> ignored
+        {"amount": "-30", "credit_card_id": "visa", "paid_to_bank": True, "reimbursement_allocated": False},
+    ]
+    # 1000 - 200 (payoff bucket) - 100 (unsettled) = 700
+    assert calc.real_available_money(accounts, txns, buckets) == Decimal("700")
+
+
 def test_spec_9_7_worked_example():
     # SPEC 9.7: checking 1500, card debt 400, buckets 300 -> real available 800
     accounts = [acct("1500", "checking")]
