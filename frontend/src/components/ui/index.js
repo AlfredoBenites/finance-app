@@ -14,4 +14,7 @@ export { default as ReorderList } from "./ReorderList";
 export { default as CardArt } from "./CardArt";
 export { Table, THead, TH, TR, TD } from "./Table";
 export { Input, Textarea, Select, Field } from "./Field";
+export { default as DateInput } from "./DateInput";
+export { default as AmountInput } from "./AmountInput";
+export { default as Autocomplete } from "./Autocomplete";
 export { cn } from "./cn";

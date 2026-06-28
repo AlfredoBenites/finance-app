@@ -8,6 +8,7 @@
    text-ink, border-border, etc). Yellow `accent` is an ACCENT ONLY — never a
    page background or body text. */
 :root {
+  color-scheme: light;
   --accent: #e4f222;
   --accent-ink: #0d0b09;
 
@@ -43,6 +44,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --accent: #e4f222;
   --accent-ink: #0d0b09;
 

@@ -16,6 +16,14 @@ export function SettingsProvider({ children }) {
   });
   const [cardTxnPageSize, setCardTxnPageSize] = usePersistedState("settings.cardTxnPageSize", 20);
   const [cardOrder, setCardOrder] = usePersistedState("settings.cardOrder", []);
+  // Expenses page: rows per page and the default filter values applied on load.
+  const [expensesPerPage, setExpensesPerPage] = usePersistedState("settings.expensesPerPage", 15);
+  const [expensesFilters, setExpensesFilters] = usePersistedState("settings.expensesFilters", {
+    profile_id: "",
+    is_paid_back: "",
+    source: "",
+    year: "current", // "current" | "all" | a specific year string
+  });
   // Dashboard / insights calculation preferences (moved off the dashboard).
   // hideRepayments defaults ON; onlyMyDebt defaults OFF; cashbackScope "all"
   // shows all cashback, "mine" only your own profile's.
@@ -35,6 +43,10 @@ export function SettingsProvider({ children }) {
     setCardTxnPageSize,
     cardOrder,
     setCardOrder,
+    expensesPerPage,
+    setExpensesPerPage,
+    expensesFilters,
+    setExpensesFilters,
     dashboardPrefs,
     setDashboardPrefs,
   };

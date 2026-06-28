@@ -3,17 +3,20 @@ import {
   LayoutDashboard,
   PieChart,
   CreditCard,
+  Receipt,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
 } from "lucide-react";
-import { Modal, Button, Input, Toggle, ReorderList, cn } from "./ui";
+import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
 import { useSettings } from "../settings/SettingsContext";
-import { profilesApi, creditCardsApi } from "../api/client";
+import { YEARS } from "../components/YearSelect";
+import { profilesApi, creditCardsApi, accountsApi } from "../api/client";
 
 const CATEGORIES = [
   ["dashboard", "Dashboard", LayoutDashboard],
   ["insights", "Insights", PieChart],
   ["cards", "Credit Cards", CreditCard],
+  ["expenses", "Expenses", Receipt],
 ];
 
 const SORT_MODES = [
@@ -85,19 +88,26 @@ export default function SettingsModal() {
     setCardTxnPageSize,
     cardOrder,
     setCardOrder,
+    expensesPerPage,
+    setExpensesPerPage,
+    expensesFilters,
+    setExpensesFilters,
     dashboardPrefs,
     setDashboardPrefs,
   } = useSettings();
   const setPref = (key, value) => setDashboardPrefs({ ...dashboardPrefs, [key]: value });
+  const setExpFilter = (key, value) => setExpensesFilters({ ...expensesFilters, [key]: value });
 
   const [tab, setTab] = useState("dashboard");
   const [profiles, setProfiles] = useState([]);
   const [cards, setCards] = useState([]);
+  const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
     if (!isOpen) return;
     profilesApi.list().then(setProfiles).catch(() => {});
     creditCardsApi.list().then((cs) => setCards(cs.filter((c) => c.is_active !== false))).catch(() => {});
+    accountsApi.list().then(setAccounts).catch(() => {});
   }, [isOpen]);
 
   const orderedProfiles = useMemo(() => applyOrder(profiles, profileSort.order), [profiles, profileSort.order]);
@@ -260,6 +270,82 @@ export default function SettingsModal() {
                 />
               )}
             </Section>
+          )}
+
+          {tab === "expenses" && (
+            <>
+              <Section title="Rows per page" hint="How many expenses show at once (max 100).">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[15, 25, 35].map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={expensesPerPage === n ? "primary" : "secondary"}
+                      onClick={() => setExpensesPerPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <span className="text-sm text-muted ml-1">Custom:</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={expensesPerPage}
+                    onChange={(e) => setExpensesPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                    className="w-20"
+                  />
+                </div>
+              </Section>
+
+              <Section title="Default filters" hint="How the Expenses filters start when you open the page.">
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">Profile</span>
+                    <Select value={expensesFilters.profile_id} onChange={(e) => setExpFilter("profile_id", e.target.value)}>
+                      <option value="">All profiles</option>
+                      {profiles.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">Status</span>
+                    <Select value={expensesFilters.is_paid_back} onChange={(e) => setExpFilter("is_paid_back", e.target.value)}>
+                      <option value="">Paid + unpaid</option>
+                      <option value="false">Unpaid only</option>
+                      <option value="true">Paid only</option>
+                    </Select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">Source</span>
+                    <Select value={expensesFilters.source} onChange={(e) => setExpFilter("source", e.target.value)}>
+                      <option value="">All sources</option>
+                      <optgroup label="Credit cards">
+                        {cards.map((c) => (
+                          <option key={c.id} value={`card:${c.id}`}>{c.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Accounts (bank / cash)">
+                        {accounts.map((a) => (
+                          <option key={a.id} value={`account:${a.id}`}>{a.name}</option>
+                        ))}
+                      </optgroup>
+                    </Select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-muted">Period</span>
+                    <Select value={expensesFilters.year} onChange={(e) => setExpFilter("year", e.target.value)}>
+                      <option value="current">This year</option>
+                      {YEARS.map((y) => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                      <option value="all">All time</option>
+                    </Select>
+                  </label>
+                </div>
+              </Section>
+            </>
           )}
         </div>
       </div>

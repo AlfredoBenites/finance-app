@@ -14,8 +14,15 @@ export default function Modal({ open, onClose, title, subtitle, children, width 
   useEffect(() => {
     if (open) {
       setMounted(true);
-      const r = requestAnimationFrame(() => setShow(true));
-      return () => cancelAnimationFrame(r);
+      // Double rAF so the start state paints before we animate (see SlideOver).
+      let r2;
+      const r1 = requestAnimationFrame(() => {
+        r2 = requestAnimationFrame(() => setShow(true));
+      });
+      return () => {
+        cancelAnimationFrame(r1);
+        if (r2) cancelAnimationFrame(r2);
+      };
     }
     setShow(false);
   }, [open]);

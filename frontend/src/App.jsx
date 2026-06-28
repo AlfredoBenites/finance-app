@@ -42,7 +42,7 @@ export default function App() {
         <Route path="/insights" element={<InsightsPage />} />
         <Route path="/profiles" element={legacy(<ProfilesPage />)} />
         <Route path="/cards" element={<CreditCardsPage />} />
-        <Route path="/transactions" element={legacy(<TransactionsPage />)} />
+        <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/income" element={legacy(<IncomePage />)} />
         <Route path="/buckets" element={legacy(<BucketsPage />)} />
         <Route path="/payments" element={legacy(<PaymentsPage />)} />

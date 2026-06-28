@@ -13,8 +13,17 @@ export default function SlideOver({ open, onClose, title, subtitle, children, wi
   useEffect(() => {
     if (open) {
       setMounted(true);
-      const r = requestAnimationFrame(() => setShow(true));
-      return () => cancelAnimationFrame(r);
+      // Double rAF so the off-screen start state is painted before we flip to
+      // the on-screen state — otherwise synchronous content can skip the
+      // transition and the panel "pops" in instead of sliding.
+      let r2;
+      const r1 = requestAnimationFrame(() => {
+        r2 = requestAnimationFrame(() => setShow(true));
+      });
+      return () => {
+        cancelAnimationFrame(r1);
+        if (r2) cancelAnimationFrame(r2);
+      };
     }
     setShow(false); // play exit animation; unmount on backdrop transitionend
   }, [open]);
