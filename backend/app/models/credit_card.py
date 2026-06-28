@@ -11,6 +11,7 @@ class CreditCardCreate(BaseModel):
     name: str
     issuer: Optional[str] = None
     last_four: Optional[str] = None
+    network: Optional[str] = None
     credit_limit: Optional[Decimal] = None
     default_cashback_rate: Optional[Decimal] = None
     color: Optional[str] = None
@@ -24,6 +25,7 @@ class CreditCardUpdate(BaseModel):
     name: Optional[str] = None
     issuer: Optional[str] = None
     last_four: Optional[str] = None
+    network: Optional[str] = None
     credit_limit: Optional[Decimal] = None
     default_cashback_rate: Optional[Decimal] = None
     color: Optional[str] = None
@@ -38,6 +40,7 @@ class CreditCard(BaseModel):
     name: str
     issuer: Optional[str] = None
     last_four: Optional[str] = None
+    network: Optional[str] = None
     credit_limit: Optional[Decimal] = None
     default_cashback_rate: Optional[Decimal] = None
     color: Optional[str] = None

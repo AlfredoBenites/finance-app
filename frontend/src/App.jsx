@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { AppShell } from "./components/ui";
+import SettingsModal from "./components/SettingsModal";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import InsightsPage from "./pages/InsightsPage";
@@ -33,13 +34,14 @@ export default function App() {
   if (!session) return <AuthPage />;
 
   return (
+    <>
     <AppShell user={user} onSignOut={signOut}>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/insights" element={<InsightsPage />} />
         <Route path="/profiles" element={legacy(<ProfilesPage />)} />
-        <Route path="/cards" element={legacy(<CreditCardsPage />)} />
+        <Route path="/cards" element={<CreditCardsPage />} />
         <Route path="/transactions" element={legacy(<TransactionsPage />)} />
         <Route path="/income" element={legacy(<IncomePage />)} />
         <Route path="/buckets" element={legacy(<BucketsPage />)} />
@@ -50,5 +52,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppShell>
+    <SettingsModal />
+    </>
   );
 }

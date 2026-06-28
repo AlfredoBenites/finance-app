@@ -18,7 +18,11 @@
   --ink: #0d0b09;
   --muted: #6b7280;
   --border: #ececec;
-  --border-strong: #e0e0e0;
+  --border-strong: #d8d8d4;
+
+  /* Button / control fill so secondary buttons read as buttons, not text. */
+  --control: #f1f1ef;
+  --control-hover: #e6e6e2;
 
   --green: #26753b;
   --green-bg: #f5fff9;
@@ -47,7 +51,10 @@
   --ink: #ffffff;
   --muted: #a3a3a3;
   --border: #2e2a2a;
-  --border-strong: #3a3636;
+  --border-strong: #423d3d;
+
+  --control: #2f2b2b;
+  --control-hover: #393434;
 
   --green: #5cc97e;
   --green-bg: #16241b;
@@ -77,6 +84,8 @@
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-control: var(--control);
+  --color-control-hover: var(--control-hover);
 
   --color-green: var(--green);
   --color-green-bg: var(--green-bg);

@@ -10,13 +10,13 @@ const VARIANTS = {
   primary:
     "bg-accent text-accent-ink border border-transparent hover:brightness-95 font-semibold",
   secondary:
-    "bg-surface text-ink border border-border hover:bg-surface-muted",
+    "bg-control text-ink border border-border-strong hover:bg-control-hover",
   green:
     "bg-green text-white border border-transparent hover:brightness-110 font-medium",
   ghost:
     "bg-transparent text-ink border border-transparent hover:bg-surface-muted",
   danger:
-    "bg-transparent text-danger border border-border hover:bg-danger-bg",
+    "bg-control text-danger border border-border-strong hover:bg-danger-bg",
 };
 
 const SIZES = {
@@ -37,7 +37,7 @@ export default function Button({
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap cursor-pointer transition-colors",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-canvas",
-        "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:hover:bg-surface",
+        "disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100",
         VARIANTS[variant],
         SIZES[size],
         className

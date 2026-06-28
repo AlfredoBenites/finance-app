@@ -19,9 +19,11 @@ import {
   Eye,
   EyeOff,
   X,
+  Settings,
 } from "lucide-react";
 import { cn } from "./cn";
 import { usePrivacy } from "../../privacy/PrivacyContext";
+import { useSettings } from "../../settings/SettingsContext";
 
 // Single source of truth for the nav: [path, label, Icon]. Paths match the
 // routes in App.jsx. NavLink renders real <a> elements, so middle-click /
@@ -52,6 +54,7 @@ export default function Sidebar({
   className,
 }) {
   const { hidden: amountsHidden, toggle: togglePrivacy } = usePrivacy();
+  const { open: openSettings } = useSettings();
 
   return (
     <aside
@@ -140,8 +143,19 @@ export default function Sidebar({
         ))}
       </nav>
 
-      {/* Footer: privacy, theme toggle, user, logout */}
+      {/* Footer: settings, privacy, theme toggle, user, logout */}
       <div className="shrink-0 border-t border-border p-2 space-y-1">
+        <button
+          onClick={openSettings}
+          title="Settings"
+          className={cn(
+            "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+          )}
+        >
+          <Settings size={18} />
+          <span className={cn(collapsed && "md:hidden")}>Settings</span>
+        </button>
         <button
           onClick={togglePrivacy}
           title={amountsHidden ? "Show amounts" : "Hide amounts"}

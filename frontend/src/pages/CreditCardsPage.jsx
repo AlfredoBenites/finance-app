@@ -1,27 +1,93 @@
 import { useEffect, useState } from "react";
 import { creditCardsApi, cashbackRulesApi, categoriesApi } from "../api/client";
 import { CATEGORIES as FALLBACK_CATEGORIES } from "../constants";
+import {
+  PageHeader,
+  Card,
+  Button,
+  Banner,
+  Badge,
+  CardArt,
+  Input,
+  Select,
+  Field,
+  cn,
+} from "../components/ui";
+
+const NETWORKS = ["Visa", "Mastercard", "Amex", "Discover", "Other"];
+
+// Preset card colors, plus a custom picker. These are the `color` stored on the
+// card and used by the card art.
+const CARD_COLORS = [
+  "#1f2933", "#0f3d3e", "#1e3a5f", "#0c4a6e", "#365314",
+  "#3b2f63", "#5b21b6", "#7f1d1d", "#7c2d12", "#3f3f46",
+];
+
+function ColorPicker({ value, onChange }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {CARD_COLORS.map((c) => (
+        <button
+          type="button"
+          key={c}
+          onClick={() => onChange(c)}
+          title={c}
+          className={cn(
+            "h-7 w-7 rounded-full transition-shadow",
+            value?.toLowerCase() === c.toLowerCase()
+              ? "ring-2 ring-accent ring-offset-1 ring-offset-surface"
+              : "ring-1 ring-border"
+          )}
+          style={{ background: c }}
+        />
+      ))}
+      <input
+        type="color"
+        value={value || "#1f2933"}
+        onChange={(e) => onChange(e.target.value)}
+        title="Custom color"
+        className="h-7 w-9 rounded border border-border bg-surface cursor-pointer p-0.5"
+      />
+      {value && (
+        <button type="button" onClick={() => onChange("")} className="text-xs text-muted hover:text-ink">
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_ADD = {
+  name: "",
+  issuer: "",
+  last_four: "",
+  network: "",
+  cashbackPct: "",
+  statement_day: "",
+  due_day: "",
+  color: "",
+};
 
 export default function CreditCardsPage() {
   const [cards, setCards] = useState([]);
-  const [name, setName] = useState("");
-  const [issuer, setIssuer] = useState("");
-  const [cashbackPct, setCashbackPct] = useState("");
-  const [dueDay, setDueDay] = useState("");
-  const [stmtDay, setStmtDay] = useState("");
-  const [dates, setDates] = useState({}); // {cardId: dueDayString}
-  const [closes, setCloses] = useState({}); // {cardId: statementDayString}
   const [error, setError] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [add, setAdd] = useState(EMPTY_ADD);
 
-  // Which card's category-rules panel is open, and that card's rules.
+  // Per-card appearance/details editor.
+  const [editId, setEditId] = useState(null);
+  const [edit, setEdit] = useState({});
+
+  // Cashback-by-category panel.
   const [openCardId, setOpenCardId] = useState(null);
   const [rules, setRules] = useState([]);
   const [ruleCategory, setRuleCategory] = useState(FALLBACK_CATEGORIES[0]);
   const [rulePct, setRulePct] = useState("");
   const [categoryList, setCategoryList] = useState(FALLBACK_CATEGORIES);
 
+  // Upgrade flow.
   const [upgrades, setUpgrades] = useState([]);
-  const [upgrading, setUpgrading] = useState(null); // cardId whose upgrade form is open
+  const [upgrading, setUpgrading] = useState(null);
   const [upgradeNew, setUpgradeNew] = useState("");
   const [upgradeDate, setUpgradeDate] = useState("");
 
@@ -29,43 +95,7 @@ export default function CreditCardsPage() {
     try {
       const list = await creditCardsApi.list();
       setCards(list);
-      setDates(Object.fromEntries(list.map((c) => [c.id, c.due_day ?? ""])));
-      setCloses(Object.fromEntries(list.map((c) => [c.id, c.statement_day ?? ""])));
       setUpgrades(await creditCardsApi.upgrades());
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function handleUpgrade(oldId) {
-    if (!upgradeNew) {
-      setError("Pick the card it was upgraded to.");
-      return;
-    }
-    try {
-      await creditCardsApi.upgrade(oldId, {
-        new_card_id: upgradeNew,
-        upgraded_on: upgradeDate || null,
-      });
-      setUpgrading(null);
-      setUpgradeNew("");
-      setUpgradeDate("");
-      setError(null);
-      loadCards();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function saveDates(cardId) {
-    const d = dates[cardId];
-    const s = closes[cardId];
-    try {
-      await creditCardsApi.update(cardId, {
-        due_day: d === "" || d == null ? null : Number(d),
-        statement_day: s === "" || s == null ? null : Number(s),
-      });
-      loadCards();
     } catch (e) {
       setError(e.message);
     }
@@ -82,23 +112,61 @@ export default function CreditCardsPage() {
       .catch(() => {});
   }, []);
 
+  const setAddField = (k, v) => setAdd((f) => ({ ...f, [k]: v }));
+
   async function handleAdd(e) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!add.name.trim()) return;
     try {
-      const rate = cashbackPct === "" ? null : Number(cashbackPct) / 100;
       await creditCardsApi.create({
-        name: name.trim(),
-        issuer: issuer.trim() || null,
-        default_cashback_rate: rate,
-        due_day: dueDay === "" ? null : Number(dueDay),
-        statement_day: stmtDay === "" ? null : Number(stmtDay),
+        name: add.name.trim(),
+        issuer: add.issuer.trim() || null,
+        last_four: add.last_four.trim() || null,
+        network: add.network || null,
+        default_cashback_rate: add.cashbackPct === "" ? null : Number(add.cashbackPct) / 100,
+        statement_day: add.statement_day === "" ? null : Number(add.statement_day),
+        due_day: add.due_day === "" ? null : Number(add.due_day),
+        color: add.color || null,
       });
-      setName("");
-      setIssuer("");
-      setCashbackPct("");
-      setDueDay("");
-      setStmtDay("");
+      setAdd(EMPTY_ADD);
+      setShowAdd(false);
+      setError(null);
+      loadCards();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  function startEdit(c) {
+    setEditId(c.id);
+    setError(null);
+    setEdit({
+      name: c.name ?? "",
+      issuer: c.issuer ?? "",
+      last_four: c.last_four ?? "",
+      network: c.network ?? "",
+      color: c.color ?? "",
+      cashbackPct: c.default_cashback_rate != null ? String(Number(c.default_cashback_rate) * 100) : "",
+      statement_day: c.statement_day ?? "",
+      due_day: c.due_day ?? "",
+    });
+  }
+  const setEditField = (k, v) => setEdit((f) => ({ ...f, [k]: v }));
+
+  async function saveEdit() {
+    try {
+      await creditCardsApi.update(editId, {
+        name: edit.name.trim() || undefined,
+        issuer: edit.issuer.trim() || null,
+        last_four: edit.last_four.trim() || null,
+        network: edit.network || null,
+        color: edit.color || null,
+        default_cashback_rate: edit.cashbackPct === "" ? null : Number(edit.cashbackPct) / 100,
+        statement_day: edit.statement_day === "" ? null : Number(edit.statement_day),
+        due_day: edit.due_day === "" ? null : Number(edit.due_day),
+      });
+      setEditId(null);
+      setError(null);
       loadCards();
     } catch (e) {
       setError(e.message);
@@ -109,6 +177,7 @@ export default function CreditCardsPage() {
     try {
       await creditCardsApi.remove(id);
       if (openCardId === id) setOpenCardId(null);
+      if (editId === id) setEditId(null);
       loadCards();
     } catch (e) {
       setError(e.message);
@@ -152,162 +221,255 @@ export default function CreditCardsPage() {
     }
   }
 
+  async function handleUpgrade(oldId) {
+    if (!upgradeNew) {
+      setError("Pick the card it was upgraded to.");
+      return;
+    }
+    try {
+      await creditCardsApi.upgrade(oldId, { new_card_id: upgradeNew, upgraded_on: upgradeDate || null });
+      setUpgrading(null);
+      setUpgradeNew("");
+      setUpgradeDate("");
+      setError(null);
+      loadCards();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   const activeCards = cards.filter((c) => c.is_active !== false);
   const archivedCards = cards.filter((c) => c.is_active === false);
 
   return (
     <div>
-      <h1>Credit Cards</h1>
+      <PageHeader
+        title="Credit Cards"
+        subtitle="Your cards, their cashback, and statement/due days."
+        actions={
+          <Button variant="primary" onClick={() => setShowAdd((s) => !s)}>
+            {showAdd ? "Close" : "Add card"}
+          </Button>
+        }
+      />
 
-      <form onSubmit={handleAdd}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Card name (e.g., Chase Freedom)"
-        />
-        <input
-          value={issuer}
-          onChange={(e) => setIssuer(e.target.value)}
-          placeholder="Issuer (e.g., Chase)"
-        />
-        <input
-          value={cashbackPct}
-          onChange={(e) => setCashbackPct(e.target.value)}
-          placeholder="Default cashback %"
-          type="number"
-          step="0.01"
-        />
-        <input
-          type="number"
-          min="1"
-          max="31"
-          value={stmtDay}
-          onChange={(e) => setStmtDay(e.target.value)}
-          placeholder="Statement closing day (1-31)"
-        />
-        <input
-          type="number"
-          min="1"
-          max="31"
-          value={dueDay}
-          onChange={(e) => setDueDay(e.target.value)}
-          placeholder="Payment due day (1-31)"
-        />
-        <button type="submit">Add</button>
-      </form>
+      {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
-      {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
-
-      {activeCards.length === 0 && <p>No credit cards yet.</p>}
-
-      {activeCards.map((c) => (
-        <div key={c.id}>
-          <div className="card">
-            <span>
-              {c.name}
-              {c.issuer ? ` · ${c.issuer}` : ""}
-              {c.default_cashback_rate != null
-                ? ` · ${(Number(c.default_cashback_rate) * 100).toFixed(2)}% default`
-                : ""}
-            </span>
-            <span style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => toggleRules(c.id)}>
-                {openCardId === c.id ? "Hide categories" : "Cashback by category"}
-              </button>
-              <button onClick={() => setUpgrading(upgrading === c.id ? null : c.id)}>
-                Upgrade
-              </button>
-              <button className="danger" onClick={() => handleDelete(c.id)}>
-                Delete
-              </button>
-            </span>
-          </div>
-
-          {upgrading === c.id && (
-            <div style={{ margin: "0 0 8px 16px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <small>Upgraded to</small>
-              <select value={upgradeNew} onChange={(e) => setUpgradeNew(e.target.value)}>
-                <option value="">Card…</option>
-                {activeCards.filter((o) => o.id !== c.id).map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+      {showAdd && (
+        <Card className="mb-6">
+          <form onSubmit={handleAdd} className="grid sm:grid-cols-2 gap-4">
+            <Field label="Card name">
+              <Input value={add.name} onChange={(e) => setAddField("name", e.target.value)} placeholder="Chase Freedom" />
+            </Field>
+            <Field label="Issuer">
+              <Input value={add.issuer} onChange={(e) => setAddField("issuer", e.target.value)} placeholder="Chase" />
+            </Field>
+            <Field label="Last 4 digits">
+              <Input
+                value={add.last_four}
+                onChange={(e) => setAddField("last_four", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="1234"
+                inputMode="numeric"
+              />
+            </Field>
+            <Field label="Network">
+              <Select value={add.network} onChange={(e) => setAddField("network", e.target.value)}>
+                <option value="">Network…</option>
+                {NETWORKS.map((n) => (
+                  <option key={n} value={n}>{n}</option>
                 ))}
-              </select>
-              <input type="date" value={upgradeDate} onChange={(e) => setUpgradeDate(e.target.value)} />
-              <button onClick={() => handleUpgrade(c.id)}>Confirm (archives {c.name})</button>
+              </Select>
+            </Field>
+            <Field label="Default cashback %">
+              <Input type="number" step="0.01" value={add.cashbackPct} onChange={(e) => setAddField("cashbackPct", e.target.value)} placeholder="1.5" />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Statement day">
+                <Input type="number" min="1" max="31" value={add.statement_day} onChange={(e) => setAddField("statement_day", e.target.value)} placeholder="1–31" />
+              </Field>
+              <Field label="Due day">
+                <Input type="number" min="1" max="31" value={add.due_day} onChange={(e) => setAddField("due_day", e.target.value)} placeholder="1–31" />
+              </Field>
             </div>
-          )}
+            <Field label="Color" className="sm:col-span-2">
+              <ColorPicker value={add.color} onChange={(v) => setAddField("color", v)} />
+            </Field>
+            <div className="sm:col-span-2 flex items-center gap-2">
+              <Button type="submit" variant="primary">Add card</Button>
+              <Button type="button" variant="ghost" onClick={() => { setShowAdd(false); setAdd(EMPTY_ADD); }}>Cancel</Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
-          <div style={{ margin: "0 0 8px 16px", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            <small>Statement closes day</small>
-            <input type="number" min="1" max="31" style={{ width: 56 }}
-              value={closes[c.id] ?? ""}
-              onChange={(e) => setCloses((m) => ({ ...m, [c.id]: e.target.value }))} />
-            <small>Payment due day</small>
-            <input type="number" min="1" max="31" style={{ width: 56 }}
-              value={dates[c.id] ?? ""}
-              onChange={(e) => setDates((m) => ({ ...m, [c.id]: e.target.value }))} />
-            <button onClick={() => saveDates(c.id)}>Save</button>
-          </div>
+      {activeCards.length === 0 && <p className="text-muted text-sm">No credit cards yet.</p>}
 
-          {openCardId === c.id && (
-            <div style={{ margin: "0 0 16px 16px" }}>
-              <form onSubmit={handleAddRule}>
-                <select
-                  value={ruleCategory}
-                  onChange={(e) => setRuleCategory(e.target.value)}
-                >
-                  {categoryList.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Cashback %"
-                  value={rulePct}
-                  onChange={(e) => setRulePct(e.target.value)}
-                />
-                <button type="submit">Set</button>
-              </form>
-              {rules.length === 0 && (
-                <p><small>No category rules — uses the card default.</small></p>
-              )}
-              {rules.map((r) => (
-                <div className="card" key={r.id}>
-                  <span>
-                    {r.category}: {(Number(r.rate) * 100).toFixed(2)}%
-                  </span>
-                  <button className="danger" onClick={() => handleDeleteRule(r.id)}>
-                    Remove
-                  </button>
+      <div className="space-y-4">
+        {activeCards.map((c) => (
+          <Card key={c.id} className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="w-44 shrink-0">
+                <CardArt name={c.name} network={c.network} lastFour={c.last_four} color={c.color} />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-ink">{c.name}</h3>
+                  {c.network && <Badge>{c.network}</Badge>}
+                  {c.last_four && <Badge tone="neutral">•••• {c.last_four}</Badge>}
                 </div>
-              ))}
+                <p className="text-sm text-muted mt-1">
+                  {c.issuer || "—"}
+                  {c.default_cashback_rate != null
+                    ? ` · ${(Number(c.default_cashback_rate) * 100).toFixed(2)}% default`
+                    : ""}
+                </p>
+                <p className="text-xs text-muted mt-0.5">
+                  {c.statement_day ? `Statement closes day ${c.statement_day}` : "No statement day"}
+                  {" · "}
+                  {c.due_day ? `Due day ${c.due_day}` : "No due day"}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <Button size="sm" onClick={() => (editId === c.id ? setEditId(null) : startEdit(c))}>
+                  {editId === c.id ? "Close" : "Edit"}
+                </Button>
+                <Button size="sm" onClick={() => toggleRules(c.id)}>
+                  {openCardId === c.id ? "Hide categories" : "Cashback by category"}
+                </Button>
+                <Button size="sm" onClick={() => setUpgrading(upgrading === c.id ? null : c.id)}>
+                  Upgrade
+                </Button>
+                <Button size="sm" variant="danger" onClick={() => handleDelete(c.id)}>
+                  Delete
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
-      ))}
+
+            {/* Edit appearance + details */}
+            {editId === c.id && (
+              <div className="border-t border-border pt-4 grid sm:grid-cols-2 gap-4">
+                <Field label="Card name">
+                  <Input value={edit.name} onChange={(e) => setEditField("name", e.target.value)} />
+                </Field>
+                <Field label="Issuer">
+                  <Input value={edit.issuer} onChange={(e) => setEditField("issuer", e.target.value)} />
+                </Field>
+                <Field label="Last 4 digits">
+                  <Input
+                    value={edit.last_four}
+                    onChange={(e) => setEditField("last_four", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    inputMode="numeric"
+                  />
+                </Field>
+                <Field label="Network">
+                  <Select value={edit.network} onChange={(e) => setEditField("network", e.target.value)}>
+                    <option value="">Network…</option>
+                    {NETWORKS.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Default cashback %">
+                  <Input type="number" step="0.01" value={edit.cashbackPct} onChange={(e) => setEditField("cashbackPct", e.target.value)} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Statement day">
+                    <Input type="number" min="1" max="31" value={edit.statement_day} onChange={(e) => setEditField("statement_day", e.target.value)} />
+                  </Field>
+                  <Field label="Due day">
+                    <Input type="number" min="1" max="31" value={edit.due_day} onChange={(e) => setEditField("due_day", e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Color" className="sm:col-span-2">
+                  <ColorPicker value={edit.color} onChange={(v) => setEditField("color", v)} />
+                </Field>
+                <div className="sm:col-span-2 flex items-center gap-2">
+                  <Button variant="primary" onClick={saveEdit}>Save</Button>
+                  <Button variant="ghost" onClick={() => setEditId(null)}>Cancel</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Upgrade */}
+            {upgrading === c.id && (
+              <div className="border-t border-border pt-4 flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-muted">Upgraded to</span>
+                <Select value={upgradeNew} onChange={(e) => setUpgradeNew(e.target.value)}>
+                  <option value="">Card…</option>
+                  {activeCards.filter((o) => o.id !== c.id).map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </Select>
+                <Input type="date" value={upgradeDate} onChange={(e) => setUpgradeDate(e.target.value)} />
+                <Button variant="primary" onClick={() => handleUpgrade(c.id)}>
+                  Confirm (archives {c.name})
+                </Button>
+              </div>
+            )}
+
+            {/* Cashback by category */}
+            {openCardId === c.id && (
+              <div className="border-t border-border pt-4 space-y-3">
+                <form onSubmit={handleAddRule} className="flex items-end gap-2 flex-wrap">
+                  <Field label="Category">
+                    <Select value={ruleCategory} onChange={(e) => setRuleCategory(e.target.value)}>
+                      {categoryList.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Cashback %">
+                    <Input type="number" step="0.01" value={rulePct} onChange={(e) => setRulePct(e.target.value)} placeholder="3" />
+                  </Field>
+                  <Button type="submit" variant="primary">Set</Button>
+                </form>
+                {rules.length === 0 ? (
+                  <p className="text-sm text-muted">No category rules — uses the card default.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {rules.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between border border-border rounded-md px-3 py-2 text-sm">
+                        <span className="text-ink">
+                          {r.category}: {(Number(r.rate) * 100).toFixed(2)}%
+                        </span>
+                        <Button size="sm" variant="danger" onClick={() => handleDeleteRule(r.id)}>Remove</Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
 
       {archivedCards.length > 0 && (
-        <>
-          <h2>Archived cards</h2>
-          {archivedCards.map((c) => (
-            <div className="card" key={c.id}>
-              <span><small>{c.name}{c.issuer ? ` · ${c.issuer}` : ""} (upgraded)</small></span>
-            </div>
-          ))}
-        </>
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-ink mb-3">Archived cards</h2>
+          <div className="space-y-2">
+            {archivedCards.map((c) => (
+              <Card key={c.id} className="py-3 text-sm text-muted">
+                {c.name}{c.issuer ? ` · ${c.issuer}` : ""} (upgraded)
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
 
       {upgrades.length > 0 && (
-        <>
-          <h2>Upgrade history</h2>
-          {upgrades.map((u) => (
-            <div className="card" key={u.id}>
-              <span>{u.old_name} → {u.new_name}</span>
-              <small>{u.upgraded_on || ""}</small>
-            </div>
-          ))}
-        </>
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-ink mb-3">Upgrade history</h2>
+          <div className="space-y-2">
+            {upgrades.map((u) => (
+              <Card key={u.id} className="flex items-center justify-between py-3 text-sm">
+                <span className="text-ink">{u.old_name} → {u.new_name}</span>
+                <span className="text-muted">{u.upgraded_on || ""}</span>
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
