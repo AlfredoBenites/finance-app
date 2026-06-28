@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
+import { AppShell } from "./components/ui";
 import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
+import InsightsPage from "./pages/InsightsPage";
 import ProfilesPage from "./pages/ProfilesPage";
 import CreditCardsPage from "./pages/CreditCardsPage";
 import TransactionsPage from "./pages/TransactionsPage";
@@ -12,58 +14,41 @@ import IncomePage from "./pages/IncomePage";
 import PaymentsPage from "./pages/PaymentsPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
 
-const PAGES = [
-  ["dashboard", "Dashboard"],
-  ["profiles", "Profiles"],
-  ["cards", "Credit Cards"],
-  ["transactions", "Expenses"],
-  ["income", "Income"],
-  ["buckets", "Buckets"],
-  ["payments", "Pay a card"],
-  ["accounts", "Accounts"],
-  ["investments", "Investments"],
-  ["shared", "Shared with me"],
-];
+// Wrap pages not yet migrated to the new design system in `.legacy` so the
+// temporary compatibility CSS keeps them looking the same. Remove the wrapper
+// (and the page from this list) as each is restyled; delete legacy.css when none
+// remain.
+const legacy = (el) => <div className="legacy">{el}</div>;
 
 export default function App() {
   const { loading, session, user, signOut } = useAuth();
-  const [page, setPage] = useState("dashboard");
 
-  if (loading) return <div className="container">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-canvas text-muted">
+        Loading…
+      </div>
+    );
+  }
   if (!session) return <AuthPage />;
 
   return (
-    <div className="container">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 16,
-        }}
-      >
-        <small>{user?.email}</small>
-        <button onClick={signOut}>Log out</button>
-      </div>
-
-      <nav style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        {PAGES.map(([key, label]) => (
-          <button key={key} onClick={() => setPage(key)}>
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {page === "dashboard" && <DashboardPage />}
-      {page === "profiles" && <ProfilesPage />}
-      {page === "cards" && <CreditCardsPage />}
-      {page === "transactions" && <TransactionsPage />}
-      {page === "income" && <IncomePage />}
-      {page === "buckets" && <BucketsPage />}
-      {page === "payments" && <PaymentsPage />}
-      {page === "accounts" && <AccountsPage />}
-      {page === "investments" && <InvestmentsPage />}
-      {page === "shared" && <SharedWithMePage />}
-    </div>
+    <AppShell user={user} onSignOut={signOut}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/insights" element={<InsightsPage />} />
+        <Route path="/profiles" element={legacy(<ProfilesPage />)} />
+        <Route path="/cards" element={legacy(<CreditCardsPage />)} />
+        <Route path="/transactions" element={legacy(<TransactionsPage />)} />
+        <Route path="/income" element={legacy(<IncomePage />)} />
+        <Route path="/buckets" element={legacy(<BucketsPage />)} />
+        <Route path="/payments" element={legacy(<PaymentsPage />)} />
+        <Route path="/accounts" element={legacy(<AccountsPage />)} />
+        <Route path="/investments" element={legacy(<InvestmentsPage />)} />
+        <Route path="/shared" element={legacy(<SharedWithMePage />)} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AppShell>
   );
 }

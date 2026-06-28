@@ -3,26 +3,18 @@ import { dashboardApi } from "../api/client";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 import usePersistedState from "../hooks/usePersistedState";
 import { money } from "../format";
+import {
+  PageHeader,
+  StatCard,
+  Card,
+  Banner,
+  Toggle,
+  Amount,
+} from "../components/ui";
 
-function Toggle({ on, onClick, label }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{ background: on ? "#2563eb" : "#9ca3af" }}
-    >
-      {label}: {on ? "on" : "off"}
-    </button>
-  );
-}
-
-function Stat({ label, value }) {
-  return (
-    <div className="card" style={{ flexDirection: "column", alignItems: "flex-start" }}>
-      <small>{label}</small>
-      <strong style={{ fontSize: 20 }}>{money(value)}</strong>
-    </div>
-  );
-}
+// Upcoming payments warm up as the due date nears: blue (plenty of time) →
+// orange (within a week) → red (2 days or less).
+const paymentTone = (days) => (days <= 2 ? "danger" : days <= 7 ? "orange" : "info");
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
@@ -60,76 +52,113 @@ export default function DashboardPage() {
   }, [year, hideRepayments, onlyMyDebt]);
 
   const header = (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Dashboard</h1>
-        <YearSelect value={year} onChange={setYear} />
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+    <>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`Income, spending, cashback and debt are for ${
+          year === "all" ? "all time" : year
+        }; balances and net worth are current.`}
+        actions={<YearSelect value={year} onChange={setYear} />}
+      />
+      <div className="flex gap-5 mb-6 flex-wrap">
         <Toggle on={hideRepayments} onClick={() => setHideRepayments((v) => !v)} label="Hide repayments" />
         <Toggle on={onlyMyDebt} onClick={() => setOnlyMyDebt((v) => !v)} label="Only my debt" />
       </div>
-    </div>
+    </>
   );
 
-  if (error) return <div>{header}<p style={{ color: "#dc2626" }}>Error: {error}</p></div>;
-  if (!data) return <div>{header}<p>Loading…</p></div>;
+  if (error)
+    return (
+      <div>
+        {header}
+        <Banner tone="danger">Error: {error}</Banner>
+      </div>
+    );
+  if (!data)
+    return (
+      <div>
+        {header}
+        <p className="text-muted text-sm">Loading…</p>
+      </div>
+    );
 
   return (
     <div>
       {header}
-      <p><small>Income, spending, cashback and debt below are for {year === "all" ? "all time" : year}; balances/net worth are current.</small></p>
 
       {data.upcoming_payments?.length > 0 && (
-        <>
-          <h2>Upcoming payments</h2>
-          {data.upcoming_payments.map((p, i) => (
-            <div
-              className="card"
-              key={i}
-              style={p.days_until <= 5 ? { borderColor: "#dc2626", borderWidth: 2 } : undefined}
-            >
-              <span>
-                {p.name} — due {p.due_date}{" "}
-                <small>({p.days_until === 0 ? "today" : `in ${p.days_until} day${p.days_until === 1 ? "" : "s"}`})</small>
-              </span>
-              <strong>{money(p.amount)}</strong>
-            </div>
-          ))}
-        </>
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-3">Upcoming payments</h2>
+          <div className="space-y-2">
+            {data.upcoming_payments.map((p, i) => (
+              <Banner key={i} tone={paymentTone(p.days_until)}>
+                <div className="flex items-center justify-between gap-3">
+                  <span>
+                    {p.name} — due {p.due_date}{" "}
+                    <span className="text-muted">
+                      ({p.days_until === 0 ? "today" : `in ${p.days_until} day${p.days_until === 1 ? "" : "s"}`})
+                    </span>
+                  </span>
+                  <strong><Amount value={p.amount} /></strong>
+                </div>
+              </Banner>
+            ))}
+          </div>
+        </section>
       )}
 
-      <Stat label="Total income" value={data.total_income} />
-      <Stat label="Total credit card debt" value={data.total_credit_card_debt} />
-      <Stat label="Cashback earned" value={data.total_cashback_earned} />
-      <Stat label="Cashback pending" value={data.total_cashback_pending} />
-      <Stat label="Money set aside in buckets" value={data.total_bucket_money} />
-      <Stat label="Liquid cash" value={data.liquid_cash} />
-      <Stat label="Real available money" value={data.real_available_money} />
-      <Stat label="Total assets" value={data.total_assets} />
-      <Stat label="Net worth" value={data.net_worth} />
+      <section className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+        <StatCard label="Total income" value={<Amount value={data.total_income} />} tone="green" />
+        <StatCard label="Total credit card debt" value={<Amount value={data.total_credit_card_debt} />} tone="danger" />
+        <StatCard label="Cashback earned" value={<Amount value={data.total_cashback_earned} />} tone="green" />
+        <StatCard label="Cashback pending" value={<Amount value={data.total_cashback_pending} />} tone="muted" />
+        <StatCard label="Money set aside in buckets" value={<Amount value={data.total_bucket_money} />} />
+        <StatCard label="Liquid cash" value={<Amount value={data.liquid_cash} />} />
+        <StatCard label="Real available money" value={<Amount value={data.real_available_money} />} accent />
+        <StatCard label="Total assets" value={<Amount value={data.total_assets} />} />
+        <StatCard label="Net worth" value={<Amount value={data.net_worth} />} accent />
+      </section>
 
-      <h2>Owed by profile</h2>
-      {data.owed_by_profile.length === 0 && <p>Nothing owed.</p>}
-      {data.owed_by_profile.map((p) => (
-        <div className="card" key={p.profile_id}>
-          <span>{p.name}</span>
-          <strong>{money(p.amount)}</strong>
+      <section className="grid md:grid-cols-2 gap-6">
+        <div>
+          <h2 className="text-lg font-semibold text-ink mb-3">Total Balance by Profile</h2>
+          {data.owed_by_profile.length === 0 ? (
+            <p className="text-muted text-sm">Nothing owed.</p>
+          ) : (
+            <div className="space-y-2">
+              {data.owed_by_profile.map((p) => (
+                <Card key={p.profile_id} className="flex items-center justify-between py-3">
+                  <span className="text-ink">{p.name}</span>
+                  <strong><Amount value={p.amount} /></strong>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-      ))}
 
-      <h2>Debt by card</h2>
-      {data.debt_by_card.length === 0 && <p>No card debt.</p>}
-      {data.debt_by_card.map((c) => (
-        <div className="card" key={c.credit_card_id}>
-          <span>
-            {c.name}
-            <br />
-            <small>saved {money(c.saved)} in its bucket</small>
-          </span>
-          <strong>{money(c.balance)} owed</strong>
+        <div>
+          <h2 className="text-lg font-semibold text-ink mb-3">Total Balance by Card</h2>
+          {data.debt_by_card.length === 0 ? (
+            <p className="text-muted text-sm">No card debt.</p>
+          ) : (
+            <div className="space-y-2">
+              {data.debt_by_card.map((c) => (
+                <Card key={c.credit_card_id} className="flex items-center justify-between py-3">
+                  <span className="text-ink">
+                    {c.name}
+                    <br />
+                    <span className="text-xs text-muted">saved {money(c.saved)} in its bucket</span>
+                  </span>
+                  <strong className="flex items-center gap-1">
+                    <Amount value={c.balance} tone="danger" />
+                    <span className="text-danger">owed</span>
+                  </strong>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-      ))}
+      </section>
     </div>
   );
 }
