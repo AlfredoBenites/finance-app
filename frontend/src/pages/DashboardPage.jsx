@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { dashboardApi } from "../api/client";
 import { useSettings } from "../settings/SettingsContext";
@@ -56,13 +56,14 @@ export default function DashboardPage() {
   const { onlyMyDebt, hideRepayments } = dashboardPrefs;
   const cashbackScope = dashboardPrefs.cashbackScope || "all";
 
+  const navigate = useNavigate();
+
   // Detail/explainer panels are URL-addressable (?profile / ?card / ?panel) so
   // they're shareable and middle-click-openable in a new tab.
   const [searchParams, setSearchParams] = useSearchParams();
   const profileParam = searchParams.get("profile");
   const cardParam = searchParams.get("card");
   const panelParam = searchParams.get("panel"); // "real" | "cashback"
-  const panelOpen = !!profileParam || !!cardParam || !!panelParam;
   const closePanel = () => setSearchParams({});
 
   // Order of the profile list, per the user's Settings choice.
@@ -140,9 +141,7 @@ export default function DashboardPage() {
           "space-y-6 md:space-y-0 md:grid md:gap-4 md:h-[calc(100vh-4rem)]",
           hasUpcoming
             ? "md:grid-rows-[auto_auto_minmax(0,1fr)_auto]"
-            : "md:grid-rows-[auto_auto_minmax(0,1fr)]",
-          "transition-transform duration-200",
-          panelOpen && "2xl:-translate-x-8"
+            : "md:grid-rows-[auto_auto_minmax(0,1fr)]"
         )}
       >
         {header}
@@ -185,7 +184,12 @@ export default function DashboardPage() {
                     to={`?profile=${p.profile_id}`}
                     className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted transition-colors"
                   >
-                    <span className="text-ink">{p.name}</span>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-ink truncate">{p.name}</span>
+                      {p.non_card_amount > 0.005 && (
+                        <Badge tone="warn">Attention needed</Badge>
+                      )}
+                    </span>
                     <span className="flex items-center gap-1.5">
                       <strong><Amount value={p.amount} /></strong>
                       <ChevronRight size={16} className="text-muted" />
@@ -242,7 +246,12 @@ export default function DashboardPage() {
                 </THead>
                 <tbody>
                   {data.upcoming_payments.map((p, i) => (
-                    <TR key={i}>
+                    <TR
+                      key={i}
+                      onClick={() => navigate("/payments")}
+                      className="cursor-pointer"
+                      title="Go to Pay a card"
+                    >
                       <TD className="text-ink">{p.name}</TD>
                       <TD className="text-ink whitespace-nowrap">{formatDate(p.due_date)}</TD>
                       <TD>
@@ -260,7 +269,12 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <ProfileDetailPanel profileId={profileParam} open={!!profileParam} onClose={closePanel} />
+      <ProfileDetailPanel
+        profileId={profileParam}
+        open={!!profileParam}
+        onClose={closePanel}
+        mismatchAmount={owedProfiles.find((p) => p.profile_id === profileParam)?.non_card_amount || 0}
+      />
       <CardDetailPanel cardId={cardParam} cardName={cardName} open={!!cardParam} onClose={closePanel} />
       <RealAvailablePanel open={panelParam === "real"} onClose={closePanel} />
       <CashbackPanel open={panelParam === "cashback"} onClose={closePanel} />

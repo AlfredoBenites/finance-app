@@ -69,9 +69,21 @@ export function RealAvailablePanel({ open, onClose }) {
       {!data && !error && <p className="text-muted text-sm">Loading…</p>}
       {ra && (
         <div>
-          {/* Simplified formula */}
+          {/* Simplified formula, with where each side comes from */}
           <Row label="Available cash" value={availableCash} op="+" />
+          {ra.available_sources?.map((acc, i) => (
+            <div key={i}>
+              <Row label={acc.name} value={acc.amount} indent />
+              {acc.sources?.map((s, j) => (
+                <div key={j} className="flex items-center justify-between gap-3 pl-6 py-0.5 text-xs text-muted">
+                  <span>{s.name}</span>
+                  <Amount value={s.amount} />
+                </div>
+              ))}
+            </div>
+          ))}
           <Row label="Unallocated card debt" value={ra.my_unallocated_debt} op="−" tone="danger" />
+          <SubList items={ra.debt_by_card} />
           <Row label="Real available money" value={ra.total} strong />
 
           {/* Full math, collapsed by default */}

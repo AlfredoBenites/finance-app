@@ -4,8 +4,11 @@ import { SlideOver, Banner, Amount } from "../ui";
 
 // Slide-over for a profile on the dashboard: what this person still owes,
 // grouped by card (highest first), with the unpaid charges behind each total.
-// Reuses the existing /statement endpoint — no backend change.
-export default function ProfileDetailPanel({ profileId, open, onClose }) {
+// Reuses the existing /statement endpoint. `mismatchAmount` is the part of the
+// profile's dashboard balance that's a bank/cash charge not handled yet — this
+// panel only lists card charges, so a non-zero value means the totals won't line
+// up and the user should settle that expense in Expenses.
+export default function ProfileDetailPanel({ profileId, open, onClose, mismatchAmount = 0 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -35,6 +38,14 @@ export default function ProfileDetailPanel({ profileId, open, onClose }) {
 
       {data && (
         <div className="space-y-5">
+          {mismatchAmount > 0.005 && (
+            <Banner tone="warn">
+              <strong>CC unallocation mismatch.</strong>{" "}
+              <Amount value={mismatchAmount} /> of this profile's balance is a bank or cash charge
+              that hasn't been settled, so it isn't shown below. Handle it in Expenses (or accept its
+              bucket suggestion) to clear this.
+            </Banner>
+          )}
           <div className="flex items-baseline justify-between border-b border-border pb-4">
             <span className="text-sm text-muted">Total still owed</span>
             <span className="text-2xl font-semibold">

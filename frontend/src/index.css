@@ -11,11 +11,11 @@
   --accent: #e4f222;
   --accent-ink: #0d0b09;
 
-  /* Canvas sits a touch below the white card surface so sections read as
-     distinct boxes in light mode without leaning heavily on gray. */
-  --canvas: #f3f3f1;
+  /* Canvas sits just below the white card surface so sections read as distinct
+     boxes in light mode, but only barely gray. */
+  --canvas: #f7f7f6;
   --surface: #ffffff;
-  --surface-muted: #f6f6f4;
+  --surface-muted: #f1f1ef;
 
   --ink: #0d0b09;
   --muted: #6b7280;

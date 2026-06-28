@@ -43,14 +43,16 @@ export default function AppShell({ user, onSignOut, children }) {
         </a>
       </div>
 
-      {/* Drawer backdrop (mobile only) */}
-      {mobileOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/40"
-          onClick={() => setMobileOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      {/* Drawer backdrop (mobile only) — always rendered so it can fade with the
+          drawer; non-interactive when closed. */}
+      <div
+        className={cn(
+          "md:hidden fixed inset-0 z-40 bg-black/40 transition-opacity duration-300",
+          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+      />
 
       <Sidebar
         user={user}

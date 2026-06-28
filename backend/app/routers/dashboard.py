@@ -77,6 +77,14 @@ def get_dashboard(
 
     # "owed by profile" is the per-person reimbursement view (who owes YOU).
     owed = calc.owed_by_profile(transactions)
+    # Of that, the portion that's a bank/cash (non-card) charge not yet handled.
+    # Those should always be allocated via a bucket, so a non-zero value flags a
+    # mismatch: the profile's balance won't match the card-only detail panel.
+    owed_non_card: dict = {}
+    for t in calc.unpaid(transactions):
+        if not t.get("credit_card_id"):
+            pid = t["profile_id"]
+            owed_non_card[pid] = owed_non_card.get(pid, calc.Decimal("0")) - calc._dec(t["amount"])
     # Card debt is what you owe the BANK (charges not yet paid to the issuer),
     # independent of reimbursement. The payoff bucket shows how much you've SAVED
     # toward it.
@@ -168,7 +176,12 @@ def get_dashboard(
         "net_worth": float(calc.net_worth(accounts, my_txns, buckets)),
         "total_income": float(total_income),
         "owed_by_profile": [
-            {"profile_id": pid, "name": profile_names.get(pid, "Unknown"), "amount": float(amt)}
+            {
+                "profile_id": pid,
+                "name": profile_names.get(pid, "Unknown"),
+                "amount": float(amt),
+                "non_card_amount": float(owed_non_card.get(pid, calc.Decimal("0"))),
+            }
             for pid, amt in owed.items()
         ],
         "debt_by_card": debt_by_card,
@@ -236,12 +249,63 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
     ra_my_debt = calc.total_card_debt(my_txns)
     ra_card_buckets = calc.all_card_bucket_money(buckets)
     ra_set_aside = calc.non_card_bucket_money(buckets)
+
+    # Where the available cash sits: each liquid account's available amount
+    # (balance minus the non-spendable buckets it holds), broken down into the
+    # spendable buckets that make it up plus any unallocated remainder. Accounts
+    # with $0 available are hidden.
+    EPS = calc.Decimal("0.005")
+    nonspend_by_account: dict = {}
+    spendable_by_account: dict = {}
+    for b in buckets:
+        if not b.get("is_active"):
+            continue
+        aid = b.get("account_id")
+        if not aid:
+            continue
+        if b.get("kind") == "spendable":
+            spendable_by_account.setdefault(aid, []).append(b)
+        else:
+            nonspend_by_account[aid] = nonspend_by_account.get(aid, calc.Decimal("0")) + calc._dec(b.get("current_amount"))
+
+    available_sources = []
+    for a in accounts:
+        if not (a.get("is_active") and a.get("account_type") in calc.LIQUID_ACCOUNT_TYPES):
+            continue
+        bal = calc._dec(a.get("balance"))
+        nonspend = nonspend_by_account.get(a["id"], calc.Decimal("0"))
+        available = bal - nonspend
+        if abs(available) < EPS:
+            continue  # hide $0 accounts
+        spend = spendable_by_account.get(a["id"], [])
+        spend_sum = sum((calc._dec(b.get("current_amount")) for b in spend), calc.Decimal("0"))
+        sources = [
+            {"name": b.get("name"), "amount": float(calc._dec(b.get("current_amount")))}
+            for b in spend
+            if abs(calc._dec(b.get("current_amount"))) >= EPS
+        ]
+        unallocated = bal - spend_sum - nonspend
+        if not sources or abs(unallocated) >= EPS:
+            sources.append({"name": "Unallocated", "amount": float(unallocated)})
+        available_sources.append({"name": a.get("name"), "amount": float(available), "sources": sources})
+    # My unallocated (unreimbursed) debt split by card.
+    my_debt_sources = sorted(
+        [
+            {"name": card_names.get(cid, "Unknown"), "amount": float(v)}
+            for cid, v in calc.debt_by_card(my_txns).items()
+            if v > 0
+        ],
+        key=lambda d: -d["amount"],
+    )
+
     real_available = {
         "liquid_cash": float(ra_liquid),
         "my_unallocated_debt": float(ra_my_debt),
         "card_buckets": float(ra_card_buckets),
         "set_aside_buckets": float(ra_set_aside),
         "total": float(ra_liquid - ra_my_debt - ra_card_buckets - ra_set_aside),
+        "available_sources": available_sources,
+        "debt_by_card": my_debt_sources,
         "accounts": liquid_accounts,
         "card_bucket_list": card_buckets,
         "bucket_list": set_aside_buckets,

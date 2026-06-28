@@ -59,7 +59,7 @@ export default function Sidebar({
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-[width,transform] duration-200",
+        "fixed inset-y-0 left-0 z-50 flex flex-col bg-surface border-r border-border transition-[transform,width] duration-300 ease-in-out",
         // On mobile the drawer is always full-width; collapse only applies md+.
         collapsed ? "w-60 md:w-16" : "w-60",
         className
