@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { creditCardsApi, cashbackRulesApi, categoriesApi } from "../api/client";
 import { CATEGORIES as FALLBACK_CATEGORIES } from "../constants";
+import { useSettings } from "../settings/SettingsContext";
 import {
   PageHeader,
   Card,
@@ -238,7 +239,18 @@ export default function CreditCardsPage() {
     }
   }
 
-  const activeCards = cards.filter((c) => c.is_active !== false);
+  const { cardOrder } = useSettings();
+  // Active cards in the user's chosen display order (Settings → Credit Cards);
+  // any card not in the saved order falls to the end.
+  const activeCards = useMemo(() => {
+    const active = cards.filter((c) => c.is_active !== false);
+    if (!cardOrder?.length) return active;
+    const rank = (id) => {
+      const i = cardOrder.indexOf(id);
+      return i === -1 ? Infinity : i;
+    };
+    return [...active].sort((a, b) => rank(a.id) - rank(b.id));
+  }, [cards, cardOrder]);
   const archivedCards = cards.filter((c) => c.is_active === false);
 
   return (

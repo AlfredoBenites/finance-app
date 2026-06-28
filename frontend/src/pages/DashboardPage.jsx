@@ -2,43 +2,70 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { dashboardApi } from "../api/client";
-import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
-import usePersistedState from "../hooks/usePersistedState";
 import { useSettings } from "../settings/SettingsContext";
-import { money } from "../format";
+import { formatDate } from "../format";
 import {
   PageHeader,
   StatCard,
   Card,
+  Badge,
   Banner,
-  Toggle,
   Amount,
+  Table,
+  THead,
+  TH,
+  TR,
+  TD,
   cn,
 } from "../components/ui";
 import ProfileDetailPanel from "../components/dashboard/ProfileDetailPanel";
 import CardDetailPanel from "../components/dashboard/CardDetailPanel";
+import { RealAvailablePanel, CashbackPanel } from "../components/dashboard/BreakdownPanels";
 
-// Upcoming payments warm up as the due date nears: blue (plenty of time) →
-// orange (within a week) → red (2 days or less).
+// Upcoming payments warm up as the due date nears: blue (plenty of time),
+// orange (within a week), red (2 days or less).
 const paymentTone = (days) => (days <= 2 ? "danger" : days <= 7 ? "orange" : "info");
+const daysLabel = (days) => (days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`);
+
+// Section heading shown above each card on the dashboard.
+function SectionTitle({ children }) {
+  return <h2 className="text-base font-semibold text-ink mb-2">{children}</h2>;
+}
+
+// A balance section (Profile or Card) as a card whose list scrolls internally.
+// On desktop it fills its grid cell's height; on mobile it grows naturally.
+function BalanceCard({ empty, children }) {
+  return (
+    <Card padded={false} className="flex flex-col overflow-hidden md:flex-1 md:min-h-0">
+      {empty ? (
+        <p className="text-muted text-sm px-4 py-6">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-border overflow-y-auto md:flex-1">{children}</ul>
+      )}
+    </Card>
+  );
+}
 
 export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [year, setYear] = useState(CURRENT_YEAR);
-  const [hideRepayments, setHideRepayments] = usePersistedState("dash.hideRepayments", false);
-  const [onlyMyDebt, setOnlyMyDebt] = usePersistedState("dash.onlyMyDebt", false);
 
-  // Detail panels are URL-addressable (?profile=<id> / ?card=<id>) so they're
-  // shareable and middle-click-openable in a new tab.
+  // Calculation prefs live in Settings now. The dashboard is all current-state
+  // (no year/period filter).
+  const { profileSort, dashboardPrefs } = useSettings();
+  const { onlyMyDebt, hideRepayments } = dashboardPrefs;
+  const cashbackScope = dashboardPrefs.cashbackScope || "all";
+
+  // Detail/explainer panels are URL-addressable (?profile / ?card / ?panel) so
+  // they're shareable and middle-click-openable in a new tab.
   const [searchParams, setSearchParams] = useSearchParams();
   const profileParam = searchParams.get("profile");
   const cardParam = searchParams.get("card");
-  const panelOpen = !!profileParam || !!cardParam;
+  const panelParam = searchParams.get("panel"); // "real" | "cashback"
+  const panelOpen = !!profileParam || !!cardParam || !!panelParam;
   const closePanel = () => setSearchParams({});
 
-  // Order of the "Total Balance by Profile" list, per the user's Settings choice.
-  const { profileSort } = useSettings();
+  // Order of the profile list, per the user's Settings choice.
   const owedProfiles = useMemo(() => {
     const arr = data?.owed_by_profile ? [...data.owed_by_profile] : [];
     if (profileSort.mode === "asc") arr.sort((a, b) => a.amount - b.amount);
@@ -59,7 +86,6 @@ export default function DashboardPage() {
     async function load(attempt = 0) {
       try {
         const d = await dashboardApi.get({
-          year: year === "all" ? undefined : year,
           onlyPrimary: onlyMyDebt,
           excludeRepayments: hideRepayments,
         });
@@ -78,135 +104,166 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [year, hideRepayments, onlyMyDebt]);
+  }, [hideRepayments, onlyMyDebt]);
 
-  const header = (
-    <>
-      <PageHeader
-        title="Dashboard"
-        subtitle={`Income, spending, cashback and debt are for ${
-          year === "all" ? "all time" : year
-        }; balances and net worth are current.`}
-        actions={<YearSelect value={year} onChange={setYear} />}
-      />
-      <div className="flex gap-5 mb-6 flex-wrap">
-        <Toggle on={hideRepayments} onClick={() => setHideRepayments((v) => !v)} label="Hide repayments" />
-        <Toggle on={onlyMyDebt} onClick={() => setOnlyMyDebt((v) => !v)} label="Only my debt" />
-      </div>
-    </>
-  );
+  const header = <PageHeader title="Dashboard" className="!mb-0" />;
 
   if (error)
     return (
       <div>
         {header}
-        <Banner tone="danger">Error: {error}</Banner>
+        <Banner tone="danger" className="mt-4">Error: {error}</Banner>
       </div>
     );
   if (!data)
     return (
       <div>
         {header}
-        <p className="text-muted text-sm">Loading…</p>
+        <p className="text-muted text-sm mt-4">Loading…</p>
       </div>
     );
 
   const cardName = data.debt_by_card.find((c) => c.credit_card_id === cardParam)?.name;
+  const cashbackTotal =
+    cashbackScope === "mine"
+      ? data.total_cashback_mine || 0
+      : (data.total_cashback_earned || 0) + (data.total_cashback_pending || 0);
+  const hasUpcoming = data.upcoming_payments?.length > 0;
 
   return (
     <>
-      {/* Only nudge the page left on very wide screens, where there's room to
-          reveal the right-hand figures without cutting anything off. */}
-      <div className={cn("transition-transform duration-200", panelOpen && "2xl:-translate-x-8")}>
-      {header}
+      {/* On desktop, lay out as a fixed-height grid so the page fills the
+          viewport without scrolling; the balances row flexes and its lists
+          scroll internally. On mobile it's a normal stacked, scrollable column. */}
+      <div
+        className={cn(
+          "space-y-6 md:space-y-0 md:grid md:gap-4 md:h-[calc(100vh-4rem)]",
+          hasUpcoming
+            ? "md:grid-rows-[auto_auto_minmax(0,1fr)_auto]"
+            : "md:grid-rows-[auto_auto_minmax(0,1fr)]",
+          "transition-transform duration-200",
+          panelOpen && "2xl:-translate-x-8"
+        )}
+      >
+        {header}
 
-      {data.upcoming_payments?.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-lg font-semibold text-ink mb-3">Upcoming payments</h2>
-          <div className="space-y-2">
-            {data.upcoming_payments.map((p, i) => (
-              <Banner key={i} tone={paymentTone(p.days_until)}>
-                <div className="flex items-center justify-between gap-3">
-                  <span>
-                    {p.name} — due {p.due_date}{" "}
-                    <span className="text-muted">
-                      ({p.days_until === 0 ? "today" : `in ${p.days_until} day${p.days_until === 1 ? "" : "s"}`})
-                    </span>
-                  </span>
-                  <strong><Amount value={p.amount} /></strong>
-                </div>
-              </Banner>
-            ))}
+        {/* Summary (top) */}
+        <section>
+          <SectionTitle>Summary</SectionTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <Link to="?panel=real" className="block">
+              <StatCard
+                label="Real available money ›"
+                value={<Amount value={data.real_available_money} />}
+                hint="Free to spend after card debt and set-aside buckets. Tap for the breakdown."
+                className="h-full cursor-pointer hover:bg-surface-muted hover:border-border-strong transition-colors"
+              />
+            </Link>
+            <Link to="?panel=cashback" className="block">
+              <StatCard
+                label="Cashback ›"
+                value={<Amount value={cashbackTotal} />}
+                hint={
+                  cashbackScope === "mine"
+                    ? "Your own cashback. Tap to see it by card and person."
+                    : "All cashback accrued. Tap to see it by card and person."
+                }
+                className="h-full cursor-pointer hover:bg-surface-muted hover:border-border-strong transition-colors"
+              />
+            </Link>
           </div>
         </section>
-      )}
 
-      <section className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-        <StatCard label="Total income" value={<Amount value={data.total_income} />} tone="green" />
-        <StatCard label="Total credit card debt" value={<Amount value={data.total_credit_card_debt} />} tone="danger" />
-        <StatCard label="Cashback earned" value={<Amount value={data.total_cashback_earned} />} tone="green" />
-        <StatCard label="Cashback pending" value={<Amount value={data.total_cashback_pending} />} tone="muted" />
-        <StatCard label="Money set aside in buckets" value={<Amount value={data.total_bucket_money} />} />
-        <StatCard label="Liquid cash" value={<Amount value={data.liquid_cash} />} />
-        <StatCard label="Real available money" value={<Amount value={data.real_available_money} />} accent />
-        <StatCard label="Total assets" value={<Amount value={data.total_assets} />} />
-        <StatCard label="Net worth" value={<Amount value={data.net_worth} />} accent />
-      </section>
-
-      <section className="grid md:grid-cols-2 gap-6">
-        <div>
-          <h2 className="text-lg font-semibold text-ink mb-3">Total Balance by Profile</h2>
-          {owedProfiles.length === 0 ? (
-            <p className="text-muted text-sm">Nothing owed.</p>
-          ) : (
-            <div className="space-y-2">
+        {/* Unallocated balances (middle, fills remaining height) */}
+        <section className="grid md:grid-cols-2 gap-6 md:min-h-0">
+          <div className="flex flex-col md:min-h-0">
+            <SectionTitle>Unallocated Balance by Profile</SectionTitle>
+            <BalanceCard empty={owedProfiles.length === 0 ? "Nothing owed." : null}>
               {owedProfiles.map((p) => (
-                <Link key={p.profile_id} to={`?profile=${p.profile_id}`} className="block">
-                  <Card className="flex items-center justify-between py-3 cursor-pointer hover:bg-surface-muted hover:border-border-strong transition-colors">
+                <li key={p.profile_id}>
+                  <Link
+                    to={`?profile=${p.profile_id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted transition-colors"
+                  >
                     <span className="text-ink">{p.name}</span>
                     <span className="flex items-center gap-1.5">
                       <strong><Amount value={p.amount} /></strong>
                       <ChevronRight size={16} className="text-muted" />
                     </span>
-                  </Card>
-                </Link>
+                  </Link>
+                </li>
               ))}
-            </div>
-          )}
-        </div>
+            </BalanceCard>
+          </div>
 
-        <div>
-          <h2 className="text-lg font-semibold text-ink mb-3">Total Balance by Card</h2>
-          {data.debt_by_card.length === 0 ? (
-            <p className="text-muted text-sm">No card debt.</p>
-          ) : (
-            <div className="space-y-2">
+          <div className="flex flex-col md:min-h-0">
+            <SectionTitle>Unallocated Balance by Card</SectionTitle>
+            <BalanceCard empty={data.debt_by_card.length === 0 ? "No cards yet." : null}>
               {data.debt_by_card.map((c) => (
-                <Link key={c.credit_card_id} to={`?card=${c.credit_card_id}`} className="block">
-                  <Card className="flex items-center justify-between py-3 cursor-pointer hover:bg-surface-muted hover:border-border-strong transition-colors">
+                <li key={c.credit_card_id}>
+                  <Link
+                    to={`?card=${c.credit_card_id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-muted transition-colors"
+                  >
                     <span className="text-ink">
                       {c.name}
                       <br />
-                      <span className="text-xs text-muted">saved {money(c.saved)} in its bucket</span>
+                      <span className="text-xs text-muted">
+                        <Amount value={c.saved} /> saved in its bucket
+                      </span>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <strong className="flex items-center gap-1">
-                        <Amount value={c.balance} tone="danger" />
-                        <span className="text-danger">owed</span>
+                        <Amount value={c.balance} tone={c.balance > 0.005 ? "danger" : "muted"} />
+                        <span className={c.balance > 0.005 ? "text-danger" : "text-muted"}>unallocated</span>
                       </strong>
                       <ChevronRight size={16} className="text-muted" />
                     </span>
-                  </Card>
-                </Link>
+                  </Link>
+                </li>
               ))}
+            </BalanceCard>
+          </div>
+        </section>
+
+        {/* Upcoming payments (bottom) */}
+        {hasUpcoming && (
+          <section className="md:min-h-0 md:overflow-hidden flex flex-col">
+            <SectionTitle>Upcoming Payments</SectionTitle>
+            <div className="overflow-auto">
+              <Table>
+                <THead>
+                  <tr>
+                    <TH>Card</TH>
+                    <TH>Due date</TH>
+                    <TH>Due in</TH>
+                    <TH align="right">Amount</TH>
+                  </tr>
+                </THead>
+                <tbody>
+                  {data.upcoming_payments.map((p, i) => (
+                    <TR key={i}>
+                      <TD className="text-ink">{p.name}</TD>
+                      <TD className="text-ink whitespace-nowrap">{formatDate(p.due_date)}</TD>
+                      <TD>
+                        <Badge tone={paymentTone(p.days_until)}>{daysLabel(p.days_until)}</Badge>
+                      </TD>
+                      <TD align="right">
+                        <strong><Amount value={p.amount} /></strong>
+                      </TD>
+                    </TR>
+                  ))}
+                </tbody>
+              </Table>
             </div>
-          )}
-        </div>
-      </section>
+          </section>
+        )}
       </div>
 
       <ProfileDetailPanel profileId={profileParam} open={!!profileParam} onClose={closePanel} />
       <CardDetailPanel cardId={cardParam} cardName={cardName} open={!!cardParam} onClose={closePanel} />
+      <RealAvailablePanel open={panelParam === "real"} onClose={closePanel} />
+      <CashbackPanel open={panelParam === "cashback"} onClose={closePanel} />
     </>
   );
 }

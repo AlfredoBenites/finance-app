@@ -174,6 +174,8 @@ export const dashboardApi = {
     const qs = p.toString();
     return request(`/api/dashboard${qs ? `?${qs}` : ""}`);
   },
+  // Line-by-line breakdowns behind Real available money, Net worth, and Cashback.
+  breakdown: () => request("/api/dashboard/breakdown"),
 };
 
 export const incomeApi = {

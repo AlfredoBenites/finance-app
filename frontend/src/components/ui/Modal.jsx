@@ -5,7 +5,9 @@ import { cn } from "./cn";
 
 // Centered dialog over a dimmed backdrop (takes most of the screen, not all).
 // Same mount/animate-out pattern as SlideOver. Close on backdrop click or Escape.
-export default function Modal({ open, onClose, title, subtitle, children, width = "max-w-2xl" }) {
+// `height` lets a caller fix the dialog height (so it doesn't resize with its
+// content); it defaults to growing up to 85vh.
+export default function Modal({ open, onClose, title, subtitle, children, width = "max-w-2xl", height }) {
   const [mounted, setMounted] = useState(false);
   const [show, setShow] = useState(false);
 
@@ -43,8 +45,9 @@ export default function Modal({ open, onClose, title, subtitle, children, width 
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative w-full bg-surface border border-border rounded-xl shadow-sm flex flex-col max-h-[85vh] transition-all duration-200",
+          "relative w-full bg-surface border border-border rounded-xl shadow-sm flex flex-col transition-all duration-200",
           width,
+          height || "max-h-[85vh]",
           show ? "opacity-100 scale-100" : "opacity-0 scale-95"
         )}
       >
@@ -61,7 +64,7 @@ export default function Modal({ open, onClose, title, subtitle, children, width 
             <X size={18} />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        <div className="flex-1 overflow-y-auto scroll-thin p-5">{children}</div>
       </div>
     </div>,
     document.body

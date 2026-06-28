@@ -199,6 +199,20 @@ def not_mine_bucket_money(buckets: list[dict]) -> Decimal:
     )
 
 
+def all_card_bucket_money(buckets: list[dict]) -> Decimal:
+    """Total in active credit-card payoff buckets: money already set aside to pay
+    cards. This may include reimbursements other people gave you that now sit in
+    your account, so it isn't free for you to spend."""
+    return sum(
+        (
+            _dec(b["current_amount"])
+            for b in buckets
+            if b.get("is_active") and b.get("credit_card_id")
+        ),
+        Decimal("0"),
+    )
+
+
 def card_bucket_savings(buckets: list[dict]) -> dict[str, Decimal]:
     """Map credit_card_id -> money saved in that card's payoff bucket(s)."""
     totals: dict[str, Decimal] = {}
@@ -245,14 +259,22 @@ def other_liabilities(accounts: list[dict]) -> Decimal:
 def real_available_money(
     accounts: list[dict], transactions: list[dict], buckets: list[dict]
 ) -> Decimal:
-    """Liquid cash minus card debt minus non-card bucket money (SPEC 9.7).
+    """Liquid cash minus everything that's spoken for (SPEC 9.7):
 
-    Card payoff buckets are excluded here: they fund the card debt that's already
-    subtracted, so counting them again would double-count.
+    - your own *unallocated* card debt: charges you haven't set aside money for
+      yet (still unreimbursed/unhandled). The allocated part already sits in a
+      card payoff bucket, so it's covered by the next line instead.
+    - all credit-card payoff buckets: that cash is earmarked to pay cards and may
+      include reimbursements other people gave you, so it isn't yours to spend.
+    - set-aside non-card buckets (gas, insurance, ...).
+
+    `transactions` should be your own profile's rows, so other people's debt
+    doesn't count against you (their share is handled via the card buckets).
     """
     return (
         liquid_cash(accounts)
-        - total_bank_debt(transactions)
+        - total_card_debt(transactions)
+        - all_card_bucket_money(buckets)
         - non_card_bucket_money(buckets)
     )
 

@@ -5,6 +5,7 @@ const TONES = {
   neutral: "bg-surface-muted text-muted border border-border",
   success: "bg-green-bg text-green border border-transparent",
   warn: "bg-[color-mix(in_srgb,var(--accent)_22%,transparent)] text-ink border border-transparent",
+  orange: "bg-orange-bg text-orange border border-transparent",
   danger: "bg-danger-bg text-danger border border-transparent",
   info: "bg-info-bg text-info border border-transparent",
 };

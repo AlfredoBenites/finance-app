@@ -62,7 +62,7 @@ export default function SlideOver({ open, onClose, title, subtitle, children, wi
             <X size={18} />
           </button>
         </header>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        <div className="flex-1 overflow-y-auto scroll-thin p-5">{children}</div>
       </aside>
     </div>,
     document.body

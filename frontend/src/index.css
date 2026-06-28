@@ -11,9 +11,11 @@
   --accent: #e4f222;
   --accent-ink: #0d0b09;
 
-  --canvas: #fcfcfc;
+  /* Canvas sits a touch below the white card surface so sections read as
+     distinct boxes in light mode without leaning heavily on gray. */
+  --canvas: #f3f3f1;
   --surface: #ffffff;
-  --surface-muted: #fafafa;
+  --surface-muted: #f6f6f4;
 
   --ink: #0d0b09;
   --muted: #6b7280;
@@ -123,5 +125,25 @@
   /* Money and other figures read better with fixed-width digits. */
   .tnum {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Thin, rounded scrollbar for scroll areas inside panels/modals. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 9999px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
   }
 }

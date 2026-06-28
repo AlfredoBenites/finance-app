@@ -183,18 +183,29 @@ export default function Sidebar({
 
         <div
           className={cn(
-            "flex items-center gap-2 px-3 py-1",
+            "flex items-center gap-2 px-2 py-1",
             collapsed ? "md:justify-center justify-between" : "justify-between"
           )}
         >
-          <span className={cn("text-xs text-muted truncate", collapsed && "md:hidden")} title={user?.email}>
-            {user?.email}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="grid place-items-center h-7 w-7 rounded-full bg-control text-ink text-xs font-semibold uppercase shrink-0"
+              title={user?.email}
+            >
+              {(user?.email?.[0] || "?").toUpperCase()}
+            </span>
+            <span className={cn("text-sm text-ink truncate", collapsed && "md:hidden")} title={user?.email}>
+              {user?.email?.split("@")[0] || "Account"}
+            </span>
+          </div>
           <button
             onClick={onSignOut}
             title="Log out"
             aria-label="Log out"
-            className="shrink-0 text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded p-1"
+            className={cn(
+              "shrink-0 text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded p-1",
+              collapsed && "md:hidden"
+            )}
           >
             <LogOut size={16} />
           </button>

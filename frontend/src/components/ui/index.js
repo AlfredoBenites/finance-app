@@ -10,6 +10,7 @@ export { default as Banner } from "./Banner";
 export { default as Toggle } from "./Toggle";
 export { default as SlideOver } from "./SlideOver";
 export { default as Modal } from "./Modal";
+export { default as ReorderList } from "./ReorderList";
 export { default as CardArt } from "./CardArt";
 export { Table, THead, TH, TR, TD } from "./Table";
 export { Input, Textarea, Select, Field } from "./Field";

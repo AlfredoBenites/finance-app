@@ -148,6 +148,17 @@ def test_real_available_keeps_spendable_buckets_but_drops_others():
     assert calc.real_available_money(accounts, [], buckets) == Decimal("750")
 
 
+def test_real_available_subtracts_card_buckets_and_only_unallocated_debt():
+    accounts = [acct("1000", "checking")]
+    # my unallocated (unreimbursed) charge of 100; the paid-back 200 is allocated
+    # already, so it shouldn't be subtracted again here.
+    txns = [txn(-100), txn(-200, paid=True)]
+    # a card payoff bucket holds 300 (set aside to pay cards; may include others')
+    buckets = [bucket("300", card="c1")]
+    # 1000 - 100 (my unallocated) - 300 (card bucket) - 0 (no non-card buckets) = 600
+    assert calc.real_available_money(accounts, txns, buckets) == Decimal("600")
+
+
 def test_spec_9_7_worked_example():
     # SPEC 9.7: checking 1500, card debt 400, buckets 300 -> real available 800
     accounts = [acct("1500", "checking")]
