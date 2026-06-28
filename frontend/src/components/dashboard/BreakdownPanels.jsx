@@ -56,6 +56,25 @@ function SubList({ items, valueKey = "amount" }) {
   );
 }
 
+// A labelled box for one side of an equation: a header (title + total) over a
+// body that lists where the total comes from.
+function GroupBox({ title, total, tone, children }) {
+  return (
+    <div className="border border-border rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-3 py-2 bg-surface-muted border-b border-border">
+        <span className="font-medium text-ink">{title}</span>
+        <span className="font-semibold"><Amount value={total} tone={tone} /></span>
+      </div>
+      <div className="px-3 py-2">{children}</div>
+    </div>
+  );
+}
+
+// The operator (− / =) shown between equation boxes.
+function Op({ children }) {
+  return <div className="text-center text-muted text-sm leading-none py-1.5">{children}</div>;
+}
+
 export function RealAvailablePanel({ open, onClose }) {
   const { data, error } = useBreakdown(open);
   const ra = data?.real_available;
@@ -69,22 +88,49 @@ export function RealAvailablePanel({ open, onClose }) {
       {!data && !error && <p className="text-muted text-sm">Loading…</p>}
       {ra && (
         <div>
-          {/* Simplified formula, with where each side comes from */}
-          <Row label="Available cash" value={availableCash} op="+" />
-          {ra.available_sources?.map((acc, i) => (
-            <div key={i}>
-              <Row label={acc.name} value={acc.amount} indent />
-              {acc.sources?.map((s, j) => (
-                <div key={j} className="flex items-center justify-between gap-3 pl-6 py-0.5 text-xs text-muted">
-                  <span>{s.name}</span>
-                  <Amount value={s.amount} />
+          {/* Simplified formula as labelled boxes, with where each side comes from */}
+          <GroupBox title="Available cash" total={availableCash}>
+            {ra.available_sources?.length ? (
+              ra.available_sources.map((acc, i) => (
+                <div key={i} className={i > 0 ? "mt-2 pt-2 border-t border-border" : ""}>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-ink">{acc.name}</span>
+                    <Amount value={acc.amount} />
+                  </div>
+                  {acc.sources?.map((s, j) => (
+                    <div key={j} className="flex items-center justify-between gap-3 pl-3 py-0.5 text-xs text-muted">
+                      <span>{s.name}</span>
+                      <Amount value={s.amount} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ))}
-          <Row label="Unallocated card debt" value={ra.my_unallocated_debt} op="−" tone="danger" />
-          <SubList items={ra.debt_by_card} />
-          <Row label="Real available money" value={ra.total} strong />
+              ))
+            ) : (
+              <p className="text-sm text-muted">No available cash.</p>
+            )}
+          </GroupBox>
+
+          <Op>−</Op>
+
+          <GroupBox title="Unallocated card debt" total={ra.my_unallocated_debt} tone="danger">
+            {ra.debt_by_card?.length ? (
+              ra.debt_by_card.map((c, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 py-0.5 text-sm">
+                  <span className="text-ink">{c.name}</span>
+                  <Amount value={c.amount} />
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted">Nothing unallocated.</p>
+            )}
+          </GroupBox>
+
+          <Op>=</Op>
+
+          <div className="flex items-center justify-between gap-3 border border-border-strong rounded-lg px-3 py-3 bg-surface-muted">
+            <span className="font-semibold text-ink">Real available money</span>
+            <span className="text-xl font-semibold"><Amount value={ra.total} /></span>
+          </div>
 
           {/* Full math, collapsed by default */}
           <button
