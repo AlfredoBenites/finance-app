@@ -118,6 +118,7 @@ export default function CardDetailPanel({ cardId, cardName, open, onClose }) {
               lastFour={cardInfo.last_four}
               color={cardInfo.color}
               size="lg"
+              className="mx-auto"
             />
           )}
 

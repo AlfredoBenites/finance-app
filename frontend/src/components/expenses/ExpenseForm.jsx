@@ -151,14 +151,15 @@ export function ExpenseFields({
           disabled={!isCard}
         />
       </Field>
-      <Field label="Note" className={fullWidth}>
-        <Textarea
-          rows={3}
-          placeholder="Optional"
-          value={form.notes}
-          onChange={(e) => setField("notes", e.target.value)}
-        />
-      </Field>
+      {panel ? (
+        <Field label="Note" className="col-span-2">
+          <Textarea rows={3} placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
+        </Field>
+      ) : (
+        <Field label="Note">
+          <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
+        </Field>
+      )}
       <div className={cn("flex items-center justify-end gap-2", fullWidth)}>
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>

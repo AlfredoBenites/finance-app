@@ -34,7 +34,7 @@ export default function TransactionDetailPanel({
     : t?.is_paid_back ? "Undo reimbursed" : "Mark reimbursed";
 
   return (
-    <SlideOver open={open} onClose={onClose} title={t?.merchant || "Expense"} subtitle={t ? formatDate(t.transaction_date) : ""}>
+    <SlideOver open={open} onClose={onClose} title={t?.merchant || "Expense"}>
       {t && (
         <div className="space-y-5">
           {/* Card art stays at the top in both views; while editing it follows
