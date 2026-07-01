@@ -210,6 +210,20 @@ def not_mine_bucket_money(buckets: list[dict]) -> Decimal:
     )
 
 
+def all_card_bucket_money(buckets: list[dict]) -> Decimal:
+    """Total in active credit-card payoff buckets: money already set aside to pay
+    cards. This may include reimbursements other people gave you that now sit in
+    your account, so it isn't free for you to spend."""
+    return sum(
+        (
+            _dec(b["current_amount"])
+            for b in buckets
+            if b.get("is_active") and b.get("credit_card_id")
+        ),
+        Decimal("0"),
+    )
+
+
 def card_bucket_savings(buckets: list[dict]) -> dict[str, Decimal]:
     """Map credit_card_id -> money saved in that card's payoff bucket(s)."""
     totals: dict[str, Decimal] = {}

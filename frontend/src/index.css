@@ -1,58 +1,151 @@
-body {
-  font-family: system-ui, sans-serif;
-  margin: 0;
-  background: #f6f7f9;
-  color: #1a1a1a;
+@import "tailwindcss";
+
+/* Class-based dark mode: <html class="dark"> toggles every dark: variant. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic tokens. Defined as plain CSS vars so they can swap per theme, then
+   exposed to Tailwind as utilities via `@theme inline` below (bg-surface,
+   text-ink, border-border, etc). Yellow `accent` is an ACCENT ONLY — never a
+   page background or body text. */
+:root {
+  color-scheme: light;
+  --accent: #e4f222;
+  --accent-ink: #0d0b09;
+
+  /* Canvas sits just below the white card surface so sections read as distinct
+     boxes in light mode, but only barely gray. */
+  --canvas: #f7f7f6;
+  --surface: #ffffff;
+  --surface-muted: #f1f1ef;
+
+  --ink: #0d0b09;
+  --muted: #6b7280;
+  --border: #ececec;
+  --border-strong: #d8d8d4;
+
+  /* Button / control fill so secondary buttons read as buttons, not text. */
+  --control: #f1f1ef;
+  --control-hover: #e6e6e2;
+
+  --green: #26753b;
+  --green-bg: #f5fff9;
+
+  --danger: #cc5118;
+  --danger-bg: #fdf1ec;
+
+  --orange: #d9822b;
+  --orange-bg: #fbf1e5;
+
+  --info: #446094;
+  --info-bg: #f2f6fa;
+  --info-border: #638dd6;
+
+  --autofill: #feffe1;
 }
 
-.container {
-  max-width: 640px;
-  margin: 40px auto;
-  padding: 0 16px;
+.dark {
+  color-scheme: dark;
+  --accent: #e4f222;
+  --accent-ink: #0d0b09;
+
+  --canvas: #1a1818;
+  --surface: #232020;
+  --surface-muted: #1f1d1d;
+
+  --ink: #ffffff;
+  --muted: #a3a3a3;
+  --border: #2e2a2a;
+  --border-strong: #423d3d;
+
+  --control: #2f2b2b;
+  --control-hover: #393434;
+
+  --green: #5cc97e;
+  --green-bg: #16241b;
+
+  --danger: #e8703f;
+  --danger-bg: #2a1a12;
+
+  --orange: #f0a850;
+  --orange-bg: #2e2413;
+
+  --info: #aac4ee;
+  --info-bg: #2a3a59;
+  --info-border: #4a679e;
+
+  --autofill: #2a2a18;
 }
 
-.card {
-  background: #fff;
-  border: 1px solid #e3e3e3;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-control: var(--control);
+  --color-control-hover: var(--control-hover);
+
+  --color-green: var(--green);
+  --color-green-bg: var(--green-bg);
+
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+
+  --color-orange: var(--orange);
+  --color-orange-bg: var(--orange-bg);
+
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+
+  --color-autofill: var(--autofill);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-form {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-}
+@layer base {
+  /* Scale the whole UI up ~10% by default (everything is sized in rem, so this
+     reads like a browser zoom of 110% without the user having to set it). */
+  html {
+    font-size: 110%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+  }
+  /* Money and other figures read better with fixed-width digits. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
 
-input,
-select {
-  box-sizing: border-box;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background: #fff;
-}
-
-/* Fixed width so a select doesn't grow (and reflow the row) when its options
-   load a moment after the page renders. Long labels truncate when closed but
-   show fully when the dropdown is open. */
-select {
-  width: 160px;
-}
-
-button {
-  padding: 8px 14px;
-  border: none;
-  border-radius: 6px;
-  background: #2563eb;
-  color: #fff;
-  cursor: pointer;
-}
-
-button.danger {
-  background: #dc2626;
+  /* Thin, rounded scrollbar for scroll areas inside panels/modals. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 9999px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+  }
 }

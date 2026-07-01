@@ -464,7 +464,12 @@ def deduct_expense(payload: DeductExpenseRequest, user_id: str = Depends(get_cur
         supabase.table(TABLE).update(
             {"current_amount": str(Decimal(str(bk["current_amount"])) + amount)}
         ).eq("id", bk["id"]).eq("owner_id", user_id).execute()
-    supabase.table("transactions").update({"account_deducted": True}).eq("id", t["id"]).eq("owner_id", user_id).execute()
+    # Accepting the suggestion also settles the expense: a bank/cash charge paid
+    # from your own account is handled once the money's accounted for, so mark it
+    # paid (drops it out of the profile's unallocated balance).
+    supabase.table("transactions").update(
+        {"account_deducted": True, "is_paid_back": True, "paid_back_date": date.today().isoformat()}
+    ).eq("id", t["id"]).eq("owner_id", user_id).execute()
     log_move(user_id, "bucket", -amount, f"Expense '{t.get('merchant') or ''}' from {bk['name'] if bk else 'Unallocated'}")
     return {"ok": True}
 

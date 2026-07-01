@@ -46,7 +46,7 @@ def get_dashboard(
         for a in accounts
     ]
     profiles = owned("profiles", "id, name, is_primary")
-    cards = owned("credit_cards", "id, name, due_day, statement_day")
+    cards = owned("credit_cards", "id, name, due_day, statement_day, is_active")
     card_payments = owned("card_payments", "credit_card_id, amount, paid_on")
     income_rows = owned("income", "amount, income_date, category")
 
@@ -77,6 +77,14 @@ def get_dashboard(
 
     # "owed by profile" is the per-person reimbursement view (who owes YOU).
     owed = calc.owed_by_profile(transactions)
+    # Of that, the portion that's a bank/cash (non-card) charge not yet handled.
+    # Those should always be allocated via a bucket, so a non-zero value flags a
+    # mismatch: the profile's balance won't match the card-only detail panel.
+    owed_non_card: dict = {}
+    for t in calc.unpaid(transactions):
+        if not t.get("credit_card_id"):
+            pid = t["profile_id"]
+            owed_non_card[pid] = owed_non_card.get(pid, calc.Decimal("0")) - calc._dec(t["amount"])
     # Card debt is what you owe the BANK (charges not yet paid to the issuer),
     # independent of reimbursement. The payoff bucket shows how much you've SAVED
     # toward it.
@@ -95,19 +103,25 @@ def get_dashboard(
             card_pays = [p for p in card_payments if p.get("credit_card_id") == c["id"]]
             statement_by_card[c["id"]] = calc.statement_due(card_txns, card_pays, int(sd), today)
 
+    # "Unallocated" = charges a person hasn't reimbursed yet (is_paid_back based).
+    # That's the red figure on the dashboard's "Unallocated Balance by Card".
+    # Every active card is listed (even at $0); the running balance owed to the
+    # bank is reported separately (total_debt) and lives on Insights.
+    unreimbursed = calc.debt_by_card(debt_txns)
+    total_debt = sum(debts.values(), calc.Decimal("0"))
     debt_by_card = []
-    total_debt = calc.Decimal("0")
-    card_ids = set(debts) | {cid for cid, v in statement_by_card.items() if v > 0}
-    for cid in card_ids:
-        owed_amt = debts.get(cid, calc.Decimal("0"))
-        total_debt += owed_amt
+    for c in cards:
+        if c.get("is_active") is False:
+            continue
+        cid = c["id"]
+        unr = unreimbursed.get(cid, calc.Decimal("0"))
         stmt = statement_by_card.get(cid)
         debt_by_card.append({
             "credit_card_id": cid,
-            "name": card_names.get(cid, "Unknown"),
-            "owed": float(owed_amt),
+            "name": c["name"],
+            "owed": float(debts.get(cid, calc.Decimal("0"))),
             "saved": float(savings.get(cid, calc.Decimal("0"))),
-            "balance": float(owed_amt),
+            "balance": float(unr),
             "statement": float(stmt) if stmt is not None else None,
         })
     debt_by_card.sort(key=lambda d: -d["balance"])
@@ -148,6 +162,11 @@ def get_dashboard(
         "total_credit_card_debt": float(total_debt),
         "total_cashback_earned": float(calc.cashback_earned(transactions)),
         "total_cashback_pending": float(calc.cashback_pending(transactions)),
+        # Cashback from only your own profile's charges, for the dashboard's
+        # "my cashback only" option.
+        "total_cashback_mine": float(
+            sum((calc._dec(t.get("cashback_amount")) for t in my_txns), calc.Decimal("0"))
+        ),
         "total_bucket_money": float(calc.total_bucket_money(buckets)),
         "liquid_cash": float(calc.liquid_cash(accounts)),
         "real_available_money": float(
@@ -157,8 +176,207 @@ def get_dashboard(
         "net_worth": float(calc.net_worth(accounts, my_txns, buckets)),
         "total_income": float(total_income),
         "owed_by_profile": [
-            {"profile_id": pid, "name": profile_names.get(pid, "Unknown"), "amount": float(amt)}
+            {
+                "profile_id": pid,
+                "name": profile_names.get(pid, "Unknown"),
+                "amount": float(amt),
+                "non_card_amount": float(owed_non_card.get(pid, calc.Decimal("0"))),
+            }
             for pid, amt in owed.items()
         ],
         "debt_by_card": debt_by_card,
     }
+
+
+@router.get("/breakdown")
+def get_breakdown(user_id: str = Depends(get_current_user_id)):
+    """Line-by-line breakdowns behind the dashboard's headline figures, so the
+    explainer panels can show exactly how each number is reached. Read-only and
+    always current-state (no year filter) — these mirror the dashboard's
+    Real available money, Net worth, and Cashback.
+    """
+    def owned(table, columns="*"):
+        return supabase.table(table).select(columns).eq("owner_id", user_id).execute().data
+
+    transactions = owned("transactions")
+    buckets = owned("buckets")
+    accounts = owned("accounts")
+    profiles = owned("profiles", "id, name, is_primary")
+    cards = owned("credit_cards", "id, name")
+
+    # Value investment accounts at the sum of their holdings (same override the
+    # main dashboard applies), so totals match exactly.
+    holdings = owned("holdings", "account_id, shares, last_price, manual_price")
+    holdings_value = {}
+    for h in holdings:
+        price = h.get("manual_price")
+        price = price if price is not None else h.get("last_price")
+        if price is not None:
+            holdings_value[h["account_id"]] = holdings_value.get(h["account_id"], calc.Decimal("0")) + (
+                calc._dec(h.get("shares")) * calc._dec(price)
+            )
+    accounts = [
+        {**a, "balance": str(holdings_value[a["id"]])} if a["id"] in holdings_value else a
+        for a in accounts
+    ]
+
+    primary_id = next((p["id"] for p in profiles if p.get("is_primary")), None)
+    my_txns = (
+        [t for t in transactions if t["profile_id"] == primary_id]
+        if primary_id is not None else transactions
+    )
+    profile_names = {p["id"]: p["name"] for p in profiles}
+    card_names = {c["id"]: c["name"] for c in cards}
+
+    # --- Real available money: liquid cash − money set aside in buckets (card
+    # payoff + other set-aside) − card charges not yet set aside (unsettled) ---
+    liquid_accounts = [
+        {"name": a.get("name"), "balance": float(calc._dec(a.get("balance")))}
+        for a in accounts
+        if a.get("is_active") and a.get("account_type") in calc.LIQUID_ACCOUNT_TYPES
+    ]
+    set_aside_buckets = [
+        {"name": b.get("name"), "amount": float(calc._dec(b.get("current_amount")))}
+        for b in buckets
+        if b.get("is_active") and not b.get("credit_card_id") and b.get("kind") != "spendable"
+    ]
+    card_buckets = [
+        {"name": b.get("name"), "amount": float(calc._dec(b.get("current_amount")))}
+        for b in buckets
+        if b.get("is_active") and b.get("credit_card_id")
+    ]
+    ra_liquid = calc.liquid_cash(accounts)
+    ra_card_buckets = calc.all_card_bucket_money(buckets)
+    ra_set_aside = sum(
+        (
+            calc._dec(b.get("current_amount"))
+            for b in buckets
+            if b.get("is_active") and not b.get("credit_card_id") and b.get("kind") != "spendable"
+        ),
+        calc.Decimal("0"),
+    )
+    ra_unsettled = calc.unsettled_card_charges(my_txns)
+
+    # Where the available cash sits: each liquid account's available amount
+    # (balance minus the non-spendable buckets it holds), broken down into the
+    # spendable buckets that make it up plus any unallocated remainder. Accounts
+    # with $0 available are hidden.
+    EPS = calc.Decimal("0.005")
+    nonspend_by_account: dict = {}
+    spendable_by_account: dict = {}
+    for b in buckets:
+        if not b.get("is_active"):
+            continue
+        aid = b.get("account_id")
+        if not aid:
+            continue
+        if b.get("kind") == "spendable":
+            spendable_by_account.setdefault(aid, []).append(b)
+        else:
+            nonspend_by_account[aid] = nonspend_by_account.get(aid, calc.Decimal("0")) + calc._dec(b.get("current_amount"))
+
+    available_sources = []
+    for a in accounts:
+        if not (a.get("is_active") and a.get("account_type") in calc.LIQUID_ACCOUNT_TYPES):
+            continue
+        bal = calc._dec(a.get("balance"))
+        nonspend = nonspend_by_account.get(a["id"], calc.Decimal("0"))
+        available = bal - nonspend
+        if abs(available) < EPS:
+            continue  # hide $0 accounts
+        spend = spendable_by_account.get(a["id"], [])
+        spend_sum = sum((calc._dec(b.get("current_amount")) for b in spend), calc.Decimal("0"))
+        sources = [
+            {"name": b.get("name"), "amount": float(calc._dec(b.get("current_amount")))}
+            for b in spend
+            if abs(calc._dec(b.get("current_amount"))) >= EPS
+        ]
+        unallocated = bal - spend_sum - nonspend
+        if not sources or abs(unallocated) >= EPS:
+            sources.append({"name": "Unallocated", "amount": float(unallocated)})
+        available_sources.append({"name": a.get("name"), "amount": float(available), "sources": sources})
+    # Unsettled card charges (not paid to the bank and not set aside yet), by card.
+    unsettled_by_card: dict = {}
+    for t in my_txns:
+        cid = t.get("credit_card_id")
+        if cid and not t.get("paid_to_bank") and not t.get("reimbursement_allocated"):
+            unsettled_by_card[cid] = unsettled_by_card.get(cid, calc.Decimal("0")) - calc._dec(t["amount"])
+    my_debt_sources = sorted(
+        [{"name": card_names.get(cid, "Unknown"), "amount": float(v)} for cid, v in unsettled_by_card.items() if v > 0],
+        key=lambda d: -d["amount"],
+    )
+
+    real_available = {
+        "liquid_cash": float(ra_liquid),
+        "my_unallocated_debt": float(ra_unsettled),
+        "card_buckets": float(ra_card_buckets),
+        "set_aside_buckets": float(ra_set_aside),
+        # Derive the total from the shared calc so it always matches the dashboard.
+        "total": float(calc.real_available_money(accounts, my_txns, buckets)),
+        "available_sources": available_sources,
+        "debt_by_card": my_debt_sources,
+        "accounts": liquid_accounts,
+        "card_bucket_list": card_buckets,
+        "bucket_list": set_aside_buckets,
+    }
+
+    # --- Net worth: assets − card debt − other liabilities − not-mine buckets ---
+    asset_accounts = [
+        {"name": a.get("name"), "balance": float(calc._dec(a.get("balance")))}
+        for a in accounts
+        if a.get("is_active") and a.get("is_asset")
+    ]
+    nw_assets = calc.total_assets(accounts)
+    nw_debt = calc.total_bank_debt(my_txns)
+    nw_other = calc.other_liabilities(accounts)
+    nw_not_mine = calc.not_mine_bucket_money(buckets)
+    net_worth = {
+        "total_assets": float(nw_assets),
+        "card_debt": float(nw_debt),
+        "other_liabilities": float(nw_other),
+        "not_mine_buckets": float(nw_not_mine),
+        "total": float(nw_assets - nw_debt - nw_other - nw_not_mine),
+        "assets": asset_accounts,
+    }
+
+    # --- Cashback: all accrued, broken down by card (with each person's share)
+    # and by person ---
+    by_profile: dict = {}
+    by_card: dict = {}
+    by_card_profile: dict = {}  # card_id -> {profile_id -> amount}
+    cashback_total = calc.Decimal("0")
+    for t in transactions:
+        amt = calc._dec(t.get("cashback_amount"))
+        if amt == 0:
+            continue
+        cashback_total += amt
+        pid = t.get("profile_id")
+        by_profile[pid] = by_profile.get(pid, calc.Decimal("0")) + amt
+        cid = t.get("credit_card_id")
+        if cid:
+            by_card[cid] = by_card.get(cid, calc.Decimal("0")) + amt
+            slot = by_card_profile.setdefault(cid, {})
+            slot[pid] = slot.get(pid, calc.Decimal("0")) + amt
+
+    def people_for(cid):
+        return sorted(
+            [{"name": profile_names.get(pid, "Unknown"), "amount": float(v)} for pid, v in by_card_profile.get(cid, {}).items()],
+            key=lambda d: -d["amount"],
+        )
+
+    cashback = {
+        "total": float(cashback_total),
+        "by_card": sorted(
+            [
+                {"name": card_names.get(cid, "Unknown"), "amount": float(v), "profiles": people_for(cid)}
+                for cid, v in by_card.items()
+            ],
+            key=lambda d: -d["amount"],
+        ),
+        "by_profile": sorted(
+            [{"name": profile_names.get(pid, "Unknown"), "amount": float(v)} for pid, v in by_profile.items()],
+            key=lambda d: -d["amount"],
+        ),
+    }
+
+    return {"real_available": real_available, "net_worth": net_worth, "cashback": cashback}

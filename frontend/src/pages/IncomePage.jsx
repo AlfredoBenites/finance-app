@@ -3,7 +3,22 @@ import { incomeApi, accountsApi, bucketsApi } from "../api/client";
 import { INCOME_TYPES } from "../constants";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
 import usePersistedState from "../hooks/usePersistedState";
-import { money } from "../format";
+import { formatDate } from "../format";
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  Banner,
+  StatCard,
+  Amount,
+  Toggle,
+  Select,
+  Input,
+  Field,
+  DateInput,
+  AmountInput,
+} from "../components/ui";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const ADD_NEW = "__add_new__";
@@ -157,108 +172,124 @@ export default function IncomePage() {
   const total = visible.reduce((s, i) => s + Number(i.amount), 0);
   const byType = {};
   for (const i of visible) byType[i.category || "Other"] = (byType[i.category || "Other"] || 0) + Number(i.amount);
+  const byTypeSorted = Object.entries(byType).sort((a, b) => b[1] - a[1]);
+
+  // Show the year in row dates only when viewing all time; otherwise "Jul 8".
+  const shortDate = (iso) => (year === "all" ? formatDate(iso) : formatDate(iso).replace(/,\s*\d{4}$/, ""));
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Income</h1>
-        <span style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setHideRepayments((v) => !v)}
-            style={{ background: hideRepayments ? "#2563eb" : "#9ca3af" }}
-          >
-            Hide repayments: {hideRepayments ? "on" : "off"}
-          </button>
-          <YearSelect value={year} onChange={setYear} />
-        </span>
-      </div>
+      <PageHeader
+        title="Income"
+        subtitle="Money coming in, by source and category."
+        actions={
+          <>
+            <Toggle on={hideRepayments} onClick={() => setHideRepayments((v) => !v)} label="Hide repayments" />
+            <YearSelect value={year} onChange={setYear} />
+          </>
+        }
+      />
 
-      <form onSubmit={handleAdd} style={{ flexWrap: "wrap" }}>
-        <input
-          type="date"
-          value={form.income_date}
-          onChange={(e) => setField("income_date", e.target.value)}
-        />
-        <select value={form.source} onChange={(e) => onSourceSelect(e.target.value)}>
-          <option value="">Source…</option>
-          {sourceOptions.map((sName) => (
-            <option key={sName} value={sName}>{sName}</option>
-          ))}
-          <option value={ADD_NEW}>➕ Add new source…</option>
-        </select>
-        <select value={form.category} onChange={(e) => onCategorySelect(e.target.value)}>
-          {categoryOptions.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-          <option value={ADD_NEW}>➕ Add new category…</option>
-        </select>
-        <input
-          type="number"
-          step="0.01"
-          placeholder="Amount"
-          value={form.amount}
-          onChange={(e) => setField("amount", e.target.value)}
-        />
-        <select
-          value={form.account_id}
-          onChange={(e) => setField("account_id", e.target.value)}
-          required
-        >
-          <option value="">Into account…</option>
-          {accounts.filter((a) => a.is_active !== false).map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
-        <input
-          placeholder="Notes"
-          value={form.notes}
-          onChange={(e) => setField("notes", e.target.value)}
-        />
-        <button type="submit">{editingId ? "Save" : "Add"}</button>
-        {editingId && <button type="button" onClick={cancelEdit}>Cancel</button>}
-      </form>
-
-      {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
-
-      <div className="card">
-        <span><strong>Total income</strong></span>
-        <strong>{money(total)}</strong>
-      </div>
-      {Object.entries(byType)
-        .sort((a, b) => b[1] - a[1])
-        .map(([type, amt]) => (
-          <div className="card" key={type}>
-            <span>{type}</span>
-            <span>{money(amt)}</span>
-          </div>
-        ))}
-
-      <h2>Entries</h2>
-      {visible.length === 0 && <p>No income yet.</p>}
-      {visible.map((i) => (
-        <div className="card" key={i.id}>
-          <span>
-            {i.income_date} · {i.source} · {i.category || "—"}
-            <br />
-            <small>
-              {money(i.amount)} · into {accountName(i.account_id)}
-              {i.notes ? ` · ${i.notes}` : ""}
-              {i.allocated_bucket_id ? " · 🪣 allocated" : ""}
-            </small>
-          </span>
-          <span style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => startEdit(i)}>Edit</button>
-            {i.allocated_bucket_id && (
-              <button onClick={() => undoAllocation(i.id)} title="Reverse the bucket/balance this income added">
-                Undo allocation
-              </button>
+      {/* Add / edit form */}
+      <Card className="mb-6">
+        <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <Field label="Date">
+            <DateInput value={form.income_date} onChange={(v) => setField("income_date", v)} />
+          </Field>
+          <Field label="Source">
+            <Select value={form.source} onChange={(e) => onSourceSelect(e.target.value)}>
+              <option value="">Source…</option>
+              {sourceOptions.map((sName) => (
+                <option key={sName} value={sName}>{sName}</option>
+              ))}
+              <option value={ADD_NEW}>➕ Add new source…</option>
+            </Select>
+          </Field>
+          <Field label="Category">
+            <Select value={form.category} onChange={(e) => onCategorySelect(e.target.value)}>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+              <option value={ADD_NEW}>➕ Add new category…</option>
+            </Select>
+          </Field>
+          <Field label="Amount">
+            <AmountInput value={form.amount} onChange={(v) => setField("amount", v)} />
+          </Field>
+          <Field label="Into account">
+            <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)} required>
+              <option value="">Into account…</option>
+              {accounts.filter((a) => a.is_active !== false).map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Notes">
+            <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-3 flex items-center justify-end gap-2">
+            {editingId && (
+              <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
             )}
-            <button className="danger" onClick={() => handleDelete(i.id)}>
-              Delete
-            </button>
-          </span>
+            <Button type="submit" variant="primary">{editingId ? "Save changes" : "Add income"}</Button>
+          </div>
+        </form>
+      </Card>
+
+      {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
+
+      {/* Totals */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <StatCard label="Total income" value={<Amount value={total} tone="green" />} accent />
+        {byTypeSorted.map(([type, amt]) => (
+          <StatCard key={type} label={type} value={<Amount value={amt} />} />
+        ))}
+      </section>
+
+      {/* Entries */}
+      <h2 className="text-lg font-semibold text-ink mb-3">Entries</h2>
+      {visible.length === 0 ? (
+        <p className="text-muted text-sm">No income yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {visible.map((i) => (
+            <Card key={i.id} className="flex items-center justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-ink font-medium">{i.source}</span>
+                  <Badge tone="neutral">{i.category || "Other"}</Badge>
+                  {i.allocated_bucket_id && <Badge tone="success">Allocated</Badge>}
+                </div>
+                <div className="text-xs text-muted mt-1 flex items-center gap-2 flex-wrap">
+                  <span>{shortDate(i.income_date)}</span>
+                  <span>·</span>
+                  <span>into {accountName(i.account_id)}</span>
+                  {i.notes && (
+                    <>
+                      <span>·</span>
+                      <span className="truncate max-w-[16rem]">{i.notes}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                <strong className="w-28 text-right">
+                  <Amount value={i.amount} tone="green" />
+                </strong>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => startEdit(i)}>Edit</Button>
+                  {i.allocated_bucket_id && (
+                    <Button size="sm" onClick={() => undoAllocation(i.id)} title="Reverse the bucket/balance this income added">
+                      Undo allocation
+                    </Button>
+                  )}
+                  <Button size="sm" variant="danger" onClick={() => handleDelete(i.id)}>Delete</Button>
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -253,3 +253,5 @@ def test_account_expense_deducts_from_bucket_and_balance(api):
     bal = next(a["balance"] for a in api.client.get("/api/accounts").json() if a["id"] == acct)
     assert float(amt) == 60.0 and float(bal) == 460.0  # both down by 40
     assert api.client.get("/api/buckets/account-expenses").json() == []  # cleared
+    t = next(x for x in api.client.get("/api/transactions").json() if x["id"] == tid)
+    assert t["is_paid_back"] is True  # accepting the suggestion settles the expense
