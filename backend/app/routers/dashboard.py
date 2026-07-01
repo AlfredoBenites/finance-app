@@ -228,8 +228,8 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
     profile_names = {p["id"]: p["name"] for p in profiles}
     card_names = {c["id"]: c["name"] for c in cards}
 
-    # --- Real available money: liquid cash − my unallocated debt − all card
-    # payoff buckets − set-aside non-card buckets ---
+    # --- Real available money: liquid cash − money set aside in buckets (card
+    # payoff + other set-aside) − card charges not yet set aside (unsettled) ---
     liquid_accounts = [
         {"name": a.get("name"), "balance": float(calc._dec(a.get("balance")))}
         for a in accounts
@@ -246,9 +246,16 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
         if b.get("is_active") and b.get("credit_card_id")
     ]
     ra_liquid = calc.liquid_cash(accounts)
-    ra_my_debt = calc.total_card_debt(my_txns)
     ra_card_buckets = calc.all_card_bucket_money(buckets)
-    ra_set_aside = calc.non_card_bucket_money(buckets)
+    ra_set_aside = sum(
+        (
+            calc._dec(b.get("current_amount"))
+            for b in buckets
+            if b.get("is_active") and not b.get("credit_card_id") and b.get("kind") != "spendable"
+        ),
+        calc.Decimal("0"),
+    )
+    ra_unsettled = calc.unsettled_card_charges(my_txns)
 
     # Where the available cash sits: each liquid account's available amount
     # (balance minus the non-spendable buckets it holds), broken down into the
@@ -288,22 +295,24 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
         if not sources or abs(unallocated) >= EPS:
             sources.append({"name": "Unallocated", "amount": float(unallocated)})
         available_sources.append({"name": a.get("name"), "amount": float(available), "sources": sources})
-    # My unallocated (unreimbursed) debt split by card.
+    # Unsettled card charges (not paid to the bank and not set aside yet), by card.
+    unsettled_by_card: dict = {}
+    for t in my_txns:
+        cid = t.get("credit_card_id")
+        if cid and not t.get("paid_to_bank") and not t.get("reimbursement_allocated"):
+            unsettled_by_card[cid] = unsettled_by_card.get(cid, calc.Decimal("0")) - calc._dec(t["amount"])
     my_debt_sources = sorted(
-        [
-            {"name": card_names.get(cid, "Unknown"), "amount": float(v)}
-            for cid, v in calc.debt_by_card(my_txns).items()
-            if v > 0
-        ],
+        [{"name": card_names.get(cid, "Unknown"), "amount": float(v)} for cid, v in unsettled_by_card.items() if v > 0],
         key=lambda d: -d["amount"],
     )
 
     real_available = {
         "liquid_cash": float(ra_liquid),
-        "my_unallocated_debt": float(ra_my_debt),
+        "my_unallocated_debt": float(ra_unsettled),
         "card_buckets": float(ra_card_buckets),
         "set_aside_buckets": float(ra_set_aside),
-        "total": float(ra_liquid - ra_my_debt - ra_card_buckets - ra_set_aside),
+        # Derive the total from the shared calc so it always matches the dashboard.
+        "total": float(calc.real_available_money(accounts, my_txns, buckets)),
         "available_sources": available_sources,
         "debt_by_card": my_debt_sources,
         "accounts": liquid_accounts,

@@ -148,15 +148,20 @@ def test_real_available_keeps_spendable_buckets_but_drops_others():
     assert calc.real_available_money(accounts, [], buckets) == Decimal("750")
 
 
-def test_real_available_subtracts_card_buckets_and_only_unallocated_debt():
+def test_real_available_payoff_bucket_and_unsettled_charges_no_double_count():
     accounts = [acct("1000", "checking")]
-    # my unallocated (unreimbursed) charge of 100; the paid-back 200 is allocated
-    # already, so it shouldn't be subtracted again here.
-    txns = [txn(-100), txn(-200, paid=True)]
-    # a card payoff bucket holds 300 (set aside to pay cards; may include others')
-    buckets = [bucket("300", card="c1")]
-    # 1000 - 100 (my unallocated) - 300 (card bucket) - 0 (no non-card buckets) = 600
-    assert calc.real_available_money(accounts, txns, buckets) == Decimal("600")
+    # a card payoff bucket holds $200 set aside for the card
+    buckets = [bucket("200", kind="set_aside", card="visa")]
+    txns = [
+        # already set aside (allocated) -> covered by the payoff bucket, NOT re-subtracted
+        {"amount": "-200", "credit_card_id": "visa", "paid_to_bank": False, "reimbursement_allocated": True},
+        # not set aside yet -> subtracted
+        {"amount": "-100", "credit_card_id": "visa", "paid_to_bank": False, "reimbursement_allocated": False},
+        # already paid to the bank -> ignored
+        {"amount": "-30", "credit_card_id": "visa", "paid_to_bank": True, "reimbursement_allocated": False},
+    ]
+    # 1000 - 200 (payoff bucket) - 100 (unsettled) = 700
+    assert calc.real_available_money(accounts, txns, buckets) == Decimal("700")
 
 
 def test_spec_9_7_worked_example():

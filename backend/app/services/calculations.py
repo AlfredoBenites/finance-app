@@ -166,21 +166,32 @@ def total_bucket_money(buckets: list[dict]) -> Decimal:
     )
 
 
-def non_card_bucket_money(buckets: list[dict]) -> Decimal:
-    """Active non-card buckets that reduce real available money.
-
-    Excludes card payoff buckets (their debt is already subtracted, so counting
-    them again would double-count) and buckets marked 'spendable' (the user
-    treats that money as freely available). 'set_aside' / 'not_mine' / unset
-    buckets are subtracted.
+def earmarked_bucket_money(buckets: list[dict]) -> Decimal:
+    """Active buckets that aren't 'spendable' — money set aside and therefore not
+    freely available. INCLUDES card payoff buckets (money earmarked to pay a card).
     """
     return sum(
         (
             _dec(b["current_amount"])
             for b in buckets
-            if b.get("is_active")
-            and not b.get("credit_card_id")
-            and b.get("kind") != "spendable"
+            if b.get("is_active") and b.get("kind") != "spendable"
+        ),
+        Decimal("0"),
+    )
+
+
+def unsettled_card_charges(transactions: list[dict]) -> Decimal:
+    """Card charges not yet paid to the bank AND not yet set aside in a payoff
+    bucket (reimbursement_allocated). You still need free cash for these; charges
+    you've already set aside for are covered by their (subtracted) payoff bucket.
+    """
+    return -sum(
+        (
+            _dec(t["amount"])
+            for t in transactions
+            if t.get("credit_card_id")
+            and not t.get("paid_to_bank")
+            and not t.get("reimbursement_allocated")
         ),
         Decimal("0"),
     )
@@ -259,23 +270,17 @@ def other_liabilities(accounts: list[dict]) -> Decimal:
 def real_available_money(
     accounts: list[dict], transactions: list[dict], buckets: list[dict]
 ) -> Decimal:
-    """Liquid cash minus everything that's spoken for (SPEC 9.7):
+    """Freely-spendable cash = liquid cash − money set aside in buckets (incl.
+    card payoff buckets) − card charges not yet set aside for.
 
-    - your own *unallocated* card debt: charges you haven't set aside money for
-      yet (still unreimbursed/unhandled). The allocated part already sits in a
-      card payoff bucket, so it's covered by the next line instead.
-    - all credit-card payoff buckets: that cash is earmarked to pay cards and may
-      include reimbursements other people gave you, so it isn't yours to spend.
-    - set-aside non-card buckets (gas, insurance, ...).
-
-    `transactions` should be your own profile's rows, so other people's debt
-    doesn't count against you (their share is handled via the card buckets).
+    Card debt isn't subtracted directly: the payoff buckets (already saved toward
+    cards) plus the unsettled charges (not yet saved for) together cover what you
+    owe, without double-counting the money sitting in payoff buckets.
     """
     return (
         liquid_cash(accounts)
-        - total_card_debt(transactions)
-        - all_card_bucket_money(buckets)
-        - non_card_bucket_money(buckets)
+        - earmarked_bucket_money(buckets)
+        - unsettled_card_charges(transactions)
     )
 
 
