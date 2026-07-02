@@ -2,47 +2,43 @@ import { useEffect, useState } from "react";
 import { incomeApi, accountsApi, bucketsApi } from "../api/client";
 import { INCOME_TYPES } from "../constants";
 import YearSelect, { CURRENT_YEAR } from "../components/YearSelect";
-import usePersistedState from "../hooks/usePersistedState";
 import { formatDate } from "../format";
 import {
   PageHeader,
   Card,
-  Button,
   Badge,
   Banner,
-  StatCard,
   Amount,
-  Toggle,
   Select,
   Input,
-  Field,
-  DateInput,
-  AmountInput,
+  Table,
+  THead,
+  TH,
+  TR,
+  TD,
 } from "../components/ui";
+import { useIncomeForm, IncomeFields, EMPTY_INCOME } from "../components/income/IncomeForm";
+import IncomeDetailPanel from "../components/income/IncomeDetailPanel";
 
-const today = () => new Date().toISOString().slice(0, 10);
-const ADD_NEW = "__add_new__";
 const uniqSorted = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b));
-
-const EMPTY = {
-  income_date: today(),
-  source: "",
-  category: INCOME_TYPES[0],
-  amount: "",
-  account_id: "",
-  notes: "",
-};
 
 export default function IncomePage() {
   const [income, setIncome] = useState([]);
   const [accounts, setAccounts] = useState([]);
-  // All income (any year) used only to populate the source/category dropdowns.
-  const [pool, setPool] = useState([]);
-  const [form, setForm] = useState(EMPTY);
-  const [editingId, setEditingId] = useState(null);
+  const [pool, setPool] = useState([]); // all income (any year) for dropdown options
   const [error, setError] = useState(null);
   const [year, setYear] = useState(CURRENT_YEAR);
-  const [hideRepayments, setHideRepayments] = usePersistedState("income.hideRepayments", false);
+  const [filters, setFilters] = useState({ category: "", account: "", allocation: "", search: "" });
+
+  const addForm = useIncomeForm();
+  const editForm = useIncomeForm();
+  const [editingId, setEditingId] = useState(null);
+  const [detailIncome, setDetailIncome] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const openDetail = (i) => {
+    setDetailIncome(i);
+    setDetailOpen(true);
+  };
 
   const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "—";
 
@@ -58,64 +54,20 @@ export default function IncomePage() {
       setError(e.message);
     }
   }
-
   async function loadPool() {
     try {
-      setPool(await incomeApi.list()); // all years
+      setPool(await incomeApi.list());
     } catch (e) {
-      // dropdown suggestions are best-effort; ignore failures
+      // dropdown suggestions are best-effort
     }
   }
+  useEffect(() => { load(); }, [year]);
+  useEffect(() => { loadPool(); }, []);
 
-  useEffect(() => {
-    load();
-  }, [year]);
+  const categoryOptions = uniqSorted([...INCOME_TYPES, ...pool.map((e) => e.category)]);
+  const sourceOptions = uniqSorted([...pool.map((e) => e.source)]);
 
-  useEffect(() => {
-    loadPool();
-  }, []);
-
-  function setField(name, value) {
-    setForm((f) => ({ ...f, [name]: value }));
-  }
-
-  function onCategorySelect(value) {
-    if (value === ADD_NEW) {
-      const name = window.prompt("New income category name:");
-      if (name && name.trim()) setField("category", name.trim());
-      return;
-    }
-    setField("category", value);
-  }
-
-  function onSourceSelect(value) {
-    if (value === ADD_NEW) {
-      const name = window.prompt("New source name:");
-      if (name && name.trim()) setField("source", name.trim());
-      return;
-    }
-    setField("source", value);
-  }
-
-  function startEdit(i) {
-    setEditingId(i.id);
-    setError(null);
-    setForm({
-      income_date: i.income_date,
-      source: i.source ?? "",
-      category: i.category ?? INCOME_TYPES[0],
-      amount: String(Math.abs(Number(i.amount))),
-      account_id: i.account_id ?? "",
-      notes: i.notes ?? "",
-    });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setForm(EMPTY);
-  }
-
-  async function handleAdd(e) {
+  async function submit(e, form, id) {
     e.preventDefault();
     if (!form.source.trim() || !form.amount || !form.account_id) {
       setError("Source, amount, and account are required.");
@@ -130,23 +82,48 @@ export default function IncomePage() {
       notes: form.notes.trim() || null,
     };
     try {
-      if (editingId) await incomeApi.update(editingId, payload);
+      if (id) await incomeApi.update(id, payload);
       else await incomeApi.create(payload);
-      setEditingId(null);
-      setForm({ ...EMPTY, income_date: form.income_date });
+      if (id) setEditingId(null);
+      else addForm.reset({ ...EMPTY_INCOME, income_date: form.income_date });
       setError(null);
       load();
-      loadPool(); // a new source/category becomes a future suggestion
-    } catch (e) {
-      setError(e.message);
+      loadPool();
+    } catch (e2) {
+      setError(e2.message);
     }
+  }
+
+  function startEdit(i) {
+    setEditingId(i.id);
+    setError(null);
+    editForm.reset({
+      income_date: i.income_date,
+      source: i.source ?? "",
+      category: i.category ?? INCOME_TYPES[0],
+      amount: String(Math.abs(Number(i.amount))),
+      account_id: i.account_id ?? "",
+      notes: i.notes ?? "",
+    });
   }
 
   async function handleDelete(id) {
     try {
       await incomeApi.remove(id);
+      if (editingId === id) setEditingId(null);
+      if (detailIncome?.id === id) setDetailOpen(false);
       load();
       loadPool();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function toggleTag(i) {
+    // Not-allocated ⇄ dismissed: flip the "handled" flag (removes/restores the tag).
+    try {
+      await incomeApi.update(i.id, { bucket_allocated: !i.bucket_allocated });
+      load();
     } catch (e) {
       setError(e.message);
     }
@@ -161,135 +138,139 @@ export default function IncomePage() {
     }
   }
 
-  // Dropdown options: known defaults + everything used before + the current
-  // (possibly just-added) value, so a freshly typed entry stays selected.
-  const categoryOptions = uniqSorted([...INCOME_TYPES, ...pool.map((e) => e.category), form.category]);
-  const sourceOptions = uniqSorted([...pool.map((e) => e.source), form.source]);
+  // Client-side filters over the year's entries.
+  const visible = income.filter((i) => {
+    if (filters.category && (i.category || "") !== filters.category) return false;
+    if (filters.account && i.account_id !== filters.account) return false;
+    if (filters.allocation === "allocated" && !i.allocated_bucket_id) return false;
+    if (filters.allocation === "notallocated" && i.bucket_allocated) return false;
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      if (!`${i.source} ${i.notes || ""}`.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
-  const visible = hideRepayments
-    ? income.filter((i) => (i.category || "") !== "Repayment")
-    : income;
-  const total = visible.reduce((s, i) => s + Number(i.amount), 0);
-  const byType = {};
-  for (const i of visible) byType[i.category || "Other"] = (byType[i.category || "Other"] || 0) + Number(i.amount);
-  const byTypeSorted = Object.entries(byType).sort((a, b) => b[1] - a[1]);
+  const showYear = year === "all";
+  const shortDate = (iso) => (showYear ? formatDate(iso) : formatDate(iso).replace(/,\s*\d{4}$/, ""));
 
-  // Show the year in row dates only when viewing all time; otherwise "Jul 8".
-  const shortDate = (iso) => (year === "all" ? formatDate(iso) : formatDate(iso).replace(/,\s*\d{4}$/, ""));
+  const shownIncome = detailIncome ? income.find((x) => x.id === detailIncome.id) || detailIncome : null;
+  const editingShown = !!shownIncome && editingId === shownIncome.id;
+  const editFieldsNode = editingShown ? (
+    <IncomeFields
+      instance={editForm}
+      accounts={accounts}
+      categoryOptions={categoryOptions}
+      sourceOptions={sourceOptions}
+      onSubmit={(e) => submit(e, editForm.form, shownIncome.id)}
+      onCancel={() => setEditingId(null)}
+      submitLabel="Save changes"
+      panel
+    />
+  ) : null;
+
+  function statusFor(i) {
+    if (i.allocated_bucket_id) return ["success", "Allocated"];
+    if (!i.bucket_allocated) return ["orange", "Not allocated"];
+    return null; // dismissed / handled — no tag
+  }
 
   return (
     <div>
-      <PageHeader
-        title="Income"
-        subtitle="Money coming in, by source and category."
-        actions={
-          <>
-            <Toggle on={hideRepayments} onClick={() => setHideRepayments((v) => !v)} label="Hide repayments" />
-            <YearSelect value={year} onChange={setYear} />
-          </>
-        }
-      />
+      <PageHeader title="Income" subtitle="Money coming in, by source and account." />
 
-      {/* Add / edit form */}
+      {/* Add form (add only) */}
       <Card className="mb-6">
-        <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Field label="Date">
-            <DateInput value={form.income_date} onChange={(v) => setField("income_date", v)} />
-          </Field>
-          <Field label="Source">
-            <Select value={form.source} onChange={(e) => onSourceSelect(e.target.value)}>
-              <option value="">Source…</option>
-              {sourceOptions.map((sName) => (
-                <option key={sName} value={sName}>{sName}</option>
-              ))}
-              <option value={ADD_NEW}>➕ Add new source…</option>
-            </Select>
-          </Field>
-          <Field label="Category">
-            <Select value={form.category} onChange={(e) => onCategorySelect(e.target.value)}>
-              {categoryOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-              <option value={ADD_NEW}>➕ Add new category…</option>
-            </Select>
-          </Field>
-          <Field label="Amount">
-            <AmountInput value={form.amount} onChange={(v) => setField("amount", v)} />
-          </Field>
-          <Field label="Into account">
-            <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)} required>
-              <option value="">Into account…</option>
-              {accounts.filter((a) => a.is_active !== false).map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Notes">
-            <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
-          </Field>
-          <div className="sm:col-span-2 lg:col-span-3 flex items-center justify-end gap-2">
-            {editingId && (
-              <Button type="button" variant="ghost" onClick={cancelEdit}>Cancel</Button>
-            )}
-            <Button type="submit" variant="primary">{editingId ? "Save changes" : "Add income"}</Button>
-          </div>
-        </form>
+        <IncomeFields
+          instance={addForm}
+          accounts={accounts}
+          categoryOptions={categoryOptions}
+          sourceOptions={sourceOptions}
+          onSubmit={(e) => submit(e, addForm.form, null)}
+          submitLabel="Add income"
+        />
       </Card>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <YearSelect value={year} onChange={setYear} />
+        <Select value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}>
+          <option value="">All categories</option>
+          {categoryOptions.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </Select>
+        <Select value={filters.account} onChange={(e) => setFilters((f) => ({ ...f, account: e.target.value }))}>
+          <option value="">All accounts</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </Select>
+        <Select value={filters.allocation} onChange={(e) => setFilters((f) => ({ ...f, allocation: e.target.value }))}>
+          <option value="">All</option>
+          <option value="allocated">Allocated</option>
+          <option value="notallocated">Not allocated</option>
+        </Select>
+        <Input
+          className="flex-1 min-w-[12rem]"
+          placeholder="Search source or notes"
+          value={filters.search}
+          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+        />
+      </div>
 
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
-      {/* Totals */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-        <StatCard label="Total income" value={<Amount value={total} tone="green" />} accent />
-        {byTypeSorted.map(([type, amt]) => (
-          <StatCard key={type} label={type} value={<Amount value={amt} />} />
-        ))}
-      </section>
-
-      {/* Entries */}
-      <h2 className="text-lg font-semibold text-ink mb-3">Entries</h2>
       {visible.length === 0 ? (
-        <p className="text-muted text-sm">No income yet.</p>
+        <p className="text-muted text-sm">No income matches.</p>
       ) : (
-        <div className="space-y-2">
-          {visible.map((i) => (
-            <Card key={i.id} className="flex items-center justify-between gap-4 py-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-ink font-medium">{i.source}</span>
-                  <Badge tone="neutral">{i.category || "Other"}</Badge>
-                  {i.allocated_bucket_id && <Badge tone="success">Allocated</Badge>}
-                </div>
-                <div className="text-xs text-muted mt-1 flex items-center gap-2 flex-wrap">
-                  <span>{shortDate(i.income_date)}</span>
-                  <span>·</span>
-                  <span>into {accountName(i.account_id)}</span>
-                  {i.notes && (
-                    <>
-                      <span>·</span>
-                      <span className="truncate max-w-[16rem]">{i.notes}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-4 shrink-0">
-                <strong className="w-28 text-right">
-                  <Amount value={i.amount} tone="green" />
-                </strong>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={() => startEdit(i)}>Edit</Button>
-                  {i.allocated_bucket_id && (
-                    <Button size="sm" onClick={() => undoAllocation(i.id)} title="Reverse the bucket/balance this income added">
-                      Undo allocation
-                    </Button>
-                  )}
-                  <Button size="sm" variant="danger" onClick={() => handleDelete(i.id)}>Delete</Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <Table className="table-fixed">
+          <THead>
+            <tr>
+              <TH className="w-[20%]">Source</TH>
+              <TH className="w-[15%]">Status</TH>
+              <TH className="w-[12%]">Date</TH>
+              <TH className="w-[16%]">Account</TH>
+              <TH align="right" className="w-[13%]">Amount</TH>
+              <TH className="w-[24%]">Notes</TH>
+            </tr>
+          </THead>
+          <tbody>
+            {visible.map((i) => {
+              const status = statusFor(i);
+              return (
+                <TR key={i.id} onClick={() => openDetail(i)} className="cursor-pointer">
+                  <TD>
+                    <span className="block truncate text-ink font-medium">{i.source}</span>
+                  </TD>
+                  <TD>{status && <Badge tone={status[0]}>{status[1]}</Badge>}</TD>
+                  <TD className="text-muted whitespace-nowrap">{shortDate(i.income_date)}</TD>
+                  <TD className="text-muted truncate">{accountName(i.account_id)}</TD>
+                  <TD align="right">
+                    <strong><Amount value={i.amount} tone="green" /></strong>
+                  </TD>
+                  <TD className="text-ink">
+                    <span className="block truncate" title={i.notes || ""}>{i.notes || ""}</span>
+                  </TD>
+                </TR>
+              );
+            })}
+          </tbody>
+        </Table>
       )}
+
+      <IncomeDetailPanel
+        income={shownIncome}
+        accountName={shownIncome ? accountName(shownIncome.account_id) : ""}
+        editing={editingShown}
+        editForm={editFieldsNode}
+        onEdit={() => startEdit(shownIncome)}
+        onUndoAllocation={() => undoAllocation(shownIncome.id)}
+        onToggleTag={() => toggleTag(shownIncome)}
+        onDelete={() => handleDelete(shownIncome.id)}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </div>
   );
 }
