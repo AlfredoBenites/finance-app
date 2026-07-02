@@ -6,6 +6,7 @@ import { formatDate } from "../format";
 import {
   PageHeader,
   Card,
+  Button,
   Badge,
   Banner,
   Amount,
@@ -19,6 +20,7 @@ import {
 } from "../components/ui";
 import { useIncomeForm, IncomeFields, EMPTY_INCOME } from "../components/income/IncomeForm";
 import IncomeDetailPanel from "../components/income/IncomeDetailPanel";
+import { useSettings } from "../settings/SettingsContext";
 
 const uniqSorted = (arr) => [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
@@ -29,6 +31,9 @@ export default function IncomePage() {
   const [error, setError] = useState(null);
   const [year, setYear] = useState(CURRENT_YEAR);
   const [filters, setFilters] = useState({ category: "", account: "", allocation: "", search: "" });
+  const { incomePerPage } = useSettings();
+  const pageSize = incomePerPage || 15;
+  const [page, setPage] = useState(0);
 
   const addForm = useIncomeForm();
   const editForm = useIncomeForm();
@@ -151,6 +156,13 @@ export default function IncomePage() {
     return true;
   });
 
+  useEffect(() => {
+    setPage(0);
+  }, [filters, year, pageSize]);
+  const total = visible.length;
+  const start = page * pageSize;
+  const pageItems = visible.slice(start, start + pageSize);
+
   const showYear = year === "all";
   const shortDate = (iso) => (showYear ? formatDate(iso) : formatDate(iso).replace(/,\s*\d{4}$/, ""));
 
@@ -221,9 +233,10 @@ export default function IncomePage() {
 
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
-      {visible.length === 0 ? (
+      {total === 0 ? (
         <p className="text-muted text-sm">No income matches.</p>
       ) : (
+        <>
         <Table className="table-fixed min-w-[46rem]">
           <THead>
             <tr>
@@ -236,7 +249,7 @@ export default function IncomePage() {
             </tr>
           </THead>
           <tbody>
-            {visible.map((i) => {
+            {pageItems.map((i) => {
               const status = statusFor(i);
               return (
                 <TR key={i.id} onClick={() => openDetail(i)} className="cursor-pointer">
@@ -257,6 +270,19 @@ export default function IncomePage() {
             })}
           </tbody>
         </Table>
+
+        {total > pageSize && (
+          <div className="flex items-center justify-between gap-3 mt-3 text-sm">
+            <span className="text-muted">
+              {start + 1}–{Math.min(start + pageSize, total)} of {total}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>Prev</Button>
+              <Button size="sm" onClick={() => setPage((p) => p + 1)} disabled={start + pageSize >= total}>Next</Button>
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       <IncomeDetailPanel
