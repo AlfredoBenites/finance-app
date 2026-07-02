@@ -327,15 +327,15 @@ export default function TransactionsPage() {
         <p className="text-muted text-sm">No transactions match.</p>
       ) : (
         <>
-          <Table className="table-fixed min-w-[46rem]">
+          <Table className="table-fixed min-w-[48rem]">
             <THead>
               <tr>
-                <TH className="w-[20%]">Merchant</TH>
-                <TH className="w-[15%]">Status</TH>
+                <TH className="w-[19%]">Merchant</TH>
+                <TH className="w-[20%]">Status</TH>
                 <TH className="w-[12%]">Date</TH>
-                <TH className="w-[16%]">Card</TH>
-                <TH align="right" className="w-[13%]">Amount</TH>
-                <TH className="w-[24%]">Notes</TH>
+                <TH className="w-[15%]">Card</TH>
+                <TH align="right" className="w-[12%]">Amount</TH>
+                <TH className="w-[22%]">Notes</TH>
               </tr>
             </THead>
             <tbody>

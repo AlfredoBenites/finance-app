@@ -4,6 +4,7 @@ import {
   PieChart,
   CreditCard,
   Receipt,
+  Banknote,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
 } from "lucide-react";
@@ -17,6 +18,7 @@ const CATEGORIES = [
   ["insights", "Insights", PieChart],
   ["cards", "Credit Cards", CreditCard],
   ["expenses", "Expenses", Receipt],
+  ["income", "Income", Banknote],
 ];
 
 const SORT_MODES = [
@@ -92,6 +94,8 @@ export default function SettingsModal() {
     setExpensesPerPage,
     expensesFilters,
     setExpensesFilters,
+    incomePerPage,
+    setIncomePerPage,
     dashboardPrefs,
     setDashboardPrefs,
   } = useSettings();
@@ -346,6 +350,32 @@ export default function SettingsModal() {
                 </div>
               </Section>
             </>
+          )}
+
+          {tab === "income" && (
+            <Section title="Rows per page" hint="How many income entries show at once (max 100).">
+              <div className="flex items-center gap-2 flex-wrap">
+                {[15, 25, 35].map((n) => (
+                  <Button
+                    key={n}
+                    size="sm"
+                    variant={incomePerPage === n ? "primary" : "secondary"}
+                    onClick={() => setIncomePerPage(n)}
+                  >
+                    {n}
+                  </Button>
+                ))}
+                <span className="text-sm text-muted ml-1">Custom:</span>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={incomePerPage}
+                  onChange={(e) => setIncomePerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                  className="w-20"
+                />
+              </div>
+            </Section>
           )}
         </div>
       </div>

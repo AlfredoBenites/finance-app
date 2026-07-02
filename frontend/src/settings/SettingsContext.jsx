@@ -24,6 +24,8 @@ export function SettingsProvider({ children }) {
     source: "",
     year: "current", // "current" | "all" | a specific year string
   });
+  // Income page: rows per page.
+  const [incomePerPage, setIncomePerPage] = usePersistedState("settings.incomePerPage", 15);
   // Dashboard / insights calculation preferences (moved off the dashboard).
   // hideRepayments defaults ON; onlyMyDebt defaults OFF; cashbackScope "all"
   // shows all cashback, "mine" only your own profile's.
@@ -47,6 +49,8 @@ export function SettingsProvider({ children }) {
     setExpensesPerPage,
     expensesFilters,
     setExpensesFilters,
+    incomePerPage,
+    setIncomePerPage,
     dashboardPrefs,
     setDashboardPrefs,
   };
