@@ -44,7 +44,7 @@ export default function Autocomplete({ value, onChange, options = [], placeholde
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder={placeholder}
-        className="relative bg-transparent text-ink border border-border rounded-md px-3 py-2 text-sm w-full placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
+        className="relative bg-transparent text-ink border border-border rounded-md px-3 py-2 text-sm w-full placeholder:text-muted focus:outline-none focus-visible:border-border-strong"
         {...props}
       />
     </div>

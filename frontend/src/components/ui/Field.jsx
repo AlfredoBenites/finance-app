@@ -4,8 +4,8 @@ import { cn } from "./cn";
 // `autofilled` highlights a value the app filled in for you (pale yellow box).
 const base =
   "bg-surface text-ink border border-border rounded-md px-3 py-2 text-sm " +
-  "placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
-  "focus-visible:border-accent disabled:opacity-50 disabled:cursor-not-allowed";
+  "placeholder:text-muted focus:outline-none focus-visible:border-border-strong " +
+  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 export function Input({ className, autofilled = false, ...props }) {
   return (

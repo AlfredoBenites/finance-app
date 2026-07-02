@@ -327,7 +327,7 @@ export default function TransactionsPage() {
         <p className="text-muted text-sm">No transactions match.</p>
       ) : (
         <>
-          <Table className="table-fixed">
+          <Table className="table-fixed min-w-[46rem]">
             <THead>
               <tr>
                 <TH className="w-[18%]">Merchant</TH>
@@ -354,12 +354,12 @@ export default function TransactionsPage() {
                       <span className="block truncate text-ink font-medium">{t.merchant || "—"}</span>
                     </TD>
                     <TD><Badge tone={statusTone}>{statusText}</Badge></TD>
-                    <TD className="text-muted whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
-                    <TD className="text-muted truncate">{sourceName(t)}</TD>
+                    <TD className="text-ink whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
+                    <TD className="text-ink truncate">{sourceName(t)}</TD>
                     <TD align="right">
                       <strong className="text-ink"><Amount value={t.amount} /></strong>
                     </TD>
-                    <TD className="text-ink">
+                    <TD className="text-muted">
                       <span className="block truncate" title={t.notes || ""}>{t.notes || ""}</span>
                     </TD>
                   </TR>

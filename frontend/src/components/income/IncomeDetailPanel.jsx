@@ -57,19 +57,17 @@ export default function IncomeDetailPanel({
           )}
 
           <div className="flex items-center gap-2 pt-2 border-t border-border">
-            <Button variant="danger" onClick={onDelete}>Delete</Button>
-            <div className="ml-auto flex items-center gap-2">
-              {allocated ? (
-                <Button onClick={onUndoAllocation} title="Reverse the bucket/balance this income added">
-                  Undo allocation
-                </Button>
-              ) : pending ? (
-                <Button onClick={onToggleTag} title="Mark as not needing allocation">Remove tag</Button>
-              ) : (
-                <Button onClick={onToggleTag} title="Flag as awaiting allocation again">Flag as not allocated</Button>
-              )}
-              <Button variant="primary" onClick={onEdit}>Edit</Button>
-            </div>
+            <Button variant="primary" onClick={onEdit}>Edit</Button>
+            {allocated ? (
+              <Button onClick={onUndoAllocation} title="Reverse the bucket/balance this income added">
+                Undo allocation
+              </Button>
+            ) : pending ? (
+              <Button onClick={onToggleTag} title="Mark as not needing allocation">Remove tag</Button>
+            ) : (
+              <Button onClick={onToggleTag} title="Flag as awaiting allocation again">Flag as not allocated</Button>
+            )}
+            <Button variant="danger" onClick={onDelete} className="ml-auto">Delete</Button>
           </div>
         </div>
       )}

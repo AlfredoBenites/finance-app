@@ -85,11 +85,19 @@ export function IncomeFields({ instance, accounts, categoryOptions, sourceOption
           <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
         )}
       </Field>
-      <div className={cn("flex items-center justify-end gap-2", panel ? "col-span-2" : "sm:col-span-2 lg:col-span-3")}>
-        {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {/* In the panel edit form: Save on the left, Cancel on the right. */}
+      <div className={cn("flex items-center gap-2", panel ? "col-span-2 justify-between" : "sm:col-span-2 lg:col-span-3 justify-end")}>
+        {panel ? (
+          <>
+            <Button type="submit" variant="primary">{submitLabel}</Button>
+            {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+          </>
+        ) : (
+          <>
+            {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+            <Button type="submit" variant="primary">{submitLabel}</Button>
+          </>
         )}
-        <Button type="submit" variant="primary">{submitLabel}</Button>
       </div>
     </form>
   );

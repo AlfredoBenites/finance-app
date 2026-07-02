@@ -224,7 +224,7 @@ export default function IncomePage() {
       {visible.length === 0 ? (
         <p className="text-muted text-sm">No income matches.</p>
       ) : (
-        <Table className="table-fixed">
+        <Table className="table-fixed min-w-[46rem]">
           <THead>
             <tr>
               <TH className="w-[20%]">Source</TH>
@@ -244,12 +244,12 @@ export default function IncomePage() {
                     <span className="block truncate text-ink font-medium">{i.source}</span>
                   </TD>
                   <TD>{status && <Badge tone={status[0]}>{status[1]}</Badge>}</TD>
-                  <TD className="text-muted whitespace-nowrap">{shortDate(i.income_date)}</TD>
-                  <TD className="text-muted truncate">{accountName(i.account_id)}</TD>
+                  <TD className="text-ink whitespace-nowrap">{shortDate(i.income_date)}</TD>
+                  <TD className="text-ink truncate">{accountName(i.account_id)}</TD>
                   <TD align="right">
                     <strong><Amount value={i.amount} tone="green" /></strong>
                   </TD>
-                  <TD className="text-ink">
+                  <TD className="text-muted">
                     <span className="block truncate" title={i.notes || ""}>{i.notes || ""}</span>
                   </TD>
                 </TR>
