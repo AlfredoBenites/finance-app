@@ -330,24 +330,28 @@ export default function TransactionsPage() {
           <Table className="table-fixed min-w-[46rem]">
             <THead>
               <tr>
-                <TH className="w-[18%]">Merchant</TH>
-                <TH className="w-[13%]">Status</TH>
-                <TH className="w-[11%]">Date</TH>
-                <TH className="w-[14%]">Card</TH>
-                <TH align="right" className="w-[11%]">Amount</TH>
-                <TH className="w-[33%]">Notes</TH>
+                <TH className="w-[20%]">Merchant</TH>
+                <TH className="w-[15%]">Status</TH>
+                <TH className="w-[12%]">Date</TH>
+                <TH className="w-[16%]">Card</TH>
+                <TH align="right" className="w-[13%]">Amount</TH>
+                <TH className="w-[24%]">Notes</TH>
               </tr>
             </THead>
             <tbody>
               {pageItems.map((t) => {
                 const own = isOwn(t);
-                const statusText = own
+                // A refund (positive amount) just offsets debt; it isn't
+                // reimbursable, so it gets a plain teal "Refund" tag.
+                const isRefund = Number(t.amount) > 0;
+                const statusText = isRefund
+                  ? "Refund"
+                  : own
                   ? (t.is_paid_back ? "Paid" : "Unallocated")
                   : (t.is_paid_back ? "Reimbursed" : "Not reimbursed");
-                // Your own not-yet-allocated charge is a calm blue/slate
-                // ("Unallocated", i.e. not put in its card bucket yet); others'
-                // not-reimbursed stays orange (waiting on someone else).
-                const statusTone = t.is_paid_back ? "success" : own ? "info" : "orange";
+                // Own not-yet-allocated = calm blue/slate ("Unallocated");
+                // others' not-reimbursed = orange (waiting on someone else).
+                const statusTone = isRefund ? "teal" : t.is_paid_back ? "success" : own ? "info" : "orange";
                 return (
                   <TR key={t.id} onClick={() => openDetail(t)} className="cursor-pointer">
                     <TD>

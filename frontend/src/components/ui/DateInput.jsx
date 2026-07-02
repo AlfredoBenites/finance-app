@@ -93,7 +93,7 @@ export default function DateInput({ value, onChange, className }) {
         onBlur={commitText}
         onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), commitText())}
         placeholder="Mon D, YYYY"
-        className="bg-surface text-ink border border-border rounded-l-md px-3 py-2 text-sm w-full placeholder:text-muted focus:outline-none focus-visible:border-border-strong"
+        className="bg-surface text-ink border border-border rounded-l-md px-3 py-2 text-sm w-full placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
       />
       <button
         ref={btnRef}

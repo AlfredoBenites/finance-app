@@ -28,14 +28,17 @@ export default function TransactionDetailPanel({
   onClose,
 }) {
   const t = transaction;
-  const statusTone = t?.is_paid_back ? "success" : own ? "info" : "orange";
-  const statusText = own
+  const isRefund = t && Number(t.amount) > 0;
+  const statusTone = isRefund ? "teal" : t?.is_paid_back ? "success" : own ? "info" : "orange";
+  const statusText = isRefund
+    ? "Refund"
+    : own
     ? t?.is_paid_back ? "Paid" : "Unallocated"
     : t?.is_paid_back ? "Reimbursed" : "Not reimbursed";
   const markLabel = own
     ? t?.is_paid_back ? "Undo paid" : "Mark paid"
     : t?.is_paid_back ? "Undo reimbursed" : "Mark reimbursed";
-  const typeText = t && Number(t.amount) < 0 ? "Purchase" : "Refund";
+  const typeText = isRefund ? "Refund" : "Purchase";
 
   return (
     <SlideOver open={open} onClose={onClose} title={t?.merchant || "Expense"}>
@@ -76,7 +79,7 @@ export default function TransactionDetailPanel({
                     "—"
                   )}
                 </Cell>
-                <Cell label={own ? "Paid" : "Reimbursed"}>
+                <Cell label={isRefund ? "Status" : own ? "Paid" : "Reimbursed"}>
                   <Badge tone={statusTone}>{statusText}</Badge>
                 </Cell>
               </div>
@@ -92,7 +95,7 @@ export default function TransactionDetailPanel({
 
               <div className="flex items-center gap-2 pt-2 border-t border-border">
                 <Button variant="primary" onClick={onEdit}>Edit</Button>
-                <Button onClick={onTogglePaid}>{markLabel}</Button>
+                {!isRefund && <Button onClick={onTogglePaid}>{markLabel}</Button>}
                 <Button variant="danger" onClick={onDelete} className="ml-auto">Delete</Button>
               </div>
             </>

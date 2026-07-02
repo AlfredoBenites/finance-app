@@ -32,7 +32,7 @@ export default function AmountInput({ value, onChange, className, placeholder = 
         value={format(value)}
         onChange={handleChange}
         placeholder={placeholder}
-        className="bg-surface text-ink border border-border rounded-md pl-6 pr-3 py-2 text-sm w-full tnum placeholder:text-muted focus:outline-none focus-visible:border-border-strong"
+        className="bg-surface text-ink border border-border rounded-md pl-6 pr-3 py-2 text-sm w-full tnum placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
         {...props}
       />
     </div>
