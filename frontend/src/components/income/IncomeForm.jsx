@@ -45,12 +45,9 @@ export function IncomeFields({ instance, accounts, categoryOptions, sourceOption
   return (
     <form
       onSubmit={onSubmit}
-      className={panel ? "flex flex-col gap-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"}
+      className={panel ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"}
     >
-      <Field label="Date">
-        <DateInput value={form.income_date} onChange={(v) => setField("income_date", v)} />
-      </Field>
-      <Field label="Source">
+      <Field label="Source" className={panel ? "col-span-2" : ""}>
         <Select value={form.source} onChange={(e) => onSourceSelect(e.target.value)}>
           <option value="">Source…</option>
           {sourceOptions.map((s) => (
@@ -67,9 +64,6 @@ export function IncomeFields({ instance, accounts, categoryOptions, sourceOption
           <option value={ADD_NEW}>➕ Add new category…</option>
         </Select>
       </Field>
-      <Field label="Amount">
-        <AmountInput value={form.amount} onChange={(v) => setField("amount", v)} />
-      </Field>
       <Field label="Account">
         <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)} required>
           <option value="">Account…</option>
@@ -78,18 +72,32 @@ export function IncomeFields({ instance, accounts, categoryOptions, sourceOption
           ))}
         </Select>
       </Field>
-      <Field label="Notes">
+      <Field label="Date">
+        <DateInput value={form.income_date} onChange={(v) => setField("income_date", v)} />
+      </Field>
+      <Field label="Amount">
+        <AmountInput value={form.amount} onChange={(v) => setField("amount", v)} />
+      </Field>
+      <Field label="Notes" className={panel ? "col-span-2" : ""}>
         {panel ? (
           <Textarea rows={3} placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
         ) : (
           <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
         )}
       </Field>
-      <div className={cn("flex items-center justify-end gap-2", !panel && "sm:col-span-2 lg:col-span-3")}>
-        {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {/* In the panel edit form: Save on the left, Cancel on the right. */}
+      <div className={cn("flex items-center gap-2", panel ? "col-span-2 justify-between" : "sm:col-span-2 lg:col-span-3 justify-end")}>
+        {panel ? (
+          <>
+            <Button type="submit" variant="primary">{submitLabel}</Button>
+            {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+          </>
+        ) : (
+          <>
+            {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+            <Button type="submit" variant="primary">{submitLabel}</Button>
+          </>
         )}
-        <Button type="submit" variant="primary">{submitLabel}</Button>
       </div>
     </form>
   );

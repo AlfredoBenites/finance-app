@@ -160,11 +160,19 @@ export function ExpenseFields({
           <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
         </Field>
       )}
-      <div className={cn("flex items-center justify-end gap-2", fullWidth)}>
-        {onCancel && (
-          <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      {/* In the panel edit form: Save on the left, Cancel on the right. */}
+      <div className={cn("flex items-center gap-2", fullWidth, panel ? "justify-between" : "justify-end")}>
+        {panel ? (
+          <>
+            <Button type="submit" variant="primary">{submitLabel}</Button>
+            {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+          </>
+        ) : (
+          <>
+            {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+            <Button type="submit" variant="primary">{submitLabel}</Button>
+          </>
         )}
-        <Button type="submit" variant="primary">{submitLabel}</Button>
       </div>
     </form>
   );

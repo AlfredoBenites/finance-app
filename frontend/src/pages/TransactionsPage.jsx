@@ -327,39 +327,43 @@ export default function TransactionsPage() {
         <p className="text-muted text-sm">No transactions match.</p>
       ) : (
         <>
-          <Table className="table-fixed">
+          <Table className="table-fixed min-w-[46rem]">
             <THead>
               <tr>
-                <TH className="w-[18%]">Merchant</TH>
-                <TH className="w-[13%]">Status</TH>
-                <TH className="w-[11%]">Date</TH>
-                <TH className="w-[14%]">Card</TH>
-                <TH align="right" className="w-[11%]">Amount</TH>
-                <TH className="w-[33%]">Notes</TH>
+                <TH className="w-[20%]">Merchant</TH>
+                <TH className="w-[15%]">Status</TH>
+                <TH className="w-[12%]">Date</TH>
+                <TH className="w-[16%]">Card</TH>
+                <TH align="right" className="w-[13%]">Amount</TH>
+                <TH className="w-[24%]">Notes</TH>
               </tr>
             </THead>
             <tbody>
               {pageItems.map((t) => {
                 const own = isOwn(t);
-                const statusText = own
+                // A refund (positive amount) just offsets debt; it isn't
+                // reimbursable, so it gets a plain teal "Refund" tag.
+                const isRefund = Number(t.amount) > 0;
+                const statusText = isRefund
+                  ? "Refund"
+                  : own
                   ? (t.is_paid_back ? "Paid" : "Unallocated")
                   : (t.is_paid_back ? "Reimbursed" : "Not reimbursed");
-                // Your own not-yet-allocated charge is a calm blue/slate
-                // ("Unallocated", i.e. not put in its card bucket yet); others'
-                // not-reimbursed stays orange (waiting on someone else).
-                const statusTone = t.is_paid_back ? "success" : own ? "info" : "orange";
+                // Own not-yet-allocated = calm blue/slate ("Unallocated");
+                // others' not-reimbursed = orange (waiting on someone else).
+                const statusTone = isRefund ? "teal" : t.is_paid_back ? "success" : own ? "info" : "orange";
                 return (
                   <TR key={t.id} onClick={() => openDetail(t)} className="cursor-pointer">
                     <TD>
                       <span className="block truncate text-ink font-medium">{t.merchant || "—"}</span>
                     </TD>
                     <TD><Badge tone={statusTone}>{statusText}</Badge></TD>
-                    <TD className="text-muted whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
-                    <TD className="text-muted truncate">{sourceName(t)}</TD>
+                    <TD className="text-ink whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
+                    <TD className="text-ink truncate">{sourceName(t)}</TD>
                     <TD align="right">
                       <strong className="text-ink"><Amount value={t.amount} /></strong>
                     </TD>
-                    <TD className="text-ink">
+                    <TD className="text-muted">
                       <span className="block truncate" title={t.notes || ""}>{t.notes || ""}</span>
                     </TD>
                   </TR>

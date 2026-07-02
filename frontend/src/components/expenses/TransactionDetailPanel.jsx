@@ -4,11 +4,11 @@ import { formatDate } from "../../format";
 // Full detail for one expense, shown in a slide-over so the row list can stay
 // minimal. Holds the actions (edit / mark / delete) and, when editing, a compact
 // edit form (passed in as `editForm`). Includes the card art for card payments.
-function Line({ label, children }) {
+function Cell({ label, children }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2 border-b border-border last:border-0">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm text-ink text-right">{children}</span>
+    <div className="py-2 border-b border-border">
+      <div className="text-xs text-muted">{label}</div>
+      <div className="text-sm text-ink mt-0.5">{children}</div>
     </div>
   );
 }
@@ -28,10 +28,17 @@ export default function TransactionDetailPanel({
   onClose,
 }) {
   const t = transaction;
-  const statusTone = t?.is_paid_back ? "success" : own ? "info" : "orange";
+  const isRefund = t && Number(t.amount) > 0;
+  const statusTone = isRefund ? "teal" : t?.is_paid_back ? "success" : own ? "info" : "orange";
+  const statusText = isRefund
+    ? "Refund"
+    : own
+    ? t?.is_paid_back ? "Paid" : "Unallocated"
+    : t?.is_paid_back ? "Reimbursed" : "Not reimbursed";
   const markLabel = own
     ? t?.is_paid_back ? "Undo paid" : "Mark paid"
     : t?.is_paid_back ? "Undo reimbursed" : "Mark reimbursed";
+  const typeText = isRefund ? "Refund" : "Purchase";
 
   return (
     <SlideOver open={open} onClose={onClose} title={t?.merchant || "Expense"}>
@@ -54,24 +61,27 @@ export default function TransactionDetailPanel({
             <div>{editForm}</div>
           ) : (
             <>
-              <div>
-                <Line label="Date">{formatDate(t.transaction_date)}</Line>
-                <Line label="Profile">{profileName}</Line>
-                <Line label="Merchant">{t.merchant || "—"}</Line>
-                {t.category && <Line label="Category">{t.category}</Line>}
-                <Line label="Amount"><Amount value={t.amount} /></Line>
-                <Line label="Payment source">{sourceName}</Line>
-                {t.cashback_amount != null && (
-                  <Line label="Cashback"><Amount value={t.cashback_amount} tone="green" /></Line>
-                )}
-                {t.credit_card_id && (
-                  <Line label="Bank status">
+              <div className="grid grid-cols-2 gap-x-6">
+                <Cell label="Date">{formatDate(t.transaction_date)}</Cell>
+                <Cell label="Merchant">{t.merchant || "—"}</Cell>
+                <Cell label="Category">{t.category || "—"}</Cell>
+                <Cell label="Type">{typeText}</Cell>
+                <Cell label="Profile">{profileName}</Cell>
+                <Cell label="Amount"><Amount value={t.amount} /></Cell>
+                <Cell label="Payment source">{sourceName}</Cell>
+                <Cell label="Cashback">
+                  {t.cashback_amount != null ? <Amount value={t.cashback_amount} tone="green" /> : "—"}
+                </Cell>
+                <Cell label="Bank status">
+                  {t.credit_card_id ? (
                     <Badge tone="neutral">{t.paid_to_bank ? "Paid to bank" : "Owed to bank"}</Badge>
-                  </Line>
-                )}
-                <Line label={own ? "Paid" : "Reimbursed"}>
-                  <Badge tone={statusTone}>{t.is_paid_back ? "Yes" : "No"}</Badge>
-                </Line>
+                  ) : (
+                    "—"
+                  )}
+                </Cell>
+                <Cell label={isRefund ? "Status" : own ? "Paid" : "Reimbursed"}>
+                  <Badge tone={statusTone}>{statusText}</Badge>
+                </Cell>
               </div>
 
               {t.notes && (
@@ -85,7 +95,7 @@ export default function TransactionDetailPanel({
 
               <div className="flex items-center gap-2 pt-2 border-t border-border">
                 <Button variant="primary" onClick={onEdit}>Edit</Button>
-                <Button onClick={onTogglePaid}>{markLabel}</Button>
+                {!isRefund && <Button onClick={onTogglePaid}>{markLabel}</Button>}
                 <Button variant="danger" onClick={onDelete} className="ml-auto">Delete</Button>
               </div>
             </>

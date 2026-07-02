@@ -4,11 +4,12 @@ import { formatDate } from "../../format";
 // Detail slide-over for one income entry: the fields, the allocation status, and
 // the actions (edit / undo-or-toggle-allocation / delete). While editing it
 // shows a compact form (passed in as `editForm`).
-function Line({ label, children }) {
+// One labelled cell in the detail grid (label above value).
+function Cell({ label, children }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-2 border-b border-border last:border-0">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-sm text-ink text-right">{children}</span>
+    <div className="py-2 border-b border-border">
+      <div className="text-xs text-muted">{label}</div>
+      <div className="text-sm text-ink mt-0.5">{children}</div>
     </div>
   );
 }
@@ -37,13 +38,13 @@ export default function IncomeDetailPanel({
 
       {i && !editing && (
         <div className="space-y-5">
-          <div>
-            <Line label="Date">{formatDate(i.income_date)}</Line>
-            <Line label="Source">{i.source}</Line>
-            {i.category && <Line label="Category">{i.category}</Line>}
-            <Line label="Amount"><Amount value={i.amount} tone="green" /></Line>
-            <Line label="Account">{accountName}</Line>
-            <Line label="Allocation"><Badge tone={statusTone}>{statusText}</Badge></Line>
+          <div className="grid grid-cols-2 gap-x-6">
+            <Cell label="Date">{formatDate(i.income_date)}</Cell>
+            <Cell label="Amount"><Amount value={i.amount} tone="green" /></Cell>
+            <Cell label="Source">{i.source}</Cell>
+            <Cell label="Category">{i.category || "—"}</Cell>
+            <Cell label="Account">{accountName}</Cell>
+            <Cell label="Allocation"><Badge tone={statusTone}>{statusText}</Badge></Cell>
           </div>
 
           {i.notes && (
