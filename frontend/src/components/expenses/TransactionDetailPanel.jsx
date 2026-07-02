@@ -84,9 +84,11 @@ export default function TransactionDetailPanel({
               )}
 
               <div className="flex items-center gap-2 pt-2 border-t border-border">
-                <Button variant="primary" onClick={onEdit}>Edit</Button>
-                <Button onClick={onTogglePaid}>{markLabel}</Button>
-                <Button variant="danger" onClick={onDelete} className="ml-auto">Delete</Button>
+                <Button variant="danger" onClick={onDelete}>Delete</Button>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button onClick={onTogglePaid}>{markLabel}</Button>
+                  <Button variant="primary" onClick={onEdit}>Edit</Button>
+                </div>
               </div>
             </>
           )}
