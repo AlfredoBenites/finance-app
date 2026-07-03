@@ -43,29 +43,36 @@ export function useIncomeForm(initial = EMPTY_INCOME) {
 
 export function IncomeFields({ instance, accounts, categoryOptions, sourceOptions, onSubmit, onCancel, submitLabel, panel }) {
   const { form, setField, onCategorySelect, onSourceSelect } = instance;
+  // A source/category the user just typed in the prompt won't be in the options
+  // list yet (it isn't saved until submit). Include the current value so the
+  // Select actually shows it as selected instead of falling back to blank.
+  const sourceOpts = form.source && !sourceOptions.includes(form.source) ? [form.source, ...sourceOptions] : sourceOptions;
+  const categoryOpts = form.category && !categoryOptions.includes(form.category) ? [form.category, ...categoryOptions] : categoryOptions;
+  // The top add form lays out in two rows of three (Date · Source · Category /
+  // Account · Amount · Notes) via order-* classes; the panel keeps DOM order.
   return (
     <form
       onSubmit={onSubmit}
       className={panel ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"}
     >
-      <Field label="Source" className={panel ? "col-span-2" : ""}>
+      <Field label="Source" className={panel ? "col-span-2" : "order-2"}>
         <Select value={form.source} onChange={(e) => onSourceSelect(e.target.value)}>
           <option value="">Source…</option>
-          {sourceOptions.map((s) => (
+          {sourceOpts.map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
           <option value={ADD_NEW}>➕ Add new source…</option>
         </Select>
       </Field>
-      <Field label="Category">
+      <Field label="Category" className={panel ? "" : "order-3"}>
         <Select value={form.category} onChange={(e) => onCategorySelect(e.target.value)}>
-          {categoryOptions.map((c) => (
+          {categoryOpts.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
           <option value={ADD_NEW}>➕ Add new category…</option>
         </Select>
       </Field>
-      <Field label="Account">
+      <Field label="Account" className={panel ? "" : "order-4"}>
         <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)} required>
           <option value="">Account…</option>
           {accounts.filter((a) => a.is_active !== false).map((a) => (
@@ -73,13 +80,13 @@ export function IncomeFields({ instance, accounts, categoryOptions, sourceOption
           ))}
         </Select>
       </Field>
-      <Field label="Date">
+      <Field label="Date" className={panel ? "" : "order-1"}>
         <DateInput value={form.income_date} onChange={(v) => setField("income_date", v)} />
       </Field>
-      <Field label="Amount">
+      <Field label="Amount" className={panel ? "" : "order-5"}>
         <AmountInput value={form.amount} onChange={(v) => setField("amount", v)} />
       </Field>
-      <Field label="Notes" className={panel ? "col-span-2" : ""}>
+      <Field label="Notes" className={panel ? "col-span-2" : "order-6"}>
         {panel ? (
           <Textarea rows={3} placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
         ) : (
@@ -87,7 +94,7 @@ export function IncomeFields({ instance, accounts, categoryOptions, sourceOption
         )}
       </Field>
       {/* In the panel edit form: Save on the left, Cancel on the right. */}
-      <div className={cn("flex items-center gap-2", panel ? "col-span-2 justify-between" : "sm:col-span-2 lg:col-span-3 justify-end")}>
+      <div className={cn("flex items-center gap-2", panel ? "col-span-2 justify-between" : "order-7 sm:col-span-2 lg:col-span-3 justify-end")}>
         {panel ? (
           <>
             <Button type="submit" variant="primary">{submitLabel}</Button>

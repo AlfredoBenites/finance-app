@@ -119,7 +119,7 @@ export default function Sidebar({
               cn(
                 "relative w-full flex items-center gap-3 py-2 rounded-md text-sm transition-colors text-left",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
+                "px-3",
                 isActive
                   ? "bg-surface-muted text-ink font-medium"
                   : "text-muted hover:bg-surface-muted hover:text-ink"
@@ -150,7 +150,7 @@ export default function Sidebar({
           title="Settings"
           className={cn(
             "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+            "px-3"
           )}
         >
           <Settings size={18} />
@@ -161,7 +161,7 @@ export default function Sidebar({
           title={amountsHidden ? "Show amounts" : "Hide amounts"}
           className={cn(
             "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+            "px-3"
           )}
         >
           {amountsHidden ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -174,7 +174,7 @@ export default function Sidebar({
           title={dark ? "Light mode" : "Dark mode"}
           className={cn(
             "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+            "px-3"
           )}
         >
           {dark ? <Sun size={18} /> : <Moon size={18} />}
@@ -184,7 +184,7 @@ export default function Sidebar({
         <div
           className={cn(
             "flex items-center gap-2 px-2 py-1",
-            collapsed ? "md:justify-center justify-between" : "justify-between"
+            "justify-between"
           )}
         >
           <div className="flex items-center gap-2 min-w-0">
