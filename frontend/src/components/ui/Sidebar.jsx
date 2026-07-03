@@ -32,12 +32,12 @@ export const NAV_ITEMS = [
   ["/dashboard", "Dashboard", LayoutDashboard],
   ["/insights", "Insights", PieChart],
   ["/profiles", "Profiles", Users],
-  ["/cards", "Credit Cards", CreditCard],
-  ["/transactions", "Expenses", Receipt],
   ["/income", "Income", Banknote],
-  ["/buckets", "Buckets", PiggyBank],
-  ["/payments", "Pay a card", Landmark],
+  ["/transactions", "Expenses", Receipt],
   ["/accounts", "Accounts", Wallet],
+  ["/buckets", "Buckets", PiggyBank],
+  ["/cards", "Credit Cards", CreditCard],
+  ["/payments", "Pay a card", Landmark],
   ["/investments", "Investments", TrendingUp],
   ["/shared", "Shared with me", Share2],
 ];
@@ -165,8 +165,8 @@ export default function Sidebar({
           )}
         >
           {amountsHidden ? <EyeOff size={18} className="shrink-0" /> : <Eye size={18} className="shrink-0" />}
-          <span className={cn(collapsed && "md:hidden")}>
-            {amountsHidden ? "Show amounts" : "Hide amounts"}
+          <span className={cn("whitespace-nowrap", collapsed && "md:hidden")}>
+            {amountsHidden ? "Show Amounts" : "Hide Amounts"}
           </span>
         </button>
         <button
@@ -178,7 +178,7 @@ export default function Sidebar({
           )}
         >
           {dark ? <Sun size={18} className="shrink-0" /> : <Moon size={18} className="shrink-0" />}
-          <span className={cn(collapsed && "md:hidden")}>{dark ? "Light mode" : "Dark mode"}</span>
+          <span className={cn("whitespace-nowrap", collapsed && "md:hidden")}>{dark ? "Light Mode" : "Dark Mode"}</span>
         </button>
 
         <div
