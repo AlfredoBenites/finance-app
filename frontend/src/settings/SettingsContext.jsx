@@ -20,6 +20,8 @@ export function SettingsProvider({ children }) {
   // = { [accountId]: [bucketId, ...] } for the buckets within each account.
   const [accountOrder, setAccountOrder] = usePersistedState("settings.accountOrder", []);
   const [bucketOrder, setBucketOrder] = usePersistedState("settings.bucketOrder", {});
+  // Buckets page: how many move-history rows show per page (max 100).
+  const [moveHistoryPerPage, setMoveHistoryPerPage] = usePersistedState("settings.moveHistoryPerPage", 25);
   // Expenses page: rows per page and the default filter values applied on load.
   const [expensesPerPage, setExpensesPerPage] = usePersistedState("settings.expensesPerPage", 15);
   const [expensesFilters, setExpensesFilters] = usePersistedState("settings.expensesFilters", {
@@ -53,6 +55,8 @@ export function SettingsProvider({ children }) {
     setAccountOrder,
     bucketOrder,
     setBucketOrder,
+    moveHistoryPerPage,
+    setMoveHistoryPerPage,
     expensesPerPage,
     setExpensesPerPage,
     expensesFilters,

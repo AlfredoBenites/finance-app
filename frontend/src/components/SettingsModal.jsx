@@ -8,6 +8,7 @@ import {
   PiggyBank,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  ChevronRight,
 } from "lucide-react";
 import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
 import { useSettings } from "../settings/SettingsContext";
@@ -96,6 +97,8 @@ export default function SettingsModal() {
     setAccountOrder,
     bucketOrder,
     setBucketOrder,
+    moveHistoryPerPage,
+    setMoveHistoryPerPage,
     expensesPerPage,
     setExpensesPerPage,
     expensesFilters,
@@ -113,6 +116,8 @@ export default function SettingsModal() {
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [buckets, setBuckets] = useState([]);
+  const [acctOrderOpen, setAcctOrderOpen] = useState(false);
+  const [bucketOrderAcct, setBucketOrderAcct] = useState(""); // which account's buckets to reorder
 
   useEffect(() => {
     if (!isOpen) return;
@@ -291,43 +296,87 @@ export default function SettingsModal() {
 
           {tab === "buckets" && (
             <>
-              <Section title="Account order" hint="Drag to set the order accounts appear on the Buckets page.">
-                {bucketAccounts.length === 0 ? (
-                  <p className="text-sm text-muted">No accounts with buckets yet.</p>
-                ) : (
-                  <ReorderList
-                    items={bucketAccounts}
-                    onReorder={(next) => setAccountOrder(next.map((a) => a.id))}
-                    renderLabel={(a) => a.name}
-                  />
+              {/* Account Order — collapsible so the list only shows when wanted. */}
+              <section className="py-4 first:pt-0 border-b border-border">
+                <button
+                  onClick={() => setAcctOrderOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+                >
+                  <ChevronRight size={16} className={cn("text-muted transition-transform", acctOrderOpen && "rotate-90")} />
+                  <h3 className="font-medium text-ink">Account Order</h3>
+                </button>
+                <p className="text-xs text-muted mt-0.5 ml-[22px]">
+                  Drag to set the order accounts appear on the Buckets page.
+                </p>
+                {acctOrderOpen && (
+                  <div className="mt-3 ml-[22px]">
+                    {bucketAccounts.length === 0 ? (
+                      <p className="text-sm text-muted">No accounts with buckets yet.</p>
+                    ) : (
+                      <ReorderList
+                        items={bucketAccounts}
+                        onReorder={(next) => setAccountOrder(next.map((a) => a.id))}
+                        renderLabel={(a) => a.name}
+                      />
+                    )}
+                  </div>
                 )}
-              </Section>
+              </section>
 
-              <Section title="Bucket order" hint="Drag to set the order of buckets within each account.">
+              {/* Bucket Order — pick one account, then drag its buckets. */}
+              <Section title="Bucket Order" hint="Pick an account, then drag its buckets into order.">
                 {bucketAccounts.length === 0 ? (
                   <p className="text-sm text-muted">No buckets yet.</p>
                 ) : (
-                  <div className="space-y-4">
-                    {bucketAccounts.map((a) => {
-                      const ordered = applyOrder(
-                        buckets.filter((b) => b.account_id === a.id),
-                        bucketOrder[a.id]
-                      );
-                      return (
-                        <div key={a.id}>
-                          <div className="text-xs font-medium text-muted mb-1.5">{a.name}</div>
-                          <ReorderList
-                            items={ordered}
-                            onReorder={(next) =>
-                              setBucketOrder({ ...bucketOrder, [a.id]: next.map((b) => b.id) })
-                            }
-                            renderLabel={(b) => b.name}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
+                  (() => {
+                    const selId =
+                      bucketAccounts.some((a) => a.id === bucketOrderAcct) ? bucketOrderAcct : bucketAccounts[0].id;
+                    const ordered = applyOrder(
+                      buckets.filter((b) => b.account_id === selId),
+                      bucketOrder[selId]
+                    );
+                    return (
+                      <div className="space-y-3">
+                        <Select value={selId} onChange={(e) => setBucketOrderAcct(e.target.value)} className="max-w-xs">
+                          {bucketAccounts.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </Select>
+                        <ReorderList
+                          items={ordered}
+                          onReorder={(next) =>
+                            setBucketOrder({ ...bucketOrder, [selId]: next.map((b) => b.id) })
+                          }
+                          renderLabel={(b) => b.name}
+                        />
+                      </div>
+                    );
+                  })()
                 )}
+              </Section>
+
+              <Section title="Move history rows per page" hint="How many moves show per page (max 100).">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[15, 25, 50].map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={moveHistoryPerPage === n ? "primary" : "secondary"}
+                      onClick={() => setMoveHistoryPerPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <span className="text-sm text-muted ml-1">Custom:</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={moveHistoryPerPage}
+                    onChange={(e) => setMoveHistoryPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                    className="w-20"
+                  />
+                </div>
               </Section>
             </>
           )}
