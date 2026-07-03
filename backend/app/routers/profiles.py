@@ -50,10 +50,14 @@ def cashback_redirected(user_id: str = Depends(get_current_user_id)):
     profiles = (
         supabase.table(TABLE).select("*").eq("owner_id", user_id).execute().data
     )
+    primary = next((p for p in profiles if p.get("is_primary")), None)
+    if not primary:
+        return []
+    # Profiles that redirect their cashback to the primary ("me") profile.
     redirecting = {
         p["id"]: p["name"]
         for p in profiles
-        if p.get("cashback_to_primary") and not p.get("is_primary")
+        if p["id"] != primary["id"] and p.get("cashback_to_profile_id") == primary["id"]
     }
     if not redirecting:
         return []
@@ -192,24 +196,19 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
     all_profiles = (
         supabase.table(TABLE).select("*").eq("owner_id", user_id).execute().data
     )
-    # Non-primary profiles whose cashback is credited to the primary profile.
-    redirecting_ids = {
+    # Other profiles whose cashback is credited to the profile being viewed.
+    incoming_ids = {
         p["id"] for p in all_profiles
-        if p.get("cashback_to_primary") and not p.get("is_primary")
+        if p["id"] != profile_id and p.get("cashback_to_profile_id") == profile_id
     }
 
     # Cashback can be attributed to a different profile than owed/debt. Owed and
-    # debt always stay with the profile that was charged (own_txns); only the
-    # cashback set shifts: the primary absorbs redirecting profiles' cashback,
-    # and a redirecting profile keeps none of its own.
-    if viewed.get("is_primary"):
-        cashback_txns = own_txns + [
-            t for t in all_txns if t.get("profile_id") in redirecting_ids
-        ]
-    elif profile_id in redirecting_ids:
-        cashback_txns = []
-    else:
-        cashback_txns = own_txns
+    # debt always stay with the profile that was charged (own_txns). For cashback,
+    # a profile always shows its OWN (kept for reference even when redirected
+    # elsewhere) plus any cashback other profiles redirect TO it.
+    cashback_txns = own_txns + [
+        t for t in all_txns if t.get("profile_id") in incoming_ids
+    ]
 
     cards = (
         supabase.table("credit_cards")

@@ -102,45 +102,53 @@ def test_profile_summary_shows_cashback_per_card(api):
     assert cb[0]["pending"] == 3.0
 
 
-def test_cashback_can_redirect_from_a_profile_to_primary(api):
+def test_cashback_redirects_to_a_chosen_profile(api):
     api.login(*USER_A)
     me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
     api.client.post(f"/api/profiles/{me}/make-primary")
-    friend = api.client.post("/api/profiles", json={"name": "Friend"}).json()["id"]
+    mom = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    stepdad = api.client.post("/api/profiles", json={"name": "Stepdad"}).json()["id"]
     visa = api.client.post("/api/credit-cards", json={"name": "Visa"}).json()["id"]
-    # Friend: a paid purchase (=> $3 earned cashback) and an unpaid $50 charge (debt).
+    # Stepdad: a paid purchase (=> $3 earned cashback) and an unpaid $50 charge (debt).
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,
-                                               "profile_id": friend, "credit_card_id": visa,
+                                               "profile_id": stepdad, "credit_card_id": visa,
                                                "cashback_rate": 0.03, "is_paid_back": True})
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-02", "amount": -50,
-                                               "profile_id": friend, "credit_card_id": visa})
+                                               "profile_id": stepdad, "credit_card_id": visa})
 
-    # Default: the friend keeps their own cashback; the primary sees none of it.
-    assert api.client.get(f"/api/profiles/{friend}/summary").json()["cashback_earned"] == 3.0
-    assert api.client.get(f"/api/profiles/{me}/summary").json()["cashback_earned"] == 0.0
+    # No redirect yet: Stepdad has his cashback; Mom/Me have none.
+    assert api.client.get(f"/api/profiles/{stepdad}/summary").json()["cashback_earned"] == 3.0
+    assert api.client.get(f"/api/profiles/{mom}/summary").json()["cashback_earned"] == 0.0
     assert api.client.get("/api/profiles/cashback-redirected").json() == []
 
-    # Redirect the friend's cashback to the primary.
-    api.client.put(f"/api/profiles/{friend}", json={"cashback_to_primary": True})
+    # Mom covers Stepdad's card: send his cashback to her.
+    api.client.put(f"/api/profiles/{stepdad}", json={"cashback_to_profile_id": mom})
 
-    # Friend now shows none of their cashback, but their debt is unchanged.
-    friend_sum = api.client.get(f"/api/profiles/{friend}/summary").json()
-    assert friend_sum["cashback_earned"] == 0.0
-    assert friend_sum["cashback_by_card"] == []
-    assert friend_sum["total_unpaid"] == 50.0
-    assert {d["name"]: d["balance"] for d in friend_sum["debt_by_card"]} == {"Visa": 50.0}
+    # Stepdad STILL shows his own cashback (kept for reference); debt unchanged.
+    sd = api.client.get(f"/api/profiles/{stepdad}/summary").json()
+    assert sd["cashback_earned"] == 3.0
+    assert {c["name"]: c["earned"] for c in sd["cashback_by_card"]} == {"Visa": 3.0}
+    assert sd["total_unpaid"] == 50.0
 
-    # Primary absorbs the cashback into its cashback_by_card, without any debt.
-    me_sum = api.client.get(f"/api/profiles/{me}/summary").json()
-    assert me_sum["cashback_earned"] == 3.0
-    assert {c["name"]: c["earned"] for c in me_sum["cashback_by_card"]} == {"Visa": 3.0}
-    assert me_sum["debt_by_card"] == []
+    # Mom now shows Stepdad's cashback merged into her by-card, with no debt.
+    mom_sum = api.client.get(f"/api/profiles/{mom}/summary").json()
+    assert mom_sum["cashback_earned"] == 3.0
+    assert {c["name"]: c["earned"] for c in mom_sum["cashback_by_card"]} == {"Visa": 3.0}
+    assert mom_sum["debt_by_card"] == []
 
-    # Insights breakdown lists the friend as a source of redirected cashback.
+    # Redirect targets Mom (not the primary), so the Insights "to me" list is empty.
+    assert api.client.get("/api/profiles/cashback-redirected").json() == []
+
+    # Point it at the primary instead → Insights lists Stepdad.
+    api.client.put(f"/api/profiles/{stepdad}", json={"cashback_to_profile_id": me})
     redirected = api.client.get("/api/profiles/cashback-redirected").json()
     assert len(redirected) == 1
-    assert redirected[0]["name"] == "Friend"
+    assert redirected[0]["name"] == "Stepdad"
     assert redirected[0]["earned"] == 3.0
+
+    # Clearing the redirect removes it from the Insights list.
+    api.client.put(f"/api/profiles/{stepdad}", json={"cashback_to_profile_id": None})
+    assert api.client.get("/api/profiles/cashback-redirected").json() == []
 
 
 def test_dashboard_upcoming_payments(api):
