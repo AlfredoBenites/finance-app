@@ -32,12 +32,12 @@ export const NAV_ITEMS = [
   ["/dashboard", "Dashboard", LayoutDashboard],
   ["/insights", "Insights", PieChart],
   ["/profiles", "Profiles", Users],
-  ["/cards", "Credit Cards", CreditCard],
-  ["/transactions", "Expenses", Receipt],
   ["/income", "Income", Banknote],
-  ["/buckets", "Buckets", PiggyBank],
-  ["/payments", "Pay a card", Landmark],
+  ["/transactions", "Expenses", Receipt],
   ["/accounts", "Accounts", Wallet],
+  ["/buckets", "Buckets", PiggyBank],
+  ["/cards", "Credit Cards", CreditCard],
+  ["/payments", "Pay a card", Landmark],
   ["/investments", "Investments", TrendingUp],
   ["/shared", "Shared with me", Share2],
 ];
@@ -117,9 +117,9 @@ export default function Sidebar({
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
               cn(
-                "relative w-full flex items-center gap-3 py-2 rounded-md text-sm transition-colors text-left",
+                "relative w-full flex items-center gap-3 h-9 rounded-md text-sm transition-colors text-left",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-                collapsed ? "md:justify-center md:px-0 px-3" : "px-3",
+                "px-3",
                 isActive
                   ? "bg-surface-muted text-ink font-medium"
                   : "text-muted hover:bg-surface-muted hover:text-ink"
@@ -135,7 +135,7 @@ export default function Sidebar({
                     isActive ? "opacity-100" : "opacity-0"
                   )}
                 />
-                <Icon size={18} strokeWidth={2} />
+                <Icon size={18} strokeWidth={2} className="shrink-0" />
                 <span className={cn("truncate", collapsed && "md:hidden")}>{label}</span>
               </>
             )}
@@ -144,47 +144,49 @@ export default function Sidebar({
       </nav>
 
       {/* Footer: settings, privacy, theme toggle, user, logout */}
-      <div className="shrink-0 border-t border-border p-2 space-y-1">
+      {/* overflow-x-hidden clips the labels at the panel edge so they reveal with
+          the width animation (like the nav) instead of popping in fully-formed. */}
+      <div className="shrink-0 overflow-x-hidden border-t border-border p-2 space-y-1">
         <button
           onClick={openSettings}
           title="Settings"
           className={cn(
-            "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            "px-3"
           )}
         >
-          <Settings size={18} />
+          <Settings size={18} className="shrink-0" />
           <span className={cn(collapsed && "md:hidden")}>Settings</span>
         </button>
         <button
           onClick={togglePrivacy}
           title={amountsHidden ? "Show amounts" : "Hide amounts"}
           className={cn(
-            "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            "px-3"
           )}
         >
-          {amountsHidden ? <EyeOff size={18} /> : <Eye size={18} />}
-          <span className={cn(collapsed && "md:hidden")}>
-            {amountsHidden ? "Show amounts" : "Hide amounts"}
+          {amountsHidden ? <EyeOff size={18} className="shrink-0" /> : <Eye size={18} className="shrink-0" />}
+          <span className={cn("whitespace-nowrap", collapsed && "md:hidden")}>
+            {amountsHidden ? "Show Amounts" : "Hide Amounts"}
           </span>
         </button>
         <button
           onClick={onToggleDark}
           title={dark ? "Light mode" : "Dark mode"}
           className={cn(
-            "w-full flex items-center gap-3 py-2 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
-            collapsed ? "md:justify-center md:px-0 px-3" : "px-3"
+            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            "px-3"
           )}
         >
-          {dark ? <Sun size={18} /> : <Moon size={18} />}
-          <span className={cn(collapsed && "md:hidden")}>{dark ? "Light mode" : "Dark mode"}</span>
+          {dark ? <Sun size={18} className="shrink-0" /> : <Moon size={18} className="shrink-0" />}
+          <span className={cn("whitespace-nowrap", collapsed && "md:hidden")}>{dark ? "Light Mode" : "Dark Mode"}</span>
         </button>
 
         <div
           className={cn(
             "flex items-center gap-2 px-2 py-1",
-            collapsed ? "md:justify-center justify-between" : "justify-between"
+            "justify-between"
           )}
         >
           <div className="flex items-center gap-2 min-w-0">
