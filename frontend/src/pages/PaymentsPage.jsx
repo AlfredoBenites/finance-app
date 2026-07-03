@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { creditCardsApi, accountsApi, bucketsApi, dashboardApi } from "../api/client";
-import { money } from "../format";
+import { money, todayLocal } from "../format";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = todayLocal;
 
 export default function PaymentsPage() {
   const [cards, setCards] = useState([]);
