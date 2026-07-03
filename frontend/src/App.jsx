@@ -40,7 +40,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/insights" element={<InsightsPage />} />
-        <Route path="/profiles" element={legacy(<ProfilesPage />)} />
+        <Route path="/profiles" element={<ProfilesPage />} />
         <Route path="/cards" element={<CreditCardsPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/income" element={<IncomePage />} />

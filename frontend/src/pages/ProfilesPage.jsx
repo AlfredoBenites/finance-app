@@ -1,18 +1,36 @@
 import { useEffect, useState } from "react";
 import { profilesApi, sharesApi, bucketsApi } from "../api/client";
-
-import { money } from "../format";
 import { writeStatement } from "../statement";
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  Banner,
+  Input,
+  Select,
+  Table,
+  THead,
+  TH,
+  TR,
+  TD,
+} from "../components/ui";
+import ProfileDetailPanel from "../components/profiles/ProfileDetailPanel";
 
 export default function ProfilesPage() {
   const [profiles, setProfiles] = useState([]);
   const [buckets, setBuckets] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
+  const [stmtLang, setStmtLang] = useState("en");
+
+  // Detail panel state (persist the profile through the close animation).
+  const [detailId, setDetailId] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [shares, setShares] = useState([]);
   const [shareEmail, setShareEmail] = useState("");
-  const [stmtLang, setStmtLang] = useState("en");
 
   async function loadProfiles() {
     try {
@@ -27,12 +45,27 @@ export default function ProfilesPage() {
     bucketsApi.list().then(setBuckets).catch(() => {});
   }, []);
 
-  async function setDefaultBucket(id, bucketId) {
+  const bucketName = (id) => buckets.find((b) => b.id === id)?.name ?? "—";
+
+  async function openDetail(profile) {
+    setDetailId(profile.id);
+    setDetailOpen(true);
+    setSummary(null);
+    setShares([]);
+    setShareEmail("");
+    setError(null);
+    setSummaryLoading(true);
     try {
-      await profilesApi.update(id, { default_bucket_id: bucketId || null });
-      loadProfiles();
+      const [summaryData, shareList] = await Promise.all([
+        profilesApi.summary(profile.id),
+        sharesApi.listForProfile(profile.id),
+      ]);
+      setSummary(summaryData);
+      setShares(shareList);
     } catch (e) {
       setError(e.message);
+    } finally {
+      setSummaryLoading(false);
     }
   }
 
@@ -42,47 +75,46 @@ export default function ProfilesPage() {
     try {
       await profilesApi.create({ name: name.trim() });
       setName("");
-      loadProfiles();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function handleDelete(id) {
-    try {
-      await profilesApi.remove(id);
-      if (summary?.profile?.id === id) setSummary(null);
-      loadProfiles();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function handleMakePrimary(id) {
-    try {
-      await profilesApi.makePrimary(id);
-      loadProfiles();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function viewSummary(id) {
-    try {
       setError(null);
-      setShareEmail("");
-      const [summaryData, shareList] = await Promise.all([
-        profilesApi.summary(id),
-        sharesApi.listForProfile(id),
-      ]);
-      setSummary(summaryData);
-      setShares(shareList);
+      loadProfiles();
     } catch (e) {
       setError(e.message);
     }
   }
 
-  async function downloadStatement(id) {
+  async function setDefaultBucket(bucketId) {
+    if (!detailId) return;
+    try {
+      await profilesApi.update(detailId, { default_bucket_id: bucketId || null });
+      loadProfiles();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleMakePrimary() {
+    if (!detailId) return;
+    try {
+      await profilesApi.makePrimary(detailId);
+      loadProfiles();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleDelete() {
+    if (!detailId) return;
+    try {
+      await profilesApi.remove(detailId);
+      setDetailOpen(false);
+      loadProfiles();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function downloadStatement() {
+    if (!detailId) return;
     // Open the window now, inside the click, so pop-up blockers allow it;
     // fill it once the data loads.
     const win = window.open("", "_blank");
@@ -92,7 +124,7 @@ export default function ProfilesPage() {
     }
     try {
       setError(null);
-      const s = await profilesApi.statement(id);
+      const s = await profilesApi.statement(detailId);
       writeStatement(win, s, stmtLang);
     } catch (e) {
       win.close();
@@ -102,11 +134,11 @@ export default function ProfilesPage() {
 
   async function handleShare(e) {
     e.preventDefault();
-    if (!shareEmail.trim() || !summary) return;
+    if (!shareEmail.trim() || !detailId) return;
     try {
-      await sharesApi.create(summary.profile.id, shareEmail.trim());
+      await sharesApi.create(detailId, shareEmail.trim());
       setShareEmail("");
-      setShares(await sharesApi.listForProfile(summary.profile.id));
+      setShares(await sharesApi.listForProfile(detailId));
     } catch (e) {
       setError(e.message);
     }
@@ -115,141 +147,91 @@ export default function ProfilesPage() {
   async function handleRevoke(shareId) {
     try {
       await sharesApi.remove(shareId);
-      setShares(await sharesApi.listForProfile(summary.profile.id));
+      setShares(await sharesApi.listForProfile(detailId));
     } catch (e) {
       setError(e.message);
     }
   }
 
+  // Keep the panel populated during its exit animation.
+  const shown = detailId ? profiles.find((p) => p.id === detailId) || null : null;
+
   return (
     <div>
-      <h1>Profiles</h1>
+      <PageHeader
+        title="Profiles"
+        subtitle="People whose spending you track."
+        actions={
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Statement language
+            <Select value={stmtLang} onChange={(e) => setStmtLang(e.target.value)}>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+            </Select>
+          </label>
+        }
+      />
 
-      <form onSubmit={handleAdd}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Profile name (e.g., Mom)"
-        />
-        <button type="submit">Add</button>
-      </form>
-
-      {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
-
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-        <small>Statement language:</small>
-        <select value={stmtLang} onChange={(e) => setStmtLang(e.target.value)}>
-          <option value="en">English</option>
-          <option value="es">Español</option>
-        </select>
-      </div>
-
-      {profiles.length === 0 && <p>No profiles yet.</p>}
-
-      {profiles.map((p) => (
-        <div className="card" key={p.id}>
-          <span>{p.name}{p.is_primary ? " (me)" : ""}</span>
-          <span style={{ display: "flex", gap: 6 }}>
-            <select
-              value={p.default_bucket_id || ""}
-              title="Default money bucket (where this person's money is kept)"
-              onChange={(e) => setDefaultBucket(p.id, e.target.value)}
-            >
-              <option value="">Money bucket…</option>
-              {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            {!p.is_primary && (
-              <button onClick={() => handleMakePrimary(p.id)}>This is me</button>
-            )}
-            <button onClick={() => viewSummary(p.id)}>View</button>
-            <button onClick={() => downloadStatement(p.id)} title="Open a printable statement (Save as PDF)">Statement</button>
-            <button className="danger" onClick={() => handleDelete(p.id)}>
-              Delete
-            </button>
-          </span>
-        </div>
-      ))}
-
-      {summary && (
-        <div style={{ marginTop: 24 }}>
-          <h2>{summary.profile.name} — summary</h2>
-          <div className="card">
-            <span>Total owed (all charges)</span>
-            <strong>{money(summary.total_owed)}</strong>
-          </div>
-          <div className="card">
-            <span>Paid back</span>
-            <strong>{money(summary.total_paid)}</strong>
-          </div>
-          <div className="card">
-            <span>Still unpaid</span>
-            <strong>{money(summary.total_unpaid)}</strong>
-          </div>
-          <div className="card">
-            <span>Cashback earned / pending</span>
-            <strong>
-              {money(summary.cashback_earned)} / {money(summary.cashback_pending)}
-            </strong>
-          </div>
-
-          <h3>Cashback by card</h3>
-          {(!summary.cashback_by_card || summary.cashback_by_card.length === 0) && (
-            <p><small>No cashback yet.</small></p>
-          )}
-          {(summary.cashback_by_card || []).map((c) => (
-            <div className="card" key={c.name}>
-              <span>{c.name}</span>
-              <span>
-                earned <strong>{money(c.earned)}</strong> · pending {money(c.pending)}
-              </span>
-            </div>
-          ))}
-          <div className="card">
-            <span>Cards used</span>
-            <span>{summary.cards_used.join(", ") || "—"}</span>
-          </div>
-
-          <h3>Owed by card</h3>
-          {(!summary.debt_by_card || summary.debt_by_card.length === 0) && (
-            <p><small>Nothing owed on any card.</small></p>
-          )}
-          {(summary.debt_by_card || []).map((c) => (
-            <div className="card" key={c.name}>
-              <span>{c.name}</span>
-              <strong>{money(c.balance)}</strong>
-            </div>
-          ))}
-          <p>
-            <small>{summary.transactions.length} transaction(s)</small>
-          </p>
-
-          <h3>Sharing</h3>
-          <p>
-            <small>
-              Share this profile with someone by email. When they sign up with
-              that email, they can see (read-only) what they owe.
-            </small>
-          </p>
-          <form onSubmit={handleShare}>
-            <input
-              type="email"
-              value={shareEmail}
-              onChange={(e) => setShareEmail(e.target.value)}
-              placeholder="person@email.com"
+      {/* Add form (add only) */}
+      <Card className="mb-6">
+        <form onSubmit={handleAdd} className="flex items-end gap-2 flex-wrap">
+          <label className="flex flex-col gap-1 flex-1 min-w-[14rem]">
+            <span className="text-xs text-muted">Name</span>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Profile name (e.g., Mom)"
             />
-            <button type="submit">Share</button>
-          </form>
-          {shares.length === 0 && <p><small>Not shared with anyone yet.</small></p>}
-          {shares.map((s) => (
-            <div className="card" key={s.id}>
-              <span>{s.shared_with_email}</span>
-              <button className="danger" onClick={() => handleRevoke(s.id)}>
-                Revoke
-              </button>
-            </div>
-          ))}
-        </div>
+          </label>
+          <Button type="submit" variant="primary">Add profile</Button>
+        </form>
+      </Card>
+
+      {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
+
+      {profiles.length === 0 ? (
+        <p className="text-muted text-sm">No profiles yet.</p>
+      ) : (
+        <Table className="table-fixed min-w-[32rem]">
+          <THead>
+            <tr>
+              <TH className="w-[55%]">Profile</TH>
+              <TH className="w-[45%]">Money bucket</TH>
+            </tr>
+          </THead>
+          <tbody>
+            {profiles.map((p) => (
+              <TR key={p.id} onClick={() => openDetail(p)} className="cursor-pointer">
+                <TD>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="text-ink font-medium truncate">{p.name}</span>
+                    {p.is_primary && <Badge tone="teal">Me</Badge>}
+                  </span>
+                </TD>
+                <TD className="text-muted truncate">{bucketName(p.default_bucket_id)}</TD>
+              </TR>
+            ))}
+          </tbody>
+        </Table>
       )}
+
+      <ProfileDetailPanel
+        profile={shown}
+        summary={summary}
+        loading={summaryLoading}
+        buckets={buckets}
+        shares={shares}
+        shareEmail={shareEmail}
+        onShareEmailChange={setShareEmail}
+        onShare={handleShare}
+        onRevoke={handleRevoke}
+        onSetBucket={setDefaultBucket}
+        onMakePrimary={handleMakePrimary}
+        onStatement={downloadStatement}
+        onDelete={handleDelete}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </div>
   );
 }
