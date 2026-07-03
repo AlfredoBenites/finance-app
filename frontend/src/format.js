@@ -9,6 +9,16 @@ export function formatDate(iso) {
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
 
+// Today's date as an ISO string ("2026-07-02") using the browser's LOCAL time.
+// new Date().toISOString() converts to UTC first, so late at night it can jump
+// to tomorrow's date; building it from the local Y/M/D avoids that shift.
+export function todayLocal() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 // Format a number as USD with thousands separators, e.g. -$1,234.56
 export function money(n) {
   // Round to cents first so floating-point dust (e.g. -1e-13) doesn't render

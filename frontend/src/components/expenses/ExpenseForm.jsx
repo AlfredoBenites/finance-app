@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button, Field, Select, Input, Textarea, DateInput, AmountInput, Autocomplete, cn } from "../ui";
+import { todayLocal } from "../../format";
 
 export const ADD_NEW = "__add_new__";
-export const today = () => new Date().toISOString().slice(0, 10);
+export const today = todayLocal;
 export const EMPTY_FORM = {
   transaction_date: today(),
   merchant: "",
