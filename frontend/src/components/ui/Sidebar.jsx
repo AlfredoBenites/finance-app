@@ -144,7 +144,9 @@ export default function Sidebar({
       </nav>
 
       {/* Footer: settings, privacy, theme toggle, user, logout */}
-      <div className="shrink-0 border-t border-border p-2 space-y-1">
+      {/* overflow-x-hidden clips the labels at the panel edge so they reveal with
+          the width animation (like the nav) instead of popping in fully-formed. */}
+      <div className="shrink-0 overflow-x-hidden border-t border-border p-2 space-y-1">
         <button
           onClick={openSettings}
           title="Settings"
