@@ -5,18 +5,20 @@ import {
   CreditCard,
   Receipt,
   Banknote,
+  PiggyBank,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
 } from "lucide-react";
 import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
 import { useSettings } from "../settings/SettingsContext";
 import { YEARS } from "../components/YearSelect";
-import { profilesApi, creditCardsApi, accountsApi } from "../api/client";
+import { profilesApi, creditCardsApi, accountsApi, bucketsApi } from "../api/client";
 
 const CATEGORIES = [
   ["dashboard", "Dashboard", LayoutDashboard],
   ["insights", "Insights", PieChart],
   ["cards", "Credit Cards", CreditCard],
+  ["buckets", "Buckets", PiggyBank],
   ["expenses", "Expenses", Receipt],
   ["income", "Income", Banknote],
 ];
@@ -90,6 +92,10 @@ export default function SettingsModal() {
     setCardTxnPageSize,
     cardOrder,
     setCardOrder,
+    accountOrder,
+    setAccountOrder,
+    bucketOrder,
+    setBucketOrder,
     expensesPerPage,
     setExpensesPerPage,
     expensesFilters,
@@ -106,16 +112,23 @@ export default function SettingsModal() {
   const [profiles, setProfiles] = useState([]);
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [buckets, setBuckets] = useState([]);
 
   useEffect(() => {
     if (!isOpen) return;
     profilesApi.list().then(setProfiles).catch(() => {});
     creditCardsApi.list().then((cs) => setCards(cs.filter((c) => c.is_active !== false))).catch(() => {});
     accountsApi.list().then(setAccounts).catch(() => {});
+    bucketsApi.list().then(setBuckets).catch(() => {});
   }, [isOpen]);
 
   const orderedProfiles = useMemo(() => applyOrder(profiles, profileSort.order), [profiles, profileSort.order]);
   const orderedCards = useMemo(() => applyOrder(cards, cardOrder), [cards, cardOrder]);
+  // Accounts that actually hold buckets, in the saved display order.
+  const bucketAccounts = useMemo(
+    () => applyOrder(accounts.filter((a) => buckets.some((b) => b.account_id === a.id)), accountOrder),
+    [accounts, buckets, accountOrder]
+  );
 
   function setMode(mode) {
     if (mode === "custom") {
@@ -274,6 +287,49 @@ export default function SettingsModal() {
                 />
               )}
             </Section>
+          )}
+
+          {tab === "buckets" && (
+            <>
+              <Section title="Account order" hint="Drag to set the order accounts appear on the Buckets page.">
+                {bucketAccounts.length === 0 ? (
+                  <p className="text-sm text-muted">No accounts with buckets yet.</p>
+                ) : (
+                  <ReorderList
+                    items={bucketAccounts}
+                    onReorder={(next) => setAccountOrder(next.map((a) => a.id))}
+                    renderLabel={(a) => a.name}
+                  />
+                )}
+              </Section>
+
+              <Section title="Bucket order" hint="Drag to set the order of buckets within each account.">
+                {bucketAccounts.length === 0 ? (
+                  <p className="text-sm text-muted">No buckets yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {bucketAccounts.map((a) => {
+                      const ordered = applyOrder(
+                        buckets.filter((b) => b.account_id === a.id),
+                        bucketOrder[a.id]
+                      );
+                      return (
+                        <div key={a.id}>
+                          <div className="text-xs font-medium text-muted mb-1.5">{a.name}</div>
+                          <ReorderList
+                            items={ordered}
+                            onReorder={(next) =>
+                              setBucketOrder({ ...bucketOrder, [a.id]: next.map((b) => b.id) })
+                            }
+                            renderLabel={(b) => b.name}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Section>
+            </>
           )}
 
           {tab === "expenses" && (
