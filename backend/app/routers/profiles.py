@@ -41,6 +41,49 @@ def create_profile(payload: ProfileCreate, user_id: str = Depends(get_current_us
     return result.data[0]
 
 
+@router.get("/cashback-redirected")
+def cashback_redirected(user_id: str = Depends(get_current_user_id)):
+    """Per-profile cashback that is credited to the primary profile instead of to
+    that profile (Insights: 'cashback from other profiles'). Declared before the
+    '/{profile_id}' route so the path isn't captured as a profile id.
+    """
+    profiles = (
+        supabase.table(TABLE).select("*").eq("owner_id", user_id).execute().data
+    )
+    redirecting = {
+        p["id"]: p["name"]
+        for p in profiles
+        if p.get("cashback_to_primary") and not p.get("is_primary")
+    }
+    if not redirecting:
+        return []
+
+    all_txns = (
+        supabase.table("transactions").select("*").eq("owner_id", user_id).execute().data
+    )
+    by_profile: dict[str, dict] = {}
+    for t in all_txns:
+        pid = t.get("profile_id")
+        if pid not in redirecting:
+            continue
+        entry = by_profile.setdefault(pid, {"earned": Decimal("0"), "pending": Decimal("0")})
+        amount = calc._dec(t.get("cashback_amount"))
+        entry["earned" if t.get("is_paid_back") else "pending"] += amount
+
+    result = [
+        {
+            "profile_id": pid,
+            "name": redirecting[pid],
+            "earned": float(v["earned"]),
+            "pending": float(v["pending"]),
+        }
+        for pid, v in by_profile.items()
+        if v["earned"] or v["pending"]
+    ]
+    result.sort(key=lambda d: -(d["earned"] + d["pending"]))
+    return result
+
+
 @router.get("/{profile_id}", response_model=Profile)
 def get_profile(profile_id: str, user_id: str = Depends(get_current_user_id)):
     result = (
@@ -134,15 +177,40 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
     if not profile.data:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    txns = (
+    viewed = profile.data[0]
+
+    all_txns = (
         supabase.table("transactions")
         .select("*")
-        .eq("profile_id", profile_id)
         .eq("owner_id", user_id)
         .order("transaction_date", desc=True)
         .execute()
         .data
     )
+    own_txns = [t for t in all_txns if t.get("profile_id") == profile_id]
+
+    all_profiles = (
+        supabase.table(TABLE).select("*").eq("owner_id", user_id).execute().data
+    )
+    # Non-primary profiles whose cashback is credited to the primary profile.
+    redirecting_ids = {
+        p["id"] for p in all_profiles
+        if p.get("cashback_to_primary") and not p.get("is_primary")
+    }
+
+    # Cashback can be attributed to a different profile than owed/debt. Owed and
+    # debt always stay with the profile that was charged (own_txns); only the
+    # cashback set shifts: the primary absorbs redirecting profiles' cashback,
+    # and a redirecting profile keeps none of its own.
+    if viewed.get("is_primary"):
+        cashback_txns = own_txns + [
+            t for t in all_txns if t.get("profile_id") in redirecting_ids
+        ]
+    elif profile_id in redirecting_ids:
+        cashback_txns = []
+    else:
+        cashback_txns = own_txns
+
     cards = (
         supabase.table("credit_cards")
         .select("id, name")
@@ -152,22 +220,24 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
     )
     card_names = {c["id"]: c["name"] for c in cards}
 
-    total_unpaid = calc.total_card_debt(txns)  # negated sum of unpaid amounts
-    total_paid = -sum((calc._dec(t["amount"]) for t in calc.paid(txns)), Decimal("0"))
+    total_unpaid = calc.total_card_debt(own_txns)  # negated sum of unpaid amounts
+    total_paid = -sum((calc._dec(t["amount"]) for t in calc.paid(own_txns)), Decimal("0"))
     total_owed = total_paid + total_unpaid
 
-    cards_used = sorted({card_names.get(t["credit_card_id"], "Unknown") for t in txns})
+    cards_used = sorted({card_names.get(t.get("credit_card_id"), "Unknown") for t in own_txns})
 
     # How much THIS profile still owes on each card (unpaid card charges).
     debt_by_card = [
         {"name": card_names.get(cid, "Unknown"), "balance": float(bal)}
-        for cid, bal in calc.debt_by_card(txns).items()
+        for cid, bal in calc.debt_by_card(own_txns).items()
     ]
     debt_by_card.sort(key=lambda d: -d["balance"])
 
-    # Cashback this profile generated on each card (earned = settled, pending = unpaid).
+    # Cashback credited to this profile on each card (earned = settled, pending =
+    # unpaid). For the primary this includes redirecting profiles' cashback,
+    # merged into the same card rows.
     cb_by_card: dict[str, dict[str, Decimal]] = {}
-    for t in txns:
+    for t in cashback_txns:
         cid = t.get("credit_card_id")
         if not cid:
             continue
@@ -182,16 +252,16 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
     cashback_by_card.sort(key=lambda d: -(d["earned"] + d["pending"]))
 
     return {
-        "profile": profile.data[0],
+        "profile": viewed,
         "total_owed": float(total_owed),
         "total_paid": float(total_paid),
         "total_unpaid": float(total_unpaid),
-        "cashback_earned": float(calc.cashback_earned(txns)),
-        "cashback_pending": float(calc.cashback_pending(txns)),
+        "cashback_earned": float(calc.cashback_earned(cashback_txns)),
+        "cashback_pending": float(calc.cashback_pending(cashback_txns)),
         "cards_used": cards_used,
         "debt_by_card": debt_by_card,
         "cashback_by_card": cashback_by_card,
-        "transactions": txns,
+        "transactions": own_txns,
     }
 
 

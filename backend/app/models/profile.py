@@ -20,6 +20,7 @@ class ProfileUpdate(BaseModel):
     avatar_initials: Optional[str] = None
     default_bucket_id: Optional[str] = None
     is_active: Optional[bool] = None
+    cashback_to_primary: Optional[bool] = None
 
 
 class Profile(BaseModel):
@@ -31,5 +32,8 @@ class Profile(BaseModel):
     is_active: bool
     is_primary: bool = False
     default_bucket_id: Optional[str] = None
+    # When true (non-primary profiles only), this profile's cashback is credited
+    # to the primary profile instead of to itself.
+    cashback_to_primary: bool = False
     created_at: datetime
     updated_at: datetime
