@@ -1,4 +1,4 @@
-import { SlideOver, StatCard, Badge, Button, Amount, Field, Select, Input } from "../ui";
+import { SlideOver, StatCard, Button, Amount, Field, Select, Input } from "../ui";
 
 // One "name … amount" row for the by-card breakdowns.
 function CardRow({ name, children }) {
@@ -10,9 +10,10 @@ function CardRow({ name, children }) {
   );
 }
 
-function Section({ title, children }) {
+// A titled block; `divider` draws a hairline above it to separate sections.
+function Section({ title, children, divider }) {
   return (
-    <div>
+    <div className={divider ? "border-t border-border pt-5" : undefined}>
       <div className="text-xs font-medium uppercase tracking-wide text-muted mb-1">{title}</div>
       {children}
     </div>
@@ -20,9 +21,10 @@ function Section({ title, children }) {
 }
 
 // Detail slide-over for one profile: spending summary, per-card breakdowns,
-// default money bucket, sharing, and the profile actions.
+// default money bucket, cashback attribution, sharing, and the profile actions.
 export default function ProfileDetailPanel({
   profile,
+  profiles,
   summary,
   loading,
   buckets,
@@ -32,6 +34,7 @@ export default function ProfileDetailPanel({
   onShare,
   onRevoke,
   onSetBucket,
+  onSetCashbackTarget,
   onMakePrimary,
   onStatement,
   onDelete,
@@ -39,6 +42,11 @@ export default function ProfileDetailPanel({
   onClose,
 }) {
   const p = profile;
+  const others = (profiles || []).filter((x) => x.id !== p?.id);
+  const redirectName = p?.cashback_to_profile_id
+    ? others.find((x) => x.id === p.cashback_to_profile_id)?.name
+    : null;
+
   return (
     <SlideOver
       open={open}
@@ -47,7 +55,7 @@ export default function ProfileDetailPanel({
       subtitle="Spending summary and sharing"
     >
       {p && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {loading || !summary ? (
             <p className="text-sm text-muted">Loading summary…</p>
           ) : (
@@ -61,7 +69,7 @@ export default function ProfileDetailPanel({
                 />
               </div>
 
-              <Section title="Owed by card">
+              <Section title="Owed by card" divider>
                 {summary.debt_by_card.length === 0 ? (
                   <p className="text-sm text-muted">Nothing owed on any card.</p>
                 ) : (
@@ -73,7 +81,7 @@ export default function ProfileDetailPanel({
                 )}
               </Section>
 
-              <Section title="Cashback by card">
+              <Section title="Cashback by card" divider>
                 {summary.cashback_by_card.length === 0 ? (
                   <p className="text-sm text-muted">No cashback yet.</p>
                 ) : (
@@ -85,28 +93,50 @@ export default function ProfileDetailPanel({
                   ))
                 )}
               </Section>
-
-              <Section title="Cards used">
-                <p className="text-sm text-ink">{summary.cards_used.join(", ") || "—"}</p>
-                <p className="text-xs text-muted mt-1">{summary.transactions.length} transaction(s)</p>
-              </Section>
             </>
           )}
 
-          <Field label="Default money bucket" className="max-w-xs">
-            <Select
-              value={p.default_bucket_id || ""}
-              onChange={(e) => onSetBucket(e.target.value)}
-              title="Where this person's money is kept"
-            >
-              <option value="">None</option>
-              {buckets.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </Select>
-          </Field>
+          {/* Settings: default bucket (left) + cashback attribution (right). */}
+          <div className="border-t border-border pt-5">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Default money bucket" className={p.is_primary ? "col-span-2" : ""}>
+                <Select
+                  value={p.default_bucket_id || ""}
+                  onChange={(e) => onSetBucket(e.target.value)}
+                  title="Where this person's money is kept"
+                >
+                  <option value="">None</option>
+                  {buckets.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </Select>
+              </Field>
 
-          <Section title="Sharing">
+              {!p.is_primary && (
+                <Field label="Send this profile's cashback to">
+                  <Select
+                    value={p.cashback_to_profile_id || ""}
+                    onChange={(e) => onSetCashbackTarget(e.target.value)}
+                    title="Credit this profile's cashback to another profile"
+                  >
+                    <option value="">Keep with this profile</option>
+                    {others.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}{x.is_primary ? " (me)" : ""}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              )}
+            </div>
+            {redirectName && (
+              <p className="text-xs text-muted mt-2">
+                This profile's cashback is also credited to {redirectName}.
+              </p>
+            )}
+          </div>
+
+          <Section title="Sharing" divider>
             <p className="text-xs text-muted mb-2">
               Share this profile by email. When they sign up with that email, they can
               see (read-only) what they owe.
@@ -138,7 +168,7 @@ export default function ProfileDetailPanel({
             )}
           </Section>
 
-          <div className="flex items-center gap-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-2 border-t border-border pt-4">
             {!p.is_primary && (
               <Button variant="primary" onClick={onMakePrimary} title="Mark this profile as you">
                 This is me
