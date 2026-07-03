@@ -53,8 +53,6 @@ export default function ProfileDetailPanel({
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="Total owed" value={<Amount value={summary.total_owed} />} />
-                <StatCard label="Paid back" value={<Amount value={summary.total_paid} />} tone="green" />
                 <StatCard label="Still unpaid" value={<Amount value={summary.total_unpaid} />} tone="danger" />
                 <StatCard
                   label="Cashback earned"
@@ -62,10 +60,6 @@ export default function ProfileDetailPanel({
                   tone="green"
                 />
               </div>
-              {/* Pending cashback as its own line under the stat grid. */}
-              <p className="-mt-4 text-xs text-muted">
-                Cashback pending: <Amount value={summary.cashback_pending} />
-              </p>
 
               <Section title="Owed by card">
                 {summary.debt_by_card.length === 0 ? (
