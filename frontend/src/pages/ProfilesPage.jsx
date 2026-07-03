@@ -92,10 +92,10 @@ export default function ProfilesPage() {
     }
   }
 
-  async function toggleCashback(next) {
+  async function setCashbackTarget(targetId) {
     if (!detailId) return;
     try {
-      await profilesApi.update(detailId, { cashback_to_primary: next });
+      await profilesApi.update(detailId, { cashback_to_profile_id: targetId || null });
       await loadProfiles();
       // Re-fetch this profile's summary so its cashback reflects the change.
       setSummaryLoading(true);
@@ -232,6 +232,7 @@ export default function ProfilesPage() {
 
       <ProfileDetailPanel
         profile={shown}
+        profiles={profiles}
         summary={summary}
         loading={summaryLoading}
         buckets={buckets}
@@ -241,7 +242,7 @@ export default function ProfilesPage() {
         onShare={handleShare}
         onRevoke={handleRevoke}
         onSetBucket={setDefaultBucket}
-        onToggleCashback={toggleCashback}
+        onSetCashbackTarget={setCashbackTarget}
         onMakePrimary={handleMakePrimary}
         onStatement={downloadStatement}
         onDelete={handleDelete}
