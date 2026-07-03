@@ -89,6 +89,7 @@ export const profilesApi = {
   summary: (id) => request(`/api/profiles/${id}/summary`),
   statement: (id) => request(`/api/profiles/${id}/statement`),
   makePrimary: (id) => request(`/api/profiles/${id}/make-primary`, { method: "POST" }),
+  cashbackRedirected: () => request("/api/profiles/cashback-redirected"),
 };
 
 export const creditCardsApi = {

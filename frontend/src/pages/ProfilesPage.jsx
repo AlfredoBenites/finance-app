@@ -92,6 +92,21 @@ export default function ProfilesPage() {
     }
   }
 
+  async function toggleCashback(next) {
+    if (!detailId) return;
+    try {
+      await profilesApi.update(detailId, { cashback_to_primary: next });
+      await loadProfiles();
+      // Re-fetch this profile's summary so its cashback reflects the change.
+      setSummaryLoading(true);
+      setSummary(await profilesApi.summary(detailId));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   async function handleMakePrimary() {
     if (!detailId) return;
     try {
@@ -226,6 +241,7 @@ export default function ProfilesPage() {
         onShare={handleShare}
         onRevoke={handleRevoke}
         onSetBucket={setDefaultBucket}
+        onToggleCashback={toggleCashback}
         onMakePrimary={handleMakePrimary}
         onStatement={downloadStatement}
         onDelete={handleDelete}

@@ -1,4 +1,4 @@
-import { SlideOver, StatCard, Badge, Button, Amount, Field, Select, Input } from "../ui";
+import { SlideOver, StatCard, Badge, Button, Amount, Field, Select, Input, Toggle } from "../ui";
 
 // One "name … amount" row for the by-card breakdowns.
 function CardRow({ name, children }) {
@@ -32,6 +32,7 @@ export default function ProfileDetailPanel({
   onShare,
   onRevoke,
   onSetBucket,
+  onToggleCashback,
   onMakePrimary,
   onStatement,
   onDelete,
@@ -91,6 +92,20 @@ export default function ProfileDetailPanel({
                 <p className="text-xs text-muted mt-1">{summary.transactions.length} transaction(s)</p>
               </Section>
             </>
+          )}
+
+          {!p.is_primary && (
+            <div className="rounded-lg border border-border p-3">
+              <Toggle
+                on={!!p.cashback_to_primary}
+                onClick={() => onToggleCashback(!p.cashback_to_primary)}
+                label="Send this profile's cashback to me"
+              />
+              <p className="text-xs text-muted mt-2">
+                Credit their cashback to your profile instead of theirs — for people
+                you cover only occasionally. Their debt is unaffected.
+              </p>
+            </div>
           )}
 
           <Field label="Default money bucket" className="max-w-xs">
