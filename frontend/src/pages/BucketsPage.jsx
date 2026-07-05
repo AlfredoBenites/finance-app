@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import { bucketsApi, accountsApi, creditCardsApi } from "../api/client";
 import { useSettings } from "../settings/SettingsContext";
 import { formatDate } from "../format";
@@ -17,14 +18,9 @@ import {
   TR,
   TD,
 } from "../components/ui";
-
-// How a bucket's money flows into net worth / real available money.
-const KINDS = [
-  { value: "spendable", label: "Mine · spendable", hint: "counts in net worth AND real available money" },
-  { value: "set_aside", label: "Mine · set aside", hint: "counts in net worth, NOT in real available money" },
-  { value: "not_mine", label: "Not mine (holding)", hint: "excluded from net worth AND real available money" },
-];
-const kindLabel = (k) => (KINDS.find((x) => x.value === k) || KINDS[1]).label;
+import { BucketIcon } from "../components/buckets/bucketIcons";
+import { kindLabel } from "../components/buckets/kinds";
+import AccountBucketsPanel from "../components/buckets/AccountBucketsPanel";
 
 // Order an array of {id} by a saved list of ids; anything not listed goes last.
 function applyOrder(items, order) {
@@ -39,13 +35,8 @@ export default function BucketsPage() {
   const [buckets, setBuckets] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
-  const [newName, setNewName] = useState("");
-  const [newAccount, setNewAccount] = useState("");
-  const [newKind, setNewKind] = useState("set_aside");
   const [moves, setMoves] = useState({}); // accountId -> {from, to, amount}
   const [assign, setAssign] = useState({}); // bucketId -> accountId
-  const [editNames, setEditNames] = useState({}); // bucketId -> name
-  const [editMode, setEditMode] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
   const [allocSel, setAllocSel] = useState({}); // "profile:card" -> {source, dest}
   const [txnSel, setTxnSel] = useState({}); // "profile:card" -> {txnId: checked}
@@ -56,6 +47,9 @@ export default function BucketsPage() {
   const [moveHistory, setMoveHistory] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // Per-account add/edit-buckets panel.
+  const [panelAccountId, setPanelAccountId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
   // Move-history filters + pagination.
   const [histBucket, setHistBucket] = useState(""); // bucket id to filter by (matched by name in the summary)
   const [histMinAmount, setHistMinAmount] = useState("");
@@ -89,7 +83,6 @@ export default function BucketsPage() {
         Object.fromEntries((x.transactions || []).map((t) => [t.id, true])),
       ])));
       setIncomeAllocs(inc);
-      setEditNames(Object.fromEntries(b.map((x) => [x.id, x.name])));
     } catch (e) {
       setError(e.message);
     }
@@ -107,22 +100,15 @@ export default function BucketsPage() {
   const allocated = (accountId) =>
     bucketsFor(accountId).reduce((s, b) => s + Number(b.current_amount), 0);
   const unassigned = buckets.filter((b) => !b.account_id);
-  const orderedAccounts = applyOrder(accounts, accountOrder);
+  // Accounts that hold buckets OR were flagged to show on this page.
+  const visibleAccounts = applyOrder(
+    accounts.filter((a) => a.show_in_buckets || buckets.some((b) => b.account_id === a.id)),
+    accountOrder
+  );
 
-  async function handleCreate(e) {
-    e.preventDefault();
-    if (!newName.trim() || !newAccount) {
-      setError("Bucket name and account are required.");
-      return;
-    }
-    try {
-      await bucketsApi.create({ name: newName.trim(), account_id: newAccount, current_amount: 0, kind: newKind });
-      setNewName("");
-      setError(null);
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
+  function openAccountPanel(a) {
+    setPanelAccountId(a.id);
+    setPanelOpen(true);
   }
 
   async function doMove(accountId) {
@@ -141,46 +127,10 @@ export default function BucketsPage() {
     }
   }
 
-  async function renameBucket(id) {
-    try {
-      await bucketsApi.update(id, { name: (editNames[id] || "").trim() });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function reassignBucket(bucketId, accountId) {
-    try {
-      await bucketsApi.update(bucketId, { account_id: accountId });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function changeKind(bucketId, kind) {
-    try {
-      await bucketsApi.update(bucketId, { kind });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
   async function assignAccount(bucketId) {
     if (!assign[bucketId]) return;
     try {
       await bucketsApi.update(bucketId, { account_id: assign[bucketId] });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function handleDelete(id) {
-    try {
-      await bucketsApi.remove(id);
       load();
     } catch (e) {
       setError(e.message);
@@ -345,43 +295,14 @@ export default function BucketsPage() {
   const histStart = histPage * histPageSize;
   const histPageItems = filteredMoves.slice(histStart, histStart + histPageSize);
 
+  const panelAccount = accounts.find((a) => a.id === panelAccountId) || null;
+
   return (
     <div>
       <PageHeader
         title="Buckets"
-        subtitle="Envelopes inside a bank account. Each account's balance is the total; move money between buckets (you can't allocate more than the account has)."
-        actions={
-          <Button variant={editMode ? "primary" : "secondary"} onClick={() => setEditMode((v) => !v)}>
-            {editMode ? "Done editing" : "Edit buckets"}
-          </Button>
-        }
+        subtitle="Envelopes inside a bank account. Click an account name to add or edit its buckets."
       />
-
-      {/* Add bucket */}
-      <Card className="mb-6">
-        <form onSubmit={handleCreate} className="flex items-end gap-2 flex-wrap">
-          <label className="flex flex-col gap-1 flex-1 min-w-[12rem]">
-            <span className="text-xs text-muted">Bucket name</span>
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New bucket name" />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted">Account</span>
-            <Select value={newAccount} onChange={(e) => setNewAccount(e.target.value)}>
-              <option value="">In account…</option>
-              {activeAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </Select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted">Kind</span>
-            <Select value={newKind} onChange={(e) => setNewKind(e.target.value)} title={KINDS.find((k) => k.value === newKind)?.hint}>
-              {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-            </Select>
-          </label>
-          <Button type="submit" variant="primary">Add bucket</Button>
-        </form>
-      </Card>
 
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
@@ -513,115 +434,90 @@ export default function BucketsPage() {
         </section>
       )}
 
-      {/* Accounts and their buckets — two per row on wider screens. */}
-      <div className="grid md:grid-cols-2 gap-x-5 gap-y-6 mb-6 items-start">
-        {orderedAccounts.map((a) => {
-          const accBuckets = bucketsFor(a.id);
-          if (accBuckets.length === 0) return null;
-          const alloc = allocated(a.id);
-          const unalloc = Math.round((Number(a.balance) - alloc) * 100) / 100;
-          const m = moves[a.id] || {};
-          const options = [{ id: "unallocated", name: "Unallocated" }, ...accBuckets];
-          return (
-            <section key={a.id}>
-              <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
-                <h2 className="text-lg font-semibold text-ink">
+      {/* Accounts and their buckets — one per row. Click a name to add/edit buckets. */}
+      {visibleAccounts.map((a) => {
+        const accBuckets = bucketsFor(a.id);
+        const alloc = allocated(a.id);
+        const unalloc = Math.round((Number(a.balance) - alloc) * 100) / 100;
+        const m = moves[a.id] || {};
+        const options = [{ id: "unallocated", name: "Unallocated" }, ...accBuckets];
+        return (
+          <section key={a.id} className="mb-6">
+            <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
+              <button
+                onClick={() => openAccountPanel(a)}
+                title="Add or edit buckets"
+                className="group inline-flex items-center gap-1.5 text-lg font-semibold text-ink hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+              >
+                <span className="group-hover:underline underline-offset-4 decoration-accent">
                   {a.name}{a.is_active === false ? " (closed)" : ""}
-                </h2>
-                {!editMode && (
-                  <div className="text-sm text-muted">
-                    Bal <Amount value={a.balance} /> · alloc <Amount value={alloc} /> ·{" "}
-                    <span className={unalloc < 0 ? "text-danger" : "text-ink"}>
-                      Unalloc <Amount value={unalloc} tone={unalloc < 0 ? "danger" : "default"} />
-                    </span>
-                  </div>
-                )}
+                </span>
+                <Pencil size={14} className="text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+              <div className="text-sm text-muted">
+                Bal <Amount value={a.balance} /> · alloc <Amount value={alloc} /> ·{" "}
+                <span className={unalloc < 0 ? "text-danger" : "text-ink"}>
+                  Unalloc <Amount value={unalloc} tone={unalloc < 0 ? "danger" : "default"} />
+                </span>
               </div>
+            </div>
 
-              {editMode ? (
-                <Card padded={false} className="divide-y divide-border">
-                  {accBuckets.map((b) => (
-                    <div className="flex items-center gap-2 px-4 py-2.5 flex-wrap" key={b.id}>
-                      <Input
-                        value={editNames[b.id] ?? ""}
-                        onChange={(e) => setEditNames((s) => ({ ...s, [b.id]: e.target.value }))}
-                        className="flex-1 min-w-[9rem]"
-                      />
-                      <Button size="sm" onClick={() => renameBucket(b.id)}>Rename</Button>
-                      {!b.credit_card_id && (
-                        <Select
-                          value={b.kind || "set_aside"}
-                          title={KINDS.find((k) => k.value === (b.kind || "set_aside"))?.hint}
-                          onChange={(e) => changeKind(b.id, e.target.value)}
-                        >
-                          {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                        </Select>
+            <Table>
+              <THead>
+                <tr>
+                  <TH className="w-8"></TH>
+                  <TH>Bucket</TH>
+                  <TH>Kind</TH>
+                  <TH align="right">Amount</TH>
+                </tr>
+              </THead>
+              <tbody>
+                {accBuckets.map((b) => (
+                  <TR key={b.id}>
+                    <TD className="pr-0">
+                      <BucketIcon icon={b.icon || (b.credit_card_id ? "credit-card" : undefined)} color={b.color} />
+                    </TD>
+                    <TD className="text-ink"><span className="block truncate">{b.name}</span></TD>
+                    <TD>
+                      {b.credit_card_id ? (
+                        <Badge tone="neutral">{cardName(b.credit_card_id)}</Badge>
+                      ) : (
+                        <Badge tone="neutral">{kindLabel(b.kind)}</Badge>
                       )}
-                      <Select value={a.id} title="Move to account" onChange={(e) => reassignBucket(b.id, e.target.value)}>
-                        {activeAccounts.concat(a.is_active === false ? [a] : []).map((acc) => (
-                          <option key={acc.id} value={acc.id}>{acc.name}</option>
-                        ))}
-                      </Select>
-                      <Button size="sm" variant="danger" onClick={() => handleDelete(b.id)}>Delete</Button>
-                    </div>
-                  ))}
-                </Card>
-              ) : (
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>Bucket</TH>
-                      <TH align="right">Amount</TH>
-                    </tr>
-                  </THead>
-                  <tbody>
-                    {accBuckets.map((b) => (
-                      <TR key={b.id}>
-                        <TD>
-                          <span className="flex items-center gap-2 min-w-0">
-                            <span className="text-ink truncate">{b.name}</span>
-                            {b.credit_card_id ? (
-                              <Badge tone="neutral">💳 {cardName(b.credit_card_id)}</Badge>
-                            ) : b.kind && b.kind !== "set_aside" ? (
-                              <Badge tone="neutral">{kindLabel(b.kind)}</Badge>
-                            ) : null}
-                          </span>
-                        </TD>
-                        <TD align="right">
-                          <strong className="text-ink"><Amount value={b.current_amount} /></strong>
-                        </TD>
-                      </TR>
-                    ))}
-                    <tr className="border-t border-border">
-                      <TD className="text-xs text-muted">Unallocated</TD>
-                      <TD align="right">
-                        <Amount value={unalloc} tone={unalloc < 0 ? "danger" : "muted"} />
-                      </TD>
-                    </tr>
-                  </tbody>
-                </Table>
-              )}
+                    </TD>
+                    <TD align="right">
+                      <strong className="text-ink"><Amount value={b.current_amount} /></strong>
+                    </TD>
+                  </TR>
+                ))}
+                <tr className="border-t border-border">
+                  <TD className="pr-0"></TD>
+                  <TD className="text-xs text-muted">Unallocated</TD>
+                  <TD></TD>
+                  <TD align="right"><Amount value={unalloc} tone={unalloc < 0 ? "danger" : "muted"} /></TD>
+                </tr>
+              </tbody>
+            </Table>
 
-              {!editMode && (
-                <div className="flex items-center gap-2 flex-wrap mt-2 pl-1">
-                  <span className="text-xs text-muted">Move</span>
-                  <Select value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
-                    <option value="">From…</option>
-                    {options.filter((o) => o.id !== m.to).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                  </Select>
-                  <Select value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
-                    <option value="">To…</option>
-                    {options.filter((o) => o.id !== m.from).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                  </Select>
-                  <Input type="number" step="0.01" placeholder="$" className="w-24"
-                    value={m.amount || ""} onChange={(e) => setMove(a.id, "amount", e.target.value)} />
-                  <Button size="sm" onClick={() => doMove(a.id)}>Move</Button>
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+            {accBuckets.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap mt-2 pl-1">
+                <span className="text-xs text-muted">Move</span>
+                <Select value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
+                  <option value="">From…</option>
+                  {options.filter((o) => o.id !== m.to).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </Select>
+                <Select value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
+                  <option value="">To…</option>
+                  {options.filter((o) => o.id !== m.from).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </Select>
+                <Input type="number" step="0.01" placeholder="$" className="w-24"
+                  value={m.amount || ""} onChange={(e) => setMove(a.id, "amount", e.target.value)} />
+                <Button size="sm" onClick={() => doMove(a.id)}>Move</Button>
+              </div>
+            )}
+          </section>
+        );
+      })}
 
       {/* Buckets not yet assigned to an account */}
       {unassigned.length > 0 && (
@@ -632,8 +528,8 @@ export default function BucketsPage() {
             {unassigned.map((b) => (
               <div className="flex items-center justify-between gap-3 px-4 py-2.5 flex-wrap" key={b.id}>
                 <span className="flex items-center gap-2 min-w-0">
+                  <BucketIcon icon={b.icon || (b.credit_card_id ? "credit-card" : undefined)} color={b.color} />
                   <span className="text-ink truncate">{b.name}</span>
-                  {b.credit_card_id && <Badge tone="neutral">💳 {cardName(b.credit_card_id)}</Badge>}
                   <span className="text-muted"><Amount value={b.current_amount} /></span>
                 </span>
                 <span className="flex items-center gap-2">
@@ -707,6 +603,16 @@ export default function BucketsPage() {
           )}
         </section>
       )}
+
+      <AccountBucketsPanel
+        account={panelAccount}
+        buckets={panelAccount ? bucketsFor(panelAccount.id) : []}
+        accounts={accounts}
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onChanged={load}
+        onError={setError}
+      />
     </div>
   );
 }
