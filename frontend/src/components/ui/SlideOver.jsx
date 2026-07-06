@@ -10,23 +10,20 @@ export default function SlideOver({ open, onClose, title, subtitle, children, wi
   const [mounted, setMounted] = useState(false);
   const [show, setShow] = useState(false);
 
+  // Mount first (off-screen), then flip to shown a frame later. Splitting the
+  // two into separate effects guarantees the off-screen start state is committed
+  // and painted before `show` flips — otherwise heavy synchronous content can
+  // skip the enter transition and the panel "pops" in instead of sliding.
   useEffect(() => {
-    if (open) {
-      setMounted(true);
-      // Double rAF so the off-screen start state is painted before we flip to
-      // the on-screen state — otherwise synchronous content can skip the
-      // transition and the panel "pops" in instead of sliding.
-      let r2;
-      const r1 = requestAnimationFrame(() => {
-        r2 = requestAnimationFrame(() => setShow(true));
-      });
-      return () => {
-        cancelAnimationFrame(r1);
-        if (r2) cancelAnimationFrame(r2);
-      };
-    }
-    setShow(false); // play exit animation; unmount on backdrop transitionend
+    if (open) setMounted(true);
+    else setShow(false); // play exit animation; unmount on backdrop transitionend
   }, [open]);
+
+  useEffect(() => {
+    if (!mounted || !open) return;
+    const r = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(r);
+  }, [mounted, open]);
 
   useEffect(() => {
     if (!open) return;

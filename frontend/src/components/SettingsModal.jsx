@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
+import { KindBadge, TAG_COLORS } from "./buckets/tagColors";
 import { useSettings } from "../settings/SettingsContext";
 import { YEARS } from "../components/YearSelect";
 import { profilesApi, creditCardsApi, accountsApi, bucketsApi } from "../api/client";
@@ -95,10 +96,10 @@ export default function SettingsModal() {
     setCardOrder,
     accountOrder,
     setAccountOrder,
-    bucketOrder,
-    setBucketOrder,
     moveHistoryPerPage,
     setMoveHistoryPerPage,
+    kindColors,
+    setKindColors,
     expensesPerPage,
     setExpensesPerPage,
     expensesFilters,
@@ -117,7 +118,6 @@ export default function SettingsModal() {
   const [accounts, setAccounts] = useState([]);
   const [buckets, setBuckets] = useState([]);
   const [acctOrderOpen, setAcctOrderOpen] = useState(false);
-  const [bucketOrderAcct, setBucketOrderAcct] = useState(""); // which account's buckets to reorder
 
   useEffect(() => {
     if (!isOpen) return;
@@ -323,36 +323,35 @@ export default function SettingsModal() {
                 )}
               </section>
 
-              {/* Bucket Order — pick one account, then drag its buckets. */}
-              <Section title="Bucket Order" hint="Pick an account, then drag its buckets into order.">
-                {bucketAccounts.length === 0 ? (
-                  <p className="text-sm text-muted">No buckets yet.</p>
-                ) : (
-                  (() => {
-                    const selId =
-                      bucketAccounts.some((a) => a.id === bucketOrderAcct) ? bucketOrderAcct : bucketAccounts[0].id;
-                    const ordered = applyOrder(
-                      buckets.filter((b) => b.account_id === selId),
-                      bucketOrder[selId]
-                    );
-                    return (
-                      <div className="space-y-3">
-                        <Select value={selId} onChange={(e) => setBucketOrderAcct(e.target.value)} className="max-w-xs">
-                          {bucketAccounts.map((a) => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                          ))}
-                        </Select>
-                        <ReorderList
-                          items={ordered}
-                          onReorder={(next) =>
-                            setBucketOrder({ ...bucketOrder, [selId]: next.map((b) => b.id) })
-                          }
-                          renderLabel={(b) => b.name}
-                        />
+              <Section title="Kind tag colors" hint="Colors for the bucket kind tags on the Buckets page. (Bucket order now lives in each account's panel.)">
+                <div className="space-y-3">
+                  {[
+                    ["card", "Credit card"],
+                    ["spendable", "Mine › Spendable"],
+                    ["set_aside", "Mine › Set Aside"],
+                    ["not_mine", "Not Mine › Holding"],
+                  ].map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between gap-3 flex-wrap">
+                      <KindBadge colorKey={kindColors[key]}>{label}</KindBadge>
+                      <div className="flex flex-wrap gap-1.5">
+                        {TAG_COLORS.map(([ck, cl, hex]) => (
+                          <button
+                            key={ck}
+                            type="button"
+                            title={cl}
+                            aria-label={cl}
+                            onClick={() => setKindColors({ ...kindColors, [key]: ck })}
+                            className={cn(
+                              "h-6 w-6 rounded-full border-2 transition-transform",
+                              kindColors[key] === ck ? "border-ink scale-110" : "border-transparent"
+                            )}
+                            style={{ backgroundColor: hex }}
+                          />
+                        ))}
                       </div>
-                    );
-                  })()
-                )}
+                    </div>
+                  ))}
+                </div>
               </Section>
 
               <Section title="Move history rows per page" hint="How many moves show per page (max 100).">

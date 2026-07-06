@@ -7,7 +7,6 @@ import {
   PageHeader,
   Card,
   Button,
-  Badge,
   Banner,
   Amount,
   Select,
@@ -20,6 +19,7 @@ import {
 } from "../components/ui";
 import { BucketIcon } from "../components/buckets/bucketIcons";
 import { kindLabel } from "../components/buckets/kinds";
+import { KindBadge } from "../components/buckets/tagColors";
 import AccountBucketsPanel from "../components/buckets/AccountBucketsPanel";
 
 // Order an array of {id} by a saved list of ids; anything not listed goes last.
@@ -55,7 +55,7 @@ export default function BucketsPage() {
   const [histMinAmount, setHistMinAmount] = useState("");
   const [histPage, setHistPage] = useState(0);
 
-  const { accountOrder, bucketOrder, moveHistoryPerPage } = useSettings();
+  const { accountOrder, bucketOrder, moveHistoryPerPage, kindColors } = useSettings();
 
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "";
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
@@ -454,10 +454,10 @@ export default function BucketsPage() {
                 </span>
                 <Pencil size={14} className="text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
-              <div className="text-sm text-muted">
-                Bal <Amount value={a.balance} /> · alloc <Amount value={alloc} /> ·{" "}
-                <span className={unalloc < 0 ? "text-danger" : "text-ink"}>
-                  Unalloc <Amount value={unalloc} tone={unalloc < 0 ? "danger" : "default"} />
+              <div className="flex items-center gap-4 text-sm text-muted">
+                <span>Balance <Amount value={a.balance} /></span>
+                <span className={unalloc < 0 ? "text-danger" : undefined}>
+                  Unallocated <Amount value={unalloc} tone={unalloc < 0 ? "danger" : "default"} />
                 </span>
               </div>
             </div>
@@ -472,6 +472,13 @@ export default function BucketsPage() {
                 </tr>
               </THead>
               <tbody>
+                {accBuckets.length === 0 && (
+                  <tr>
+                    <TD colSpan={4} className="text-sm text-muted text-center py-4">
+                      No buckets yet — click the account name to add.
+                    </TD>
+                  </tr>
+                )}
                 {accBuckets.map((b) => (
                   <TR key={b.id}>
                     <TD className="pr-0">
@@ -480,9 +487,9 @@ export default function BucketsPage() {
                     <TD className="text-ink"><span className="block truncate">{b.name}</span></TD>
                     <TD>
                       {b.credit_card_id ? (
-                        <Badge tone="neutral">{cardName(b.credit_card_id)}</Badge>
+                        <KindBadge colorKey={kindColors.card}>{cardName(b.credit_card_id)}</KindBadge>
                       ) : (
-                        <Badge tone="neutral">{kindLabel(b.kind)}</Badge>
+                        <KindBadge colorKey={kindColors[b.kind] || "gray"}>{kindLabel(b.kind)}</KindBadge>
                       )}
                     </TD>
                     <TD align="right">
@@ -490,12 +497,6 @@ export default function BucketsPage() {
                     </TD>
                   </TR>
                 ))}
-                <tr className="border-t border-border">
-                  <TD className="pr-0"></TD>
-                  <TD className="text-xs text-muted">Unallocated</TD>
-                  <TD></TD>
-                  <TD align="right"><Amount value={unalloc} tone={unalloc < 0 ? "danger" : "muted"} /></TD>
-                </tr>
               </tbody>
             </Table>
 
