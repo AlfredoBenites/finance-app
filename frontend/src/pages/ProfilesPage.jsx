@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { profilesApi, sharesApi, bucketsApi } from "../api/client";
 import { writeStatement } from "../statement";
+import { useSettings } from "../settings/SettingsContext";
 import {
   PageHeader,
   Card,
@@ -8,7 +9,6 @@ import {
   Badge,
   Banner,
   Input,
-  Select,
   Table,
   THead,
   TH,
@@ -22,7 +22,7 @@ export default function ProfilesPage() {
   const [buckets, setBuckets] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
-  const [stmtLang, setStmtLang] = useState("en");
+  const { statementLang, setStatementLang } = useSettings();
 
   // Detail panel state (persist the profile through the close animation).
   const [detailId, setDetailId] = useState(null);
@@ -140,7 +140,7 @@ export default function ProfilesPage() {
     try {
       setError(null);
       const s = await profilesApi.statement(detailId);
-      writeStatement(win, s, stmtLang);
+      writeStatement(win, s, statementLang);
     } catch (e) {
       win.close();
       setError(e.message);
@@ -176,15 +176,6 @@ export default function ProfilesPage() {
       <PageHeader
         title="Profiles"
         subtitle="People whose spending you track."
-        actions={
-          <label className="flex items-center gap-2 text-sm text-muted">
-            Statement language
-            <Select value={stmtLang} onChange={(e) => setStmtLang(e.target.value)}>
-              <option value="en">English</option>
-              <option value="es">Español</option>
-            </Select>
-          </label>
-        }
       />
 
       {/* Add form (add only) */}
@@ -245,6 +236,8 @@ export default function ProfilesPage() {
         onSetCashbackTarget={setCashbackTarget}
         onMakePrimary={handleMakePrimary}
         onStatement={downloadStatement}
+        statementLang={statementLang}
+        onSetStatementLang={setStatementLang}
         onDelete={handleDelete}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}

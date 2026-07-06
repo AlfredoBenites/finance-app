@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.auth import get_current_user_id
 from app.database import supabase
 from app.models.bucket import Bucket, BucketCreate, BucketUpdate
+from app.routers.transactions import sync_refunds_paid_back
 from app.services.money_log import log_move
 
 router = APIRouter(prefix="/api/buckets", tags=["buckets"])
@@ -195,6 +196,8 @@ def allocate_reimbursement(payload: AllocateRequest, user_id: str = Depends(get_
         supabase.table("transactions").update(
             {"reimbursement_allocated": True, "is_paid_back": True, "paid_back_date": paid_on}
         ).eq("id", ln["id"]).eq("owner_id", user_id).execute()
+        # Settle any refunds linked to this purchase alongside it.
+        sync_refunds_paid_back(user_id, ln["id"], True, paid_on)
     log_move(user_id, "bucket", amount, f"{src['name']} → {dest['name']} (allocate to card)")
     return {"ok": True, "allocated": float(amount)}
 

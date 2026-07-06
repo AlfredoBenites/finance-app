@@ -1,4 +1,4 @@
-import { SlideOver, StatCard, Button, Amount, Field, Select, Input } from "../ui";
+import { SlideOver, StatCard, Button, Amount, Field, Select, Input, cn } from "../ui";
 
 // One "name … amount" row for the by-card breakdowns.
 function CardRow({ name, children }) {
@@ -37,6 +37,8 @@ export default function ProfileDetailPanel({
   onSetCashbackTarget,
   onMakePrimary,
   onStatement,
+  statementLang,
+  onSetStatementLang,
   onDelete,
   open,
   onClose,
@@ -168,16 +170,37 @@ export default function ProfileDetailPanel({
             )}
           </Section>
 
-          <div className="flex items-center gap-2 border-t border-border pt-4">
-            {!p.is_primary && (
-              <Button variant="primary" onClick={onMakePrimary} title="Mark this profile as you">
-                This is me
+          <div className="border-t border-border pt-4 space-y-3">
+            {/* Remembered statement language (persisted, so no need to re-pick). */}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted">Statement language</span>
+              <div className="inline-flex rounded-md border border-border-strong p-0.5">
+                {[["en", "English"], ["es", "Español"]].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => onSetStatementLang(val)}
+                    className={cn(
+                      "px-2.5 h-7 rounded text-xs transition-colors",
+                      statementLang === val ? "bg-control text-ink font-medium" : "text-muted hover:text-ink"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {!p.is_primary && (
+                <Button variant="primary" onClick={onMakePrimary} title="Mark this profile as you">
+                  This is me
+                </Button>
+              )}
+              <Button onClick={onStatement} title="Open a printable statement (Save as PDF)">
+                Statement
               </Button>
-            )}
-            <Button onClick={onStatement} title="Open a printable statement (Save as PDF)">
-              Statement
-            </Button>
-            <Button variant="danger" onClick={onDelete} className="ml-auto">Delete</Button>
+              <Button variant="danger" onClick={onDelete} className="ml-auto">Delete</Button>
+            </div>
           </div>
         </div>
       )}
