@@ -165,7 +165,7 @@ export default function GroupPurchaseForm({
           ))}
         </div>
         <span className="text-xs text-muted">
-          {mode === "itemized" ? "Tax & discount by order; tip & fees split evenly." : "Whole bill split equally."}
+          {mode === "itemized" ? "Tax, tip, fees & discount split by each order size." : "Whole bill split equally."}
         </span>
       </div>
 

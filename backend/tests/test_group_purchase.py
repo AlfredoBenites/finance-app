@@ -10,16 +10,16 @@ def _owed(shares):
     return {s["profile_id"]: s["owed"] for s in shares}
 
 
-def test_itemized_tax_and_discount_proportional_fees_even():
+def test_itemized_splits_all_shared_costs_proportionally():
     shares = compute_shares(
         mode="itemized", tax="3", tip="6", delivery_fee="0", service_fee="0", discount="0",
         participants=[{"profile_id": "a", "subtotal": "20"}, {"profile_id": "b", "subtotal": "10"}],
         payer_profile_id="a",
     )
     owed = _owed(shares)
-    # A: 20 + 2 tax + 3 tip; B: 10 + 1 tax + 3 tip; sum = grand (30 + 3 + 6 = 39).
-    assert owed["a"] == Decimal("25.00")
-    assert owed["b"] == Decimal("14.00")
+    # shared pool = 9, split by order (2:1): A 20 + 6, B 10 + 3; sum = grand (39).
+    assert owed["a"] == Decimal("26.00")
+    assert owed["b"] == Decimal("13.00")
 
 
 def test_even_split_divides_whole_bill_equally():
@@ -56,9 +56,10 @@ def test_charged_to_aggregates_and_matches_doordash_receipt():
         payer_profile_id="me",
     )
     owed = _owed(shares)
-    assert owed["me"] == Decimal("27.52")  # my share + Bubu's share
-    assert owed["blanki"] == Decimal("14.64")
-    assert owed["vale"] == Decimal("18.13")
+    # All shared costs split by order; my share + Bubu's fold onto me.
+    assert owed["me"] == Decimal("27.12")
+    assert owed["blanki"] == Decimal("14.57")
+    assert owed["vale"] == Decimal("18.60")
     assert "bubu" not in owed  # Bubu's share was charged to me
     assert sum(owed.values()) == Decimal("60.29")  # matches the receipt total
 
@@ -77,9 +78,9 @@ def test_create_group_splits_into_per_profile_charges(api):
     })
     assert resp.status_code == 201
     by_profile = {t["profile_id"]: float(t["amount"]) for t in resp.json()["transactions"]}
-    assert by_profile[me] == -25.0
-    assert by_profile[mom] == -14.0
-    assert api.client.get(f"/api/profiles/{mom}/summary").json()["total_unpaid"] == 14.0
+    assert by_profile[me] == -26.0
+    assert by_profile[mom] == -13.0
+    assert api.client.get(f"/api/profiles/{mom}/summary").json()["total_unpaid"] == 13.0
 
 
 def test_create_group_charged_to_pays_for_someone(api):

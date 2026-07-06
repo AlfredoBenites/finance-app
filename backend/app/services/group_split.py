@@ -2,9 +2,9 @@
 each share is charged to.
 
 Shared costs are entered as amounts (matching a receipt, e.g. DoorDash):
-- "itemized": each person has an order subtotal. Tax and discount are split
-  PROPORTIONALLY to each subtotal (like a rate / an order-wide discount); tip +
-  delivery + service fees are split EVENLY per person.
+- "itemized": each person has an order subtotal, and ALL shared costs (tax, tip,
+  delivery, service, minus discount) are split PROPORTIONALLY to each subtotal —
+  the way DoorDash's receipt-split works (bigger orders pay more of the fees).
 - "even": one subtotal; the whole bill (subtotal + tax + tip + fees - discount) is
   divided EQUALLY among the participants.
 
@@ -40,29 +40,24 @@ def compute_shares(
     if n == 0:
         return []
 
-    tax = _dec(tax)
-    discount = _dec(discount)
-    even_pool = _dec(tip) + _dec(delivery_fee) + _dec(service_fee)
-    even_each = even_pool / n
+    # All shared costs pooled together (discount reduces the pool).
+    shared = _dec(tax) + _dec(tip) + _dec(delivery_fee) + _dec(service_fee) - _dec(discount)
 
     def charged_to(p):
         return p.get("charged_to") or p["profile_id"]
 
     if mode == "even":
         total_sub = _dec(subtotal)
-        grand = total_sub + tax + even_pool - discount
+        grand = total_sub + shared
         per = grand / n
         per_person = [(charged_to(p), per) for p in participants]
-    else:  # itemized
+    else:  # itemized — split the shared pool proportionally to each order
         subs = [_dec(p.get("subtotal")) for p in participants]
         total_sub = sum(subs, Decimal(0))
-        grand = total_sub + tax + even_pool - discount
-        prop_pool = tax - discount  # split proportionally to each order
+        grand = total_sub + shared
         per_person = []
         for p, sub in zip(participants, subs):
-            share = sub + even_each
-            if total_sub > 0:
-                share += (sub / total_sub) * prop_pool
+            share = sub + ((sub / total_sub) * shared if total_sub > 0 else Decimal(0))
             per_person.append((charged_to(p), share))
 
     # Aggregate by who each share is charged to (first-seen order).

@@ -8,28 +8,25 @@ export function computeSplit({ mode, tax, tip, deliveryFee, serviceFee, discount
   const n = participants.length;
   if (!n) return { perPerson: [], charges: [], grand: 0 };
 
-  const t = Number(tax) || 0;
-  const dc = Number(discount) || 0;
-  const evenPool = (Number(tip) || 0) + (Number(deliveryFee) || 0) + (Number(serviceFee) || 0);
-  const evenEach = evenPool / n;
+  const shared =
+    (Number(tax) || 0) + (Number(tip) || 0) + (Number(deliveryFee) || 0) + (Number(serviceFee) || 0) - (Number(discount) || 0);
   const chargedTo = (p) => p.charged_to || p.profile_id;
 
   let grand;
   let perPerson;
   if (mode === "even") {
     const sub = Number(subtotal) || 0;
-    grand = sub + t + evenPool - dc;
+    grand = sub + shared;
     const per = grand / n;
     perPerson = participants.map((p) => ({ profile_id: p.profile_id, charged_to: chargedTo(p), owed: per }));
   } else {
     const subs = participants.map((p) => Number(p.subtotal) || 0);
     const totalSub = subs.reduce((a, b) => a + b, 0);
-    grand = totalSub + t + evenPool - dc;
-    const propPool = t - dc;
+    grand = totalSub + shared;
     perPerson = participants.map((p, i) => ({
       profile_id: p.profile_id,
       charged_to: chargedTo(p),
-      owed: subs[i] + evenEach + (totalSub > 0 ? (subs[i] / totalSub) * propPool : 0),
+      owed: subs[i] + (totalSub > 0 ? (subs[i] / totalSub) * shared : 0),
     }));
   }
 
