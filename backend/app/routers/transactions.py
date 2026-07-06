@@ -1,4 +1,5 @@
 """CRUD + filtering endpoints for transactions. Scoped to the logged-in user."""
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
@@ -17,6 +18,34 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 TABLE = "transactions"
 
 ONE_SOURCE_MSG = "A transaction must have exactly one payment source: a card or an account."
+
+
+def sync_refunds_paid_back(user_id: str, target_id: str, is_paid_back: bool, paid_back_date):
+    """Keep a purchase's linked refunds settled in lockstep with it.
+
+    A refund only offsets debt while its target purchase is still owed; once the
+    purchase is reimbursed/paid, the refund should leave the 'owed' calcs too. So
+    whenever a purchase's is_paid_back flips, its linked refunds follow. This keeps
+    every is_paid_back-based figure (profile summary, statement, dashboard) right.
+    """
+    supabase.table(TABLE).update(
+        {"is_paid_back": is_paid_back, "paid_back_date": paid_back_date}
+    ).eq("owner_id", user_id).eq("refund_for_id", target_id).execute()
+
+
+def _target_paid_state(user_id: str, target_id: str):
+    """(is_paid_back, paid_back_date) of a refund's target purchase, or None."""
+    tgt = (
+        supabase.table(TABLE)
+        .select("is_paid_back, paid_back_date")
+        .eq("id", target_id)
+        .eq("owner_id", user_id)
+        .execute()
+        .data
+    )
+    if not tgt:
+        return None
+    return tgt[0].get("is_paid_back", False), tgt[0].get("paid_back_date")
 
 
 def _first_of_next_month(year: int, month: int) -> str:
@@ -77,6 +106,12 @@ def create_transaction(
     data["owner_id"] = user_id
     cashback = compute_cashback(payload.amount, payload.cashback_rate)
     data["cashback_amount"] = str(cashback) if cashback is not None else None
+    # A refund inherits its target purchase's settled state so it offsets debt
+    # only while that purchase is still owed.
+    if data.get("refund_for_id"):
+        state = _target_paid_state(user_id, data["refund_for_id"])
+        if state is not None:
+            data["is_paid_back"], data["paid_back_date"] = state
     try:
         result = supabase.table(TABLE).insert(data).execute()
     except APIError as e:
@@ -109,6 +144,12 @@ def update_transaction(
     changes = payload.model_dump(mode="json", exclude_unset=True)
     if not changes:
         raise HTTPException(status_code=400, detail="No fields to update")
+
+    # Linking a refund to a purchase: adopt that purchase's settled state.
+    if changes.get("refund_for_id"):
+        state = _target_paid_state(user_id, changes["refund_for_id"])
+        if state is not None:
+            changes["is_paid_back"], changes["paid_back_date"] = state
 
     # If amount or rate changed, recompute cashback using the new values
     # merged with whatever the row currently has.
@@ -145,6 +186,9 @@ def update_transaction(
         raise
     if not result.data:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    # A purchase's paid state changed → keep its linked refunds in lockstep.
+    if "is_paid_back" in changes:
+        sync_refunds_paid_back(user_id, transaction_id, changes["is_paid_back"], changes.get("paid_back_date"))
     return result.data[0]
 
 

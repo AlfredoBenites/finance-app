@@ -58,6 +58,26 @@ def test_linked_refund_nets_against_its_purchase(api):
     assert len(after[0]["transactions"]) == 1
 
 
+def test_linked_refund_settles_with_its_purchase(api):
+    # A refund keeps offsetting debt only while its purchase is owed; when the
+    # purchase is reimbursed, the refund settles too and leaves the owed totals.
+    me, mom, acct, card, moms, payoff = _setup(api)
+    purchase = api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -30,
+                    "profile_id": mom, "credit_card_id": card}).json()["id"]
+    refund = api.client.post("/api/transactions", json={"transaction_date": "2026-06-03", "amount": 8.61,
+                    "profile_id": mom, "credit_card_id": card, "refund_for_id": purchase}).json()["id"]
+    # While the purchase is unpaid, the refund is unpaid too (offsets the debt).
+    assert api.client.get(f"/api/transactions/{refund}").json()["is_paid_back"] is False
+    summary_before = api.client.get(f"/api/profiles/{mom}/summary").json()
+    assert summary_before["total_unpaid"] == 30.0 - 8.61
+
+    # Mark the purchase reimbursed → the refund follows, so neither is left owed.
+    api.client.put(f"/api/transactions/{purchase}", json={"is_paid_back": True})
+    assert api.client.get(f"/api/transactions/{refund}").json()["is_paid_back"] is True
+    summary_after = api.client.get(f"/api/profiles/{mom}/summary").json()
+    assert summary_after["total_unpaid"] == 0.0
+
+
 def test_fully_refunded_purchase_drops_out_of_suggestions(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     purchase = api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -20,
