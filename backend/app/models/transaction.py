@@ -62,6 +62,7 @@ class Transaction(BaseModel):
     paid_to_bank: bool = False
     account_deducted: bool = False
     refund_for_id: Optional[str] = None
+    group_id: Optional[str] = None  # set when this is one line of a split group purchase
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime

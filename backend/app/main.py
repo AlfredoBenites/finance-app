@@ -18,6 +18,7 @@ from app.routers import (
     income,
     profiles,
     shares,
+    transaction_groups,
     transactions,
 )
 
@@ -36,6 +37,7 @@ app.add_middleware(
 app.include_router(profiles.router)
 app.include_router(credit_cards.router)
 app.include_router(transactions.router)
+app.include_router(transaction_groups.router)
 app.include_router(buckets.router)
 app.include_router(accounts.router)
 app.include_router(dashboard.router)
