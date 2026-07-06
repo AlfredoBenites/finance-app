@@ -242,3 +242,12 @@ export const transactionsApi = {
     request(`/api/transactions/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/transactions/${id}`, { method: "DELETE" }),
 };
+
+export const transactionGroupsApi = {
+  create: (data) =>
+    request("/api/transaction-groups", { method: "POST", body: JSON.stringify(data) }),
+  get: (id) => request(`/api/transaction-groups/${id}`),
+  update: (id, data) =>
+    request(`/api/transaction-groups/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  remove: (id) => request(`/api/transaction-groups/${id}`, { method: "DELETE" }),
+};

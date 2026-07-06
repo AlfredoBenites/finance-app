@@ -4,6 +4,7 @@ import {
   creditCardsApi,
   accountsApi,
   transactionsApi,
+  transactionGroupsApi,
   cashbackRulesApi,
   categoriesApi,
   merchantCategoriesApi,
@@ -27,7 +28,9 @@ import {
   TD,
 } from "../components/ui";
 import { useExpenseForm, ExpenseFields, today } from "../components/expenses/ExpenseForm";
+import GroupPurchaseForm from "../components/expenses/GroupPurchaseForm";
 import TransactionDetailPanel from "../components/expenses/TransactionDetailPanel";
+import { Modal } from "../components/ui";
 import { useSettings } from "../settings/SettingsContext";
 
 export default function TransactionsPage() {
@@ -49,6 +52,25 @@ export default function TransactionsPage() {
     setDetailTxn(t);
     setDetailOpen(true);
   };
+  const [groupEdit, setGroupEdit] = useState(null); // { id, data } for the group edit modal
+
+  async function openGroupEdit(groupId) {
+    try {
+      const g = await transactionGroupsApi.get(groupId);
+      setGroupEdit({ id: groupId, data: g.data });
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  async function deleteGroup(groupId) {
+    try {
+      await transactionGroupsApi.remove(groupId);
+      setDetailOpen(false);
+      loadTransactions();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   // Initial filters come from Settings (Expenses → Default filters).
   const { expensesPerPage, expensesFilters } = useSettings();
@@ -274,19 +296,31 @@ export default function TransactionsPage() {
     <div>
       <PageHeader title="Expenses" subtitle="Add, edit, and track your purchases and refunds." />
 
-      {/* Add form */}
+      {/* Add form (swaps to the group calculator when Type = Group purchase) */}
       <Card className="mb-6">
-        <ExpenseFields
-          instance={addForm}
-          profiles={profiles}
-          cards={cards}
-          accounts={accounts}
-          categoryList={categoryList}
-          merchantNames={merchantNames}
-          refundCandidates={transactions}
-          onSubmit={(e) => submit(e, addForm.form, null)}
-          submitLabel="Add expense"
-        />
+        {addForm.form.type === "group" ? (
+          <GroupPurchaseForm
+            profiles={profiles}
+            cards={cards}
+            categoryList={categoryList}
+            primaryId={primaryId}
+            onExitGroup={(t) => addForm.setField("type", t)}
+            onDone={() => { addForm.reset(); loadTransactions(); }}
+            setError={setError}
+          />
+        ) : (
+          <ExpenseFields
+            instance={addForm}
+            profiles={profiles}
+            cards={cards}
+            accounts={accounts}
+            categoryList={categoryList}
+            merchantNames={merchantNames}
+            refundCandidates={transactions}
+            onSubmit={(e) => submit(e, addForm.form, null)}
+            submitLabel="Add expense"
+          />
+        )}
       </Card>
 
       {/* Filters */}
@@ -362,7 +396,12 @@ export default function TransactionsPage() {
                     <TD>
                       <span className="block truncate text-ink font-medium">{t.merchant || "—"}</span>
                     </TD>
-                    <TD><Badge tone={statusTone}>{statusText}</Badge></TD>
+                    <TD>
+                      <span className="inline-flex items-center gap-1 flex-wrap">
+                        <Badge tone={statusTone}>{statusText}</Badge>
+                        {t.group_id && <Badge tone="neutral">Group</Badge>}
+                      </span>
+                    </TD>
                     <TD className="text-ink whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
                     <TD className="text-ink truncate">{sourceName(t)}</TD>
                     <TD align="right">
@@ -404,7 +443,24 @@ export default function TransactionsPage() {
         onEdit={() => startEdit(shownTxn)}
         onTogglePaid={() => togglePaid(shownTxn)}
         onDelete={() => handleDelete(shownTxn.id)}
+        onEditGroup={() => shownTxn?.group_id && openGroupEdit(shownTxn.group_id)}
+        onDeleteGroup={() => shownTxn?.group_id && deleteGroup(shownTxn.group_id)}
       />
+
+      <Modal open={!!groupEdit} onClose={() => setGroupEdit(null)} title="Edit group purchase" width="max-w-3xl">
+        {groupEdit && (
+          <GroupPurchaseForm
+            profiles={profiles}
+            cards={cards}
+            categoryList={categoryList}
+            primaryId={primaryId}
+            groupId={groupEdit.id}
+            initialData={groupEdit.data}
+            onDone={() => { setGroupEdit(null); setDetailOpen(false); loadTransactions(); }}
+            setError={setError}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

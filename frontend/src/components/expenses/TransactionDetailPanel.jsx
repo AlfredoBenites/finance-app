@@ -24,6 +24,8 @@ export default function TransactionDetailPanel({
   onEdit,
   onTogglePaid,
   onDelete,
+  onEditGroup,
+  onDeleteGroup,
   open,
   onClose,
 }) {
@@ -90,6 +92,21 @@ export default function TransactionDetailPanel({
                   <div className="text-sm text-ink bg-surface-muted border border-border rounded-lg px-3 py-2 whitespace-pre-wrap">
                     {t.notes}
                   </div>
+                </div>
+              )}
+
+              {t.group_id && (
+                <div className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm text-ink">Part of a group purchase</span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={onEditGroup}>Edit group</Button>
+                      <Button size="sm" variant="danger" onClick={onDeleteGroup}>Delete group</Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted mt-1">
+                    This is one person's share. Editing or deleting the group affects every line in it.
+                  </p>
                 </div>
               )}
 
