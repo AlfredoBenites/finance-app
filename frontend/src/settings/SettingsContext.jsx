@@ -39,8 +39,8 @@ export function SettingsProvider({ children }) {
   });
   // Income page: rows per page.
   const [incomePerPage, setIncomePerPage] = usePersistedState("settings.incomePerPage", 15);
-  // Profiles: remembered language for the printable statement ("en" | "es").
-  const [statementLang, setStatementLang] = usePersistedState("settings.statementLang", "en");
+  // Profiles: remembered statement language PER profile — { [profileId]: "en" | "es" }.
+  const [statementLangByProfile, setStatementLangByProfile] = usePersistedState("settings.statementLangByProfile", {});
   // Dashboard / insights calculation preferences (moved off the dashboard).
   // hideRepayments defaults ON; onlyMyDebt defaults OFF; cashbackScope "all"
   // shows all cashback, "mine" only your own profile's.
@@ -74,8 +74,8 @@ export function SettingsProvider({ children }) {
     setExpensesFilters,
     incomePerPage,
     setIncomePerPage,
-    statementLang,
-    setStatementLang,
+    statementLangByProfile,
+    setStatementLangByProfile,
     dashboardPrefs,
     setDashboardPrefs,
   };

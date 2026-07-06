@@ -22,7 +22,7 @@ export default function ProfilesPage() {
   const [buckets, setBuckets] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
-  const { statementLang, setStatementLang } = useSettings();
+  const { statementLangByProfile, setStatementLangByProfile } = useSettings();
 
   // Detail panel state (persist the profile through the close animation).
   const [detailId, setDetailId] = useState(null);
@@ -140,7 +140,7 @@ export default function ProfilesPage() {
     try {
       setError(null);
       const s = await profilesApi.statement(detailId);
-      writeStatement(win, s, statementLang);
+      writeStatement(win, s, statementLangByProfile[detailId] || "en");
     } catch (e) {
       win.close();
       setError(e.message);
@@ -170,6 +170,11 @@ export default function ProfilesPage() {
 
   // Keep the panel populated during its exit animation.
   const shown = detailId ? profiles.find((p) => p.id === detailId) || null : null;
+  // Statement language is remembered per profile.
+  const statementLang = (detailId && statementLangByProfile[detailId]) || "en";
+  const setStatementLang = (lang) => {
+    if (detailId) setStatementLangByProfile({ ...statementLangByProfile, [detailId]: lang });
+  };
 
   return (
     <div>
