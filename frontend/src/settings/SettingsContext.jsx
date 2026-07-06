@@ -16,6 +16,19 @@ export function SettingsProvider({ children }) {
   });
   const [cardTxnPageSize, setCardTxnPageSize] = usePersistedState("settings.cardTxnPageSize", 20);
   const [cardOrder, setCardOrder] = usePersistedState("settings.cardOrder", []);
+  // Buckets page display order: accountOrder = array of account ids; bucketOrder
+  // = { [accountId]: [bucketId, ...] } for the buckets within each account.
+  const [accountOrder, setAccountOrder] = usePersistedState("settings.accountOrder", []);
+  const [bucketOrder, setBucketOrder] = usePersistedState("settings.bucketOrder", {});
+  // Buckets page: how many move-history rows show per page (max 100).
+  const [moveHistoryPerPage, setMoveHistoryPerPage] = usePersistedState("settings.moveHistoryPerPage", 25);
+  // Colors for the bucket "kind" tags (keys from tagColors palette).
+  const [kindColors, setKindColors] = usePersistedState("settings.kindColors", {
+    card: "orange",
+    spendable: "green",
+    set_aside: "blue",
+    not_mine: "brown",
+  });
   // Expenses page: rows per page and the default filter values applied on load.
   const [expensesPerPage, setExpensesPerPage] = usePersistedState("settings.expensesPerPage", 15);
   const [expensesFilters, setExpensesFilters] = usePersistedState("settings.expensesFilters", {
@@ -45,6 +58,14 @@ export function SettingsProvider({ children }) {
     setCardTxnPageSize,
     cardOrder,
     setCardOrder,
+    accountOrder,
+    setAccountOrder,
+    bucketOrder,
+    setBucketOrder,
+    moveHistoryPerPage,
+    setMoveHistoryPerPage,
+    kindColors,
+    setKindColors,
     expensesPerPage,
     setExpensesPerPage,
     expensesFilters,

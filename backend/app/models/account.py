@@ -22,6 +22,7 @@ class AccountUpdate(BaseModel):
     balance: Optional[Decimal] = None
     is_asset: Optional[bool] = None
     is_active: Optional[bool] = None
+    show_in_buckets: Optional[bool] = None
 
 
 class Account(BaseModel):
@@ -32,5 +33,7 @@ class Account(BaseModel):
     balance: Decimal
     is_asset: bool
     is_active: bool
+    # When true, the account appears on the Buckets page even with no buckets yet.
+    show_in_buckets: bool = False
     created_at: datetime
     updated_at: datetime

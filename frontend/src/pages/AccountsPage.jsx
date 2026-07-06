@@ -115,6 +115,15 @@ export default function AccountsPage() {
     }
   }
 
+  async function setShowInBuckets(id, val) {
+    try {
+      await accountsApi.update(id, { show_in_buckets: val });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
   const closedAccounts = accounts.filter((a) => a.is_active === false);
 
@@ -186,6 +195,12 @@ export default function AccountsPage() {
           <div className="card" key={a.id}>
             <span>{a.name} · {a.account_type} · {money(a.balance)} · {a.is_asset ? "asset" : "liability"}</span>
             <span style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={() => setShowInBuckets(a.id, !a.show_in_buckets)}
+                title="Show this account on the Buckets page so you can add buckets to it"
+              >
+                {a.show_in_buckets ? "Hide from Buckets" : "Show in Buckets"}
+              </button>
               <button onClick={() => startEdit(a)}>Edit</button>
               <button onClick={() => setClosed(a.id, true)}>Close</button>
               <button className="danger" onClick={() => handleDelete(a.id)}>Delete</button>

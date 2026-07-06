@@ -18,6 +18,8 @@ class BucketCreate(BaseModel):
     is_active: bool = True
     is_completed: bool = False
     kind: str = "set_aside"  # spendable | set_aside | not_mine
+    icon: Optional[str] = None  # lucide icon key
+    color: Optional[str] = None  # color key for the icon
 
 
 class BucketUpdate(BaseModel):
@@ -32,6 +34,8 @@ class BucketUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_completed: Optional[bool] = None
     kind: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
 
 
 class Bucket(BaseModel):
@@ -47,5 +51,7 @@ class Bucket(BaseModel):
     is_active: bool
     is_completed: bool
     kind: str = "set_aside"
+    icon: Optional[str] = None
+    color: Optional[str] = None
     created_at: datetime
     updated_at: datetime

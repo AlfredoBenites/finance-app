@@ -1,26 +1,42 @@
 import { useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import { bucketsApi, accountsApi, creditCardsApi } from "../api/client";
-import { money } from "../format";
+import { useSettings } from "../settings/SettingsContext";
+import { formatDate } from "../format";
+import {
+  PageHeader,
+  Card,
+  Button,
+  Banner,
+  Amount,
+  Select,
+  Input,
+  Table,
+  THead,
+  TH,
+  TR,
+  TD,
+} from "../components/ui";
+import { BucketIcon } from "../components/buckets/bucketIcons";
+import { kindLabel } from "../components/buckets/kinds";
+import { KindBadge } from "../components/buckets/tagColors";
+import AccountBucketsPanel from "../components/buckets/AccountBucketsPanel";
 
-// How a bucket's money flows into net worth / real available money.
-const KINDS = [
-  { value: "spendable", label: "Mine · spendable", hint: "counts in net worth AND real available money" },
-  { value: "set_aside", label: "Mine · set aside", hint: "counts in net worth, NOT in real available money" },
-  { value: "not_mine", label: "Not mine (holding)", hint: "excluded from net worth AND real available money" },
-];
-const kindLabel = (k) => (KINDS.find((x) => x.value === k) || KINDS[1]).label;
+// Order an array of {id} by a saved list of ids; anything not listed goes last.
+function applyOrder(items, order) {
+  const set = new Set(order || []);
+  const byId = Object.fromEntries(items.map((i) => [i.id, i]));
+  const inOrder = (order || []).map((id) => byId[id]).filter(Boolean);
+  const rest = items.filter((i) => !set.has(i.id));
+  return [...inOrder, ...rest];
+}
 
 export default function BucketsPage() {
   const [buckets, setBuckets] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
-  const [newName, setNewName] = useState("");
-  const [newAccount, setNewAccount] = useState("");
-  const [newKind, setNewKind] = useState("set_aside");
   const [moves, setMoves] = useState({}); // accountId -> {from, to, amount}
   const [assign, setAssign] = useState({}); // bucketId -> accountId
-  const [editNames, setEditNames] = useState({}); // bucketId -> name
-  const [editMode, setEditMode] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
   const [allocSel, setAllocSel] = useState({}); // "profile:card" -> {source, dest}
   const [txnSel, setTxnSel] = useState({}); // "profile:card" -> {txnId: checked}
@@ -31,6 +47,15 @@ export default function BucketsPage() {
   const [moveHistory, setMoveHistory] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // Per-account add/edit-buckets panel.
+  const [panelAccountId, setPanelAccountId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  // Move-history filters + pagination.
+  const [histBucket, setHistBucket] = useState(""); // bucket id to filter by (matched by name in the summary)
+  const [histMinAmount, setHistMinAmount] = useState("");
+  const [histPage, setHistPage] = useState(0);
+
+  const { accountOrder, bucketOrder, moveHistoryPerPage, kindColors } = useSettings();
 
   const cardName = (id) => cards.find((c) => c.id === id)?.name ?? "";
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
@@ -58,7 +83,6 @@ export default function BucketsPage() {
         Object.fromEntries((x.transactions || []).map((t) => [t.id, true])),
       ])));
       setIncomeAllocs(inc);
-      setEditNames(Object.fromEntries(b.map((x) => [x.id, x.name])));
     } catch (e) {
       setError(e.message);
     }
@@ -68,25 +92,23 @@ export default function BucketsPage() {
     load();
   }, []);
 
-  const bucketsFor = (accountId) => buckets.filter((b) => b.account_id === accountId);
+  useEffect(() => {
+    setHistPage(0);
+  }, [histBucket, histMinAmount, moveHistoryPerPage]);
+
+  const bucketsFor = (accountId) => applyOrder(buckets.filter((b) => b.account_id === accountId), bucketOrder[accountId]);
   const allocated = (accountId) =>
     bucketsFor(accountId).reduce((s, b) => s + Number(b.current_amount), 0);
   const unassigned = buckets.filter((b) => !b.account_id);
+  // Accounts that hold buckets OR were flagged to show on this page.
+  const visibleAccounts = applyOrder(
+    accounts.filter((a) => a.show_in_buckets || buckets.some((b) => b.account_id === a.id)),
+    accountOrder
+  );
 
-  async function handleCreate(e) {
-    e.preventDefault();
-    if (!newName.trim() || !newAccount) {
-      setError("Bucket name and account are required.");
-      return;
-    }
-    try {
-      await bucketsApi.create({ name: newName.trim(), account_id: newAccount, current_amount: 0, kind: newKind });
-      setNewName("");
-      setError(null);
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
+  function openAccountPanel(a) {
+    setPanelAccountId(a.id);
+    setPanelOpen(true);
   }
 
   async function doMove(accountId) {
@@ -105,46 +127,10 @@ export default function BucketsPage() {
     }
   }
 
-  async function renameBucket(id) {
-    try {
-      await bucketsApi.update(id, { name: (editNames[id] || "").trim() });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function reassignBucket(bucketId, accountId) {
-    try {
-      await bucketsApi.update(bucketId, { account_id: accountId });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function changeKind(bucketId, kind) {
-    try {
-      await bucketsApi.update(bucketId, { kind });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
   async function assignAccount(bucketId) {
     if (!assign[bucketId]) return;
     try {
       await bucketsApi.update(bucketId, { account_id: assign[bucketId] });
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function handleDelete(id) {
-    try {
-      await bucketsApi.remove(id);
       load();
     } catch (e) {
       setError(e.message);
@@ -294,254 +280,340 @@ export default function BucketsPage() {
   const setMove = (accountId, field, value) =>
     setMoves((s) => ({ ...s, [accountId]: { ...s[accountId], [field]: value } }));
 
+  // Move-history filtering (by bucket name in the summary + minimum amount) and pagination.
+  const bucketNameById = (id) => buckets.find((b) => b.id === id)?.name || "";
+  const filteredMoves = moveHistory.filter((m) => {
+    if (histBucket) {
+      const name = bucketNameById(histBucket).toLowerCase();
+      if (name && !(m.summary || "").toLowerCase().includes(name)) return false;
+    }
+    if (histMinAmount && Math.abs(Number(m.amount)) < Number(histMinAmount)) return false;
+    return true;
+  });
+  const histPageSize = moveHistoryPerPage || 25;
+  const histTotal = filteredMoves.length;
+  const histStart = histPage * histPageSize;
+  const histPageItems = filteredMoves.slice(histStart, histStart + histPageSize);
+
+  const panelAccount = accounts.find((a) => a.id === panelAccountId) || null;
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Buckets</h1>
-        <button onClick={() => setEditMode((v) => !v)}>
-          {editMode ? "Done editing" : "Edit buckets"}
-        </button>
-      </div>
-      <p><small>
-        Buckets are envelopes inside a bank account. Each account's balance is the
-        total; move money between buckets (you can't allocate more than the account has).
-      </small></p>
+      <PageHeader
+        title="Buckets"
+        subtitle="Envelopes inside a bank account. Click an account name to add or edit its buckets."
+      />
 
-      <form onSubmit={handleCreate}>
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New bucket name" />
-        <select value={newAccount} onChange={(e) => setNewAccount(e.target.value)}>
-          <option value="">In account…</option>
-          {activeAccounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
-        <select value={newKind} onChange={(e) => setNewKind(e.target.value)} title={KINDS.find((k) => k.value === newKind)?.hint}>
-          {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-        </select>
-        <button type="submit">Add bucket</button>
-      </form>
+      {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
-      {error && <p style={{ color: "#dc2626" }}>Error: {error}</p>}
-
+      {/* Income → bucket suggestions */}
       {incomeAllocs.length > 0 && (
-        <div style={{ textAlign: "right", marginBottom: 4 }}>
-          <button onClick={dismissAllIncome} disabled={busy}>
-            {busy ? "Working…" : "Dismiss all income"}
-          </button>
-        </div>
-      )}
-      {incomeAllocs.map((r) => {
-        const accountBuckets = buckets.filter((b) => b.account_id === r.account_id);
-        return (
-          <div className="card" key={r.income_id} style={{ borderColor: "#16a34a", borderWidth: 2, background: "#f0fdf4", flexWrap: "wrap" }}>
-            <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              Put <strong>{money(r.amount)}</strong> ({r.source}, into {r.account_name}) in bucket
-              <select value={incomeSel[r.income_id] || ""} onChange={(e) => setIncomeSel((s) => ({ ...s, [r.income_id]: e.target.value }))}>
-                <option value="">bucket…</option>
-                <option value="unallocated">Unallocated (just the balance)</option>
-                {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </span>
-            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={() => allocateIncome(r)} disabled={busy}>Allocate</button>
-              <button onClick={() => dismissIncome(r)} disabled={busy} title="Decline this suggestion">✕</button>
-            </span>
+        <section className="mb-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Income to allocate</h2>
+            <Button size="sm" onClick={dismissAllIncome} disabled={busy}>
+              {busy ? "Working…" : "Dismiss all"}
+            </Button>
           </div>
-        );
-      })}
+          {incomeAllocs.map((r) => {
+            const accountBuckets = bucketsFor(r.account_id);
+            return (
+              <Banner tone="success" key={r.income_id}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    Put <strong><Amount value={r.amount} /></strong> ({r.source}, into {r.account_name}) in bucket
+                    <Select value={incomeSel[r.income_id] || ""} onChange={(e) => setIncomeSel((s) => ({ ...s, [r.income_id]: e.target.value }))}>
+                      <option value="">bucket…</option>
+                      <option value="unallocated">Unallocated (just the balance)</option>
+                      {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="green" onClick={() => allocateIncome(r)} disabled={busy}>Allocate</Button>
+                    <Button size="sm" variant="ghost" onClick={() => dismissIncome(r)} disabled={busy} title="Decline this suggestion">✕</Button>
+                  </div>
+                </div>
+              </Banner>
+            );
+          })}
+        </section>
+      )}
 
+      {/* Bank/cash expense → bucket suggestions */}
       {acctExpenses.length > 0 && (
-        <div style={{ textAlign: "right", marginBottom: 4 }}>
-          <button onClick={dismissAllExpenses} disabled={busy}>
-            {busy ? "Working…" : "Dismiss all expenses"}
-          </button>
-        </div>
-      )}
-      {acctExpenses.map((r) => {
-        const accountBuckets = buckets.filter((b) => b.account_id === r.account_id);
-        const isPurchase = Number(r.amount) < 0;
-        return (
-          <div className="card" key={r.transaction_id} style={{ borderColor: "#d97706", borderWidth: 2, background: "#fff7ed", flexWrap: "wrap" }}>
-            <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              {isPurchase ? "Subtract" : "Add"} <strong>{money(Math.abs(Number(r.amount)))}</strong> ({r.merchant || "—"}, from {r.account_name}) {isPurchase ? "from" : "to"}
-              <select value={expenseSel[r.transaction_id] || ""} onChange={(e) => setExpenseSel((s) => ({ ...s, [r.transaction_id]: e.target.value }))}>
-                <option value="">bucket…</option>
-                <option value="unallocated">Unallocated (just the balance)</option>
-                {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </span>
-            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={() => deductExpense(r)} disabled={busy}>Apply</button>
-              <button onClick={() => dismissExpense(r)} disabled={busy} title="Decline this suggestion">✕</button>
-            </span>
+        <section className="mb-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Account expenses to apply</h2>
+            <Button size="sm" onClick={dismissAllExpenses} disabled={busy}>
+              {busy ? "Working…" : "Dismiss all"}
+            </Button>
           </div>
-        );
-      })}
+          {acctExpenses.map((r) => {
+            const accountBuckets = bucketsFor(r.account_id);
+            const isPurchase = Number(r.amount) < 0;
+            return (
+              <Banner tone="orange" key={r.transaction_id}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isPurchase ? "Subtract" : "Add"} <strong><Amount value={Math.abs(Number(r.amount))} /></strong> ({r.merchant || "—"}, from {r.account_name}) {isPurchase ? "from" : "to"}
+                    <Select value={expenseSel[r.transaction_id] || ""} onChange={(e) => setExpenseSel((s) => ({ ...s, [r.transaction_id]: e.target.value }))}>
+                      <option value="">bucket…</option>
+                      <option value="unallocated">Unallocated (just the balance)</option>
+                      {accountBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="primary" onClick={() => deductExpense(r)} disabled={busy}>Apply</Button>
+                    <Button size="sm" variant="ghost" onClick={() => dismissExpense(r)} disabled={busy} title="Decline this suggestion">✕</Button>
+                  </div>
+                </div>
+              </Banner>
+            );
+          })}
+        </section>
+      )}
 
+      {/* Reimbursement / set-aside suggestions */}
       {reimbursements.length > 0 && (
-        <div style={{ textAlign: "right", marginBottom: 4 }}>
-          <button onClick={dismissAll} disabled={busy}>
-            {busy ? "Working…" : "Dismiss all suggestions"}
-          </button>
-        </div>
-      )}
-      {reimbursements.map((r) => {
-        const key = `${r.profile_id}:${r.credit_card_id}`;
-        const sel = allocSel[key] || { source: r.source_bucket_id || "", dest: r.dest_bucket_id || "" };
-        const setSel = (field, value) => setAllocSel((s) => ({ ...s, [key]: { ...sel, [field]: value } }));
-        const lines = r.transactions || [];
-        const picked = txnSel[key] || {};
-        const chosen = lines.filter((t) => picked[t.id]);
-        const selAmount = chosen.reduce((s, t) => s - Number(t.amount), 0);
-        const toggleTxn = (id) => setTxnSel((s) => ({ ...s, [key]: { ...s[key], [id]: !s[key]?.[id] } }));
-        return (
-          <div className="card" key={key} style={{ borderColor: "#2563eb", borderWidth: 2, background: "#eff6ff", flexWrap: "wrap" }}>
-            <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              {r.own ? "Set aside" : "Move"} <strong>{money(selAmount)}</strong> ({r.profile_name}'s {r.card_name}) from
-              <select value={sel.source} onChange={(e) => setSel("source", e.target.value)}>
-                <option value="">bucket…</option>
-                {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-              to
-              <select value={sel.dest} onChange={(e) => setSel("dest", e.target.value)}>
-                <option value="">bucket…</option>
-                {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </span>
-            <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={() => allocate(r, sel, chosen.map((t) => t.id))} disabled={busy || chosen.length === 0}>Allocate</button>
-              <button onClick={() => dismiss(r)} disabled={busy} title="Decline this suggestion">✕</button>
-            </span>
-            {lines.length > 0 && (
-              <details style={{ flexBasis: "100%", marginTop: 6 }}>
-                <summary style={{ cursor: "pointer", fontSize: 13, color: "#1e3a8a" }}>
-                  {chosen.length} of {lines.length} transaction{lines.length === 1 ? "" : "s"} selected
-                </summary>
-                <ul style={{ margin: "6px 0 0", paddingLeft: 4, fontSize: 13, listStyle: "none" }}>
-                  {lines.map((t) => (
-                    <li key={t.id}>
-                      <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <input type="checkbox" checked={!!picked[t.id]} onChange={() => toggleTxn(t.id)} />
-                        {t.transaction_date} · {t.merchant || "—"} · <strong>{money(-t.amount)}</strong>
-                        {t.notes ? ` · ${t.notes}` : ""}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
+        <section className="mb-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Reimbursement suggestions</h2>
+            <Button size="sm" onClick={dismissAll} disabled={busy}>
+              {busy ? "Working…" : "Dismiss all"}
+            </Button>
           </div>
-        );
-      })}
+          {reimbursements.map((r) => {
+            const key = `${r.profile_id}:${r.credit_card_id}`;
+            const sel = allocSel[key] || { source: r.source_bucket_id || "", dest: r.dest_bucket_id || "" };
+            const setSel = (field, value) => setAllocSel((s) => ({ ...s, [key]: { ...sel, [field]: value } }));
+            const lines = r.transactions || [];
+            const picked = txnSel[key] || {};
+            const chosen = lines.filter((t) => picked[t.id]);
+            const selAmount = chosen.reduce((s, t) => s - Number(t.amount), 0);
+            const toggleTxn = (id) => setTxnSel((s) => ({ ...s, [key]: { ...s[key], [id]: !s[key]?.[id] } }));
+            return (
+              <Banner tone="info" key={key}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {r.own ? "Set aside" : "Move"} <strong><Amount value={selAmount} /></strong> ({r.profile_name}'s {r.card_name}) from
+                    <Select value={sel.source} onChange={(e) => setSel("source", e.target.value)}>
+                      <option value="">bucket…</option>
+                      {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </Select>
+                    to
+                    <Select value={sel.dest} onChange={(e) => setSel("dest", e.target.value)}>
+                      <option value="">bucket…</option>
+                      {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="primary" onClick={() => allocate(r, sel, chosen.map((t) => t.id))} disabled={busy || chosen.length === 0}>Allocate</Button>
+                    <Button size="sm" variant="ghost" onClick={() => dismiss(r)} disabled={busy} title="Decline this suggestion">✕</Button>
+                  </div>
+                </div>
+                {lines.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-info">
+                      {chosen.length} of {lines.length} transaction{lines.length === 1 ? "" : "s"} selected
+                    </summary>
+                    <ul className="mt-1.5 space-y-1 text-xs">
+                      {lines.map((t) => (
+                        <li key={t.id}>
+                          <label className="flex items-center gap-2">
+                            <input type="checkbox" className="h-4 w-4 accent-green" checked={!!picked[t.id]} onChange={() => toggleTxn(t.id)} />
+                            <span className="text-ink">{t.transaction_date} · {t.merchant || "—"} · <strong><Amount value={-t.amount} /></strong>{t.notes ? ` · ${t.notes}` : ""}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </Banner>
+            );
+          })}
+        </section>
+      )}
 
-      {accounts.map((a) => {
+      {/* Accounts and their buckets — one per row. Click a name to add/edit buckets. */}
+      {visibleAccounts.map((a) => {
         const accBuckets = bucketsFor(a.id);
-        if (accBuckets.length === 0) return null;
         const alloc = allocated(a.id);
         const unalloc = Math.round((Number(a.balance) - alloc) * 100) / 100;
         const m = moves[a.id] || {};
         const options = [{ id: "unallocated", name: "Unallocated" }, ...accBuckets];
         return (
-          <div key={a.id} style={{ marginTop: 20 }}>
-            <h2>{a.name}{a.is_active === false ? " (closed)" : ""}</h2>
-            {!editMode && (
-              <div className="card">
-                <span>Balance {money(a.balance)} · allocated {money(alloc)}</span>
-                <strong style={unalloc < 0 ? { color: "#dc2626" } : undefined}>
-                  Unallocated {money(unalloc)}
-                </strong>
+          <section key={a.id} className="mb-6">
+            <div className="flex items-baseline justify-between gap-3 mb-2 flex-wrap">
+              <button
+                onClick={() => openAccountPanel(a)}
+                title="Add or edit buckets"
+                className="group inline-flex items-center gap-1.5 text-lg font-semibold text-ink hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+              >
+                <span className="group-hover:underline underline-offset-4 decoration-accent">
+                  {a.name}{a.is_active === false ? " (closed)" : ""}
+                </span>
+                <Pencil size={14} className="text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+              <div className="flex items-center gap-4 text-sm text-muted">
+                <span>Balance <Amount value={a.balance} /></span>
+                <span className={unalloc < 0 ? "text-danger" : undefined}>
+                  Unallocated <Amount value={unalloc} tone={unalloc < 0 ? "danger" : "default"} />
+                </span>
               </div>
-            )}
-            {accBuckets.map((b) =>
-              editMode ? (
-                <div className="card" key={b.id}>
-                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      value={editNames[b.id] ?? ""}
-                      onChange={(e) => setEditNames((s) => ({ ...s, [b.id]: e.target.value }))}
-                    />
-                    <button onClick={() => renameBucket(b.id)}>Rename</button>
-                  </span>
-                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    {!b.credit_card_id && (
-                      <select value={b.kind || "set_aside"} title={KINDS.find((k) => k.value === (b.kind || "set_aside"))?.hint}
-                        onChange={(e) => changeKind(b.id, e.target.value)}>
-                        {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                      </select>
-                    )}
-                    <select value={a.id} title="Move to account" onChange={(e) => reassignBucket(b.id, e.target.value)}>
-                      {activeAccounts.concat(a.is_active === false ? [a] : []).map((acc) => (
-                        <option key={acc.id} value={acc.id}>{acc.name}</option>
-                      ))}
-                    </select>
-                    <button className="danger" onClick={() => handleDelete(b.id)}>Delete</button>
-                  </span>
-                </div>
-              ) : (
-                <div className="card" key={b.id}>
-                  <span>
-                    {b.name}
-                    {b.credit_card_id
-                      ? ` · 💳 ${cardName(b.credit_card_id)}`
-                      : b.kind && b.kind !== "set_aside" ? ` · ${kindLabel(b.kind)}` : ""}
-                  </span>
-                  <strong>{money(b.current_amount)}</strong>
-                </div>
-              )
-            )}
-            {!editMode && (
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0 0 16px" }}>
-                <small>Move</small>
-                <select value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
+            </div>
+
+            <Table>
+              <THead>
+                <tr>
+                  <TH className="w-8"></TH>
+                  <TH>Bucket</TH>
+                  <TH>Kind</TH>
+                  <TH align="right">Amount</TH>
+                </tr>
+              </THead>
+              <tbody>
+                {accBuckets.length === 0 && (
+                  <tr>
+                    <TD colSpan={4} className="text-sm text-muted text-center py-4">
+                      No buckets yet — click the account name to add.
+                    </TD>
+                  </tr>
+                )}
+                {accBuckets.map((b) => (
+                  <TR key={b.id}>
+                    <TD className="pr-0">
+                      <BucketIcon icon={b.icon || (b.credit_card_id ? "credit-card" : undefined)} color={b.color} />
+                    </TD>
+                    <TD className="text-ink"><span className="block truncate">{b.name}</span></TD>
+                    <TD>
+                      {b.credit_card_id ? (
+                        <KindBadge colorKey={kindColors.card}>{cardName(b.credit_card_id)}</KindBadge>
+                      ) : (
+                        <KindBadge colorKey={kindColors[b.kind] || "gray"}>{kindLabel(b.kind)}</KindBadge>
+                      )}
+                    </TD>
+                    <TD align="right">
+                      <strong className="text-ink"><Amount value={b.current_amount} /></strong>
+                    </TD>
+                  </TR>
+                ))}
+              </tbody>
+            </Table>
+
+            {accBuckets.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap mt-2 pl-1">
+                <span className="text-xs text-muted">Move</span>
+                <Select value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
                   <option value="">From…</option>
                   {options.filter((o) => o.id !== m.to).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-                <select value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
+                </Select>
+                <Select value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
                   <option value="">To…</option>
                   {options.filter((o) => o.id !== m.from).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-                <input type="number" step="0.01" placeholder="$" style={{ width: 90 }}
+                </Select>
+                <Input type="number" step="0.01" placeholder="$" className="w-24"
                   value={m.amount || ""} onChange={(e) => setMove(a.id, "amount", e.target.value)} />
-                <button onClick={() => doMove(a.id)}>Move</button>
+                <Button size="sm" onClick={() => doMove(a.id)}>Move</Button>
               </div>
             )}
-          </div>
+          </section>
         );
       })}
 
+      {/* Buckets not yet assigned to an account */}
       {unassigned.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <h2>Unassigned buckets</h2>
-          <p><small>Assign each to the account where the money is kept.</small></p>
-          {unassigned.map((b) => (
-            <div className="card" key={b.id}>
-              <span>
-                {b.name}
-                {b.credit_card_id ? ` · 💳 ${cardName(b.credit_card_id)}` : ""} · {money(b.current_amount)}
-              </span>
-              <span style={{ display: "flex", gap: 6 }}>
-                <select value={assign[b.id] || ""} onChange={(e) => setAssign((s) => ({ ...s, [b.id]: e.target.value }))}>
-                  <option value="">Account…</option>
-                  {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-                <button onClick={() => assignAccount(b.id)}>Assign</button>
-              </span>
-            </div>
-          ))}
-        </div>
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-1">Unassigned buckets</h2>
+          <p className="text-sm text-muted mb-2">Assign each to the account where the money is kept.</p>
+          <Card padded={false} className="divide-y divide-border">
+            {unassigned.map((b) => (
+              <div className="flex items-center justify-between gap-3 px-4 py-2.5 flex-wrap" key={b.id}>
+                <span className="flex items-center gap-2 min-w-0">
+                  <BucketIcon icon={b.icon || (b.credit_card_id ? "credit-card" : undefined)} color={b.color} />
+                  <span className="text-ink truncate">{b.name}</span>
+                  <span className="text-muted"><Amount value={b.current_amount} /></span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <Select value={assign[b.id] || ""} onChange={(e) => setAssign((s) => ({ ...s, [b.id]: e.target.value }))}>
+                    <option value="">Account…</option>
+                    {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </Select>
+                  <Button size="sm" onClick={() => assignAccount(b.id)}>Assign</Button>
+                </span>
+              </div>
+            ))}
+          </Card>
+        </section>
       )}
 
+      {/* Move history */}
       {moveHistory.length > 0 && (
-        <div style={{ marginTop: 20 }}>
-          <h2>Move history</h2>
-          {moveHistory.map((m) => (
-            <div className="card" key={m.id}>
-              <span><small>{(m.created_at || "").slice(0, 10)} · {m.summary}</small></span>
-              <strong>{money(m.amount)}</strong>
-            </div>
-          ))}
-        </div>
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-2">Move history</h2>
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <Select value={histBucket} onChange={(e) => setHistBucket(e.target.value)}>
+              <option value="">All buckets</option>
+              {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Min $"
+              className="w-28"
+              value={histMinAmount}
+              onChange={(e) => setHistMinAmount(e.target.value)}
+            />
+          </div>
+
+          {histTotal === 0 ? (
+            <p className="text-muted text-sm">No moves match.</p>
+          ) : (
+            <>
+              <Table className="table-fixed min-w-[32rem]">
+                <THead>
+                  <tr>
+                    <TH className="w-[22%]">Date</TH>
+                    <TH className="w-[58%]">Summary</TH>
+                    <TH align="right" className="w-[20%]">Amount</TH>
+                  </tr>
+                </THead>
+                <tbody>
+                  {histPageItems.map((m) => (
+                    <TR key={m.id}>
+                      <TD className="text-ink whitespace-nowrap">{formatDate(m.created_at)}</TD>
+                      <TD className="text-muted"><span className="block truncate" title={m.summary}>{m.summary}</span></TD>
+                      <TD align="right"><strong className="text-ink"><Amount value={m.amount} /></strong></TD>
+                    </TR>
+                  ))}
+                </tbody>
+              </Table>
+
+              {histTotal > histPageSize && (
+                <div className="flex items-center justify-between gap-3 mt-3 text-sm">
+                  <span className="text-muted">
+                    {histStart + 1}–{Math.min(histStart + histPageSize, histTotal)} of {histTotal}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" onClick={() => setHistPage((p) => p - 1)} disabled={histPage === 0}>Prev</Button>
+                    <Button size="sm" onClick={() => setHistPage((p) => p + 1)} disabled={histStart + histPageSize >= histTotal}>Next</Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       )}
+
+      <AccountBucketsPanel
+        account={panelAccount}
+        buckets={panelAccount ? bucketsFor(panelAccount.id) : []}
+        accounts={accounts}
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onChanged={load}
+        onError={setError}
+      />
     </div>
   );
 }

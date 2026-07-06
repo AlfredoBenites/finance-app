@@ -5,18 +5,22 @@ import {
   CreditCard,
   Receipt,
   Banknote,
+  PiggyBank,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  ChevronRight,
 } from "lucide-react";
 import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
+import { KindBadge, TAG_COLORS } from "./buckets/tagColors";
 import { useSettings } from "../settings/SettingsContext";
 import { YEARS } from "../components/YearSelect";
-import { profilesApi, creditCardsApi, accountsApi } from "../api/client";
+import { profilesApi, creditCardsApi, accountsApi, bucketsApi } from "../api/client";
 
 const CATEGORIES = [
   ["dashboard", "Dashboard", LayoutDashboard],
   ["insights", "Insights", PieChart],
   ["cards", "Credit Cards", CreditCard],
+  ["buckets", "Buckets", PiggyBank],
   ["expenses", "Expenses", Receipt],
   ["income", "Income", Banknote],
 ];
@@ -90,6 +94,12 @@ export default function SettingsModal() {
     setCardTxnPageSize,
     cardOrder,
     setCardOrder,
+    accountOrder,
+    setAccountOrder,
+    moveHistoryPerPage,
+    setMoveHistoryPerPage,
+    kindColors,
+    setKindColors,
     expensesPerPage,
     setExpensesPerPage,
     expensesFilters,
@@ -106,16 +116,24 @@ export default function SettingsModal() {
   const [profiles, setProfiles] = useState([]);
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [buckets, setBuckets] = useState([]);
+  const [acctOrderOpen, setAcctOrderOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     profilesApi.list().then(setProfiles).catch(() => {});
     creditCardsApi.list().then((cs) => setCards(cs.filter((c) => c.is_active !== false))).catch(() => {});
     accountsApi.list().then(setAccounts).catch(() => {});
+    bucketsApi.list().then(setBuckets).catch(() => {});
   }, [isOpen]);
 
   const orderedProfiles = useMemo(() => applyOrder(profiles, profileSort.order), [profiles, profileSort.order]);
   const orderedCards = useMemo(() => applyOrder(cards, cardOrder), [cards, cardOrder]);
+  // Accounts that actually hold buckets, in the saved display order.
+  const bucketAccounts = useMemo(
+    () => applyOrder(accounts.filter((a) => buckets.some((b) => b.account_id === a.id)), accountOrder),
+    [accounts, buckets, accountOrder]
+  );
 
   function setMode(mode) {
     if (mode === "custom") {
@@ -274,6 +292,92 @@ export default function SettingsModal() {
                 />
               )}
             </Section>
+          )}
+
+          {tab === "buckets" && (
+            <>
+              {/* Account Order — collapsible so the list only shows when wanted. */}
+              <section className="py-4 first:pt-0 border-b border-border">
+                <button
+                  onClick={() => setAcctOrderOpen((o) => !o)}
+                  className="flex items-center gap-1.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+                >
+                  <ChevronRight size={16} className={cn("text-muted transition-transform", acctOrderOpen && "rotate-90")} />
+                  <h3 className="font-medium text-ink">Account Order</h3>
+                </button>
+                <p className="text-xs text-muted mt-0.5 ml-[22px]">
+                  Drag to set the order accounts appear on the Buckets page.
+                </p>
+                {acctOrderOpen && (
+                  <div className="mt-3 ml-[22px]">
+                    {bucketAccounts.length === 0 ? (
+                      <p className="text-sm text-muted">No accounts with buckets yet.</p>
+                    ) : (
+                      <ReorderList
+                        items={bucketAccounts}
+                        onReorder={(next) => setAccountOrder(next.map((a) => a.id))}
+                        renderLabel={(a) => a.name}
+                      />
+                    )}
+                  </div>
+                )}
+              </section>
+
+              <Section title="Kind tag colors" hint="Colors for the bucket kind tags on the Buckets page. (Bucket order now lives in each account's panel.)">
+                <div className="space-y-3">
+                  {[
+                    ["card", "Credit card"],
+                    ["spendable", "Mine › Spendable"],
+                    ["set_aside", "Mine › Set Aside"],
+                    ["not_mine", "Not Mine › Holding"],
+                  ].map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between gap-3 flex-wrap">
+                      <KindBadge colorKey={kindColors[key]}>{label}</KindBadge>
+                      <div className="flex flex-wrap gap-1.5">
+                        {TAG_COLORS.map(([ck, cl, hex]) => (
+                          <button
+                            key={ck}
+                            type="button"
+                            title={cl}
+                            aria-label={cl}
+                            onClick={() => setKindColors({ ...kindColors, [key]: ck })}
+                            className={cn(
+                              "h-6 w-6 rounded-full border-2 transition-transform",
+                              kindColors[key] === ck ? "border-ink scale-110" : "border-transparent"
+                            )}
+                            style={{ backgroundColor: hex }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              <Section title="Move history rows per page" hint="How many moves show per page (max 100).">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[15, 25, 50].map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={moveHistoryPerPage === n ? "primary" : "secondary"}
+                      onClick={() => setMoveHistoryPerPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <span className="text-sm text-muted ml-1">Custom:</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={moveHistoryPerPage}
+                    onChange={(e) => setMoveHistoryPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                    className="w-20"
+                  />
+                </div>
+              </Section>
+            </>
           )}
 
           {tab === "expenses" && (
