@@ -11,6 +11,7 @@ import {
   Amount,
   Select,
   Input,
+  AmountInput,
   Table,
   THead,
   TH,
@@ -509,16 +510,15 @@ export default function BucketsPage() {
             {accBuckets.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap mt-2 pl-1">
                 <span className="text-sm text-muted">Move</span>
-                <Select className="w-40 truncate" value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
+                <Select className="w-52 truncate" value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
                   <option value="">From…</option>
                   {options.filter((o) => o.id !== m.to).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </Select>
-                <Select className="w-40 truncate" value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
+                <Select className="w-52 truncate" value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
                   <option value="">To…</option>
                   {options.filter((o) => o.id !== m.from).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </Select>
-                <Input type="number" step="0.01" placeholder="$" className="w-24"
-                  value={m.amount || ""} onChange={(e) => setMove(a.id, "amount", e.target.value)} />
+                <AmountInput className="w-32" value={m.amount || ""} onChange={(v) => setMove(a.id, "amount", v)} />
                 <Button size="sm" onClick={() => doMove(a.id)}>Move</Button>
               </div>
             )}
