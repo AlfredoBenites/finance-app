@@ -36,6 +36,37 @@ def test_suggests_own_and_others_paid_charges(api):
     assert by_profile["Mom"]["transactions"][0]["amount"] == -100.0
 
 
+def test_linked_refund_nets_against_its_purchase(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    purchase = api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -33.81,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True}).json()["id"]
+    # Before any refund, the suggestion moves the full charge.
+    before = api.client.get("/api/buckets/reimbursements").json()
+    assert before[0]["amount"] == 33.81
+
+    # A $10 refund linked to that purchase nets it down to $23.81.
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-05", "amount": 10,
+                    "profile_id": mom, "credit_card_id": card, "refund_for_id": purchase})
+    after = api.client.get("/api/buckets/reimbursements").json()
+    assert len(after) == 1
+    assert round(after[0]["amount"], 2) == 23.81
+    # The line reflects the net amount (so the checklist + allocate math match) and reports the refund.
+    line = after[0]["transactions"][0]
+    assert round(line["amount"], 2) == -23.81
+    assert round(line["refunded"], 2) == 10.0
+    # The refund itself is not a separate suggestion line.
+    assert len(after[0]["transactions"]) == 1
+
+
+def test_fully_refunded_purchase_drops_out_of_suggestions(api):
+    me, mom, acct, card, moms, payoff = _setup(api)
+    purchase = api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -20,
+                    "profile_id": mom, "credit_card_id": card, "is_paid_back": True}).json()["id"]
+    api.client.post("/api/transactions", json={"transaction_date": "2026-06-06", "amount": 20,
+                    "profile_id": mom, "credit_card_id": card, "refund_for_id": purchase})
+    assert api.client.get("/api/buckets/reimbursements").json() == []
+
+
 def test_allocate_moves_source_to_dest_and_clears(api):
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -100,

@@ -53,15 +53,24 @@ def _allocation_groups(user_id: str):
         supabase.table("transactions")
         .select(
             "id, amount, credit_card_id, profile_id, reimbursement_allocated, "
-            "is_paid_back, paid_to_bank, merchant, transaction_date, category, notes"
+            "is_paid_back, paid_to_bank, merchant, transaction_date, category, notes, refund_for_id"
         )
         .eq("owner_id", user_id)
         .order("transaction_date")
         .execute()
         .data
     )
+    # Sum linked refunds by the purchase they offset (refund amounts are positive).
+    refund_by_target: dict[str, Decimal] = {}
+    for t in txns:
+        tgt = t.get("refund_for_id")
+        if tgt:
+            refund_by_target[tgt] = refund_by_target.get(tgt, Decimal("0")) + Decimal(str(t["amount"]))
+
     groups: dict[tuple, dict] = {}
     for t in txns:
+        if t.get("refund_for_id"):
+            continue  # a linked refund is netted into its target purchase, not its own line
         if not t.get("credit_card_id") or t.get("reimbursement_allocated"):
             continue
         is_own = t["profile_id"] == primary_id
@@ -70,17 +79,23 @@ def _allocation_groups(user_id: str):
                 continue  # already paid to the bank — nothing to set aside
         elif not t.get("is_paid_back"):
             continue  # others' charges: only once they've reimbursed you
+        amt = Decimal(str(t["amount"]))  # purchases are negative
+        refunded = refund_by_target.get(t["id"], Decimal("0"))  # positive
+        net_amt = amt + refunded  # e.g. -33.81 + 10 = -23.81
+        owed = -net_amt  # positive amount still to set aside
+        if owed <= 0:
+            continue  # fully refunded — nothing to set aside
         key = (t["profile_id"], t["credit_card_id"])
         g = groups.setdefault(key, {"total": Decimal("0"), "lines": [], "own": is_own})
-        amt = Decimal(str(t["amount"]))
-        g["total"] += -amt  # purchases are negative; owed is positive
+        g["total"] += owed
         g["lines"].append({
             "id": t["id"],
             "transaction_date": t["transaction_date"],
             "merchant": t.get("merchant"),
             "category": t.get("category"),
             "notes": t.get("notes"),
-            "amount": float(amt),
+            "amount": float(net_amt),  # net of refunds, so the checklist + allocate math match
+            "refunded": float(refunded),  # how much refund was netted out (for display)
         })
     return {k: v for k, v in groups.items() if v["total"] > 0}
 
