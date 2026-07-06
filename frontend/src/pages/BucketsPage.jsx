@@ -53,6 +53,7 @@ export default function BucketsPage() {
   // Move-history filters + pagination.
   const [histBucket, setHistBucket] = useState(""); // bucket id to filter by (matched by name in the summary)
   const [histMinAmount, setHistMinAmount] = useState("");
+  const [histMaxAmount, setHistMaxAmount] = useState("");
   const [histPage, setHistPage] = useState(0);
 
   const { accountOrder, bucketOrder, moveHistoryPerPage, kindColors } = useSettings();
@@ -94,7 +95,7 @@ export default function BucketsPage() {
 
   useEffect(() => {
     setHistPage(0);
-  }, [histBucket, histMinAmount, moveHistoryPerPage]);
+  }, [histBucket, histMinAmount, histMaxAmount, moveHistoryPerPage]);
 
   const bucketsFor = (accountId) => applyOrder(buckets.filter((b) => b.account_id === accountId), bucketOrder[accountId]);
   const allocated = (accountId) =>
@@ -288,6 +289,7 @@ export default function BucketsPage() {
       if (name && !(m.summary || "").toLowerCase().includes(name)) return false;
     }
     if (histMinAmount && Math.abs(Number(m.amount)) < Number(histMinAmount)) return false;
+    if (histMaxAmount && Math.abs(Number(m.amount)) > Number(histMaxAmount)) return false;
     return true;
   });
   const histPageSize = moveHistoryPerPage || 25;
@@ -466,13 +468,13 @@ export default function BucketsPage() {
               </div>
             </div>
 
-            <Table>
+            <Table className="table-fixed">
               <THead>
                 <tr>
-                  <TH className="w-8"></TH>
-                  <TH>Bucket</TH>
-                  <TH>Kind</TH>
-                  <TH align="right">Amount</TH>
+                  <TH className="w-10"></TH>
+                  <TH className="w-[44%]">Bucket</TH>
+                  <TH className="w-[32%]">Kind</TH>
+                  <TH align="right" className="w-[24%]">Amount</TH>
                 </tr>
               </THead>
               <tbody>
@@ -506,12 +508,12 @@ export default function BucketsPage() {
 
             {accBuckets.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap mt-2 pl-1">
-                <span className="text-xs text-muted">Move</span>
-                <Select value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
+                <span className="text-sm text-muted">Move</span>
+                <Select className="w-40 truncate" value={m.from || ""} onChange={(e) => setMove(a.id, "from", e.target.value)}>
                   <option value="">From…</option>
                   {options.filter((o) => o.id !== m.to).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </Select>
-                <Select value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
+                <Select className="w-40 truncate" value={m.to || ""} onChange={(e) => setMove(a.id, "to", e.target.value)}>
                   <option value="">To…</option>
                   {options.filter((o) => o.id !== m.from).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </Select>
@@ -567,6 +569,15 @@ export default function BucketsPage() {
               className="w-28"
               value={histMinAmount}
               onChange={(e) => setHistMinAmount(e.target.value)}
+            />
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Max $"
+              className="w-28"
+              value={histMaxAmount}
+              onChange={(e) => setHistMaxAmount(e.target.value)}
             />
           </div>
 
