@@ -144,6 +144,7 @@ export default function TransactionsPage() {
       profile_id: t.profile_id,
       paymentSource: t.credit_card_id ? `card:${t.credit_card_id}` : `account:${t.account_id}`,
       cashbackPct: t.cashback_rate != null ? String(Number(t.cashback_rate) * 100) : "",
+      refund_for_id: t.refund_for_id ?? null,
       notes: t.notes ?? "",
     });
   }
@@ -170,6 +171,8 @@ export default function TransactionsPage() {
       credit_card_id: isCard ? sourceId : null,
       account_id: isCard ? null : sourceId,
       cashback_rate: rate,
+      // Only a card refund can be linked to a purchase it offsets.
+      refund_for_id: form.type === "refund" && isCard ? form.refund_for_id || null : null,
       notes: form.notes.trim() || null,
     };
     try {
@@ -259,6 +262,7 @@ export default function TransactionsPage() {
       accounts={accounts}
       categoryList={categoryList}
       merchantNames={merchantNames}
+      refundCandidates={transactions.filter((t) => t.id !== shownTxn.id)}
       onSubmit={(e) => submit(e, editForm.form, shownTxn.id)}
       onCancel={() => setEditingId(null)}
       submitLabel="Save changes"
@@ -279,6 +283,7 @@ export default function TransactionsPage() {
           accounts={accounts}
           categoryList={categoryList}
           merchantNames={merchantNames}
+          refundCandidates={transactions}
           onSubmit={(e) => submit(e, addForm.form, null)}
           submitLabel="Add expense"
         />

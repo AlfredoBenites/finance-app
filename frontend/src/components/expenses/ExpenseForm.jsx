@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Field, Select, Input, Textarea, DateInput, AmountInput, Autocomplete, cn } from "../ui";
 import { todayLocal } from "../../format";
+import RefundPicker from "./RefundPicker";
 
 export const ADD_NEW = "__add_new__";
 export const today = todayLocal;
@@ -13,6 +14,7 @@ export const EMPTY_FORM = {
   profile_id: "",
   paymentSource: "", // "card:<id>" or "account:<id>"
   cashbackPct: "",
+  refund_for_id: null, // when type === "refund", the purchase it offsets
   notes: "",
 };
 
@@ -82,6 +84,7 @@ export function ExpenseFields({
   accounts,
   categoryList,
   merchantNames,
+  refundCandidates = [],
   onSubmit,
   onCancel,
   submitLabel,
@@ -90,6 +93,13 @@ export function ExpenseFields({
   const { form, setField, onSourceChange, onCategorySelect, onMerchantChange } = instance;
   const isCard = form.paymentSource.startsWith("card:");
   const fullWidth = panel ? "col-span-2" : "sm:col-span-2 lg:col-span-3";
+  // Same card's purchases, most recent first, as candidates for a refund link.
+  const refundCardId = isCard ? form.paymentSource.slice(5) : null;
+  const refundOptions = refundCardId
+    ? refundCandidates
+        .filter((t) => t.credit_card_id === refundCardId && Number(t.amount) < 0)
+        .sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : -1))
+    : [];
   return (
     <form
       onSubmit={onSubmit}
@@ -111,7 +121,13 @@ export function ExpenseFields({
         </Select>
       </Field>
       <Field label="Type">
-        <Select value={form.type} onChange={(e) => setField("type", e.target.value)}>
+        <Select
+          value={form.type}
+          onChange={(e) => {
+            setField("type", e.target.value);
+            if (e.target.value !== "refund") setField("refund_for_id", null);
+          }}
+        >
           <option value="purchase">Purchase</option>
           <option value="refund">Refund</option>
         </Select>
@@ -161,6 +177,20 @@ export function ExpenseFields({
           <Input placeholder="Optional" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
         </Field>
       )}
+      {form.type === "refund" && (
+        <Field
+          label="Refund for (optional)"
+          hint={isCard ? "The purchase this refund offsets, so suggestions move the remaining amount." : "Pick a credit-card payment source to link a purchase."}
+          className={fullWidth}
+        >
+          <RefundPicker
+            value={form.refund_for_id}
+            candidates={refundOptions}
+            onChange={(id) => setField("refund_for_id", id)}
+          />
+        </Field>
+      )}
+
       {/* In the panel edit form: Save on the left, Cancel on the right. */}
       <div className={cn("flex items-center gap-2", fullWidth, panel ? "justify-between" : "justify-end")}>
         {panel ? (

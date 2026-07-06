@@ -421,7 +421,11 @@ export default function BucketsPage() {
                         <li key={t.id}>
                           <label className="flex items-center gap-2">
                             <input type="checkbox" className="h-4 w-4 accent-green" checked={!!picked[t.id]} onChange={() => toggleTxn(t.id)} />
-                            <span className="text-ink">{t.transaction_date} · {t.merchant || "—"} · <strong><Amount value={-t.amount} /></strong>{t.notes ? ` · ${t.notes}` : ""}</span>
+                            <span className="text-ink">
+                              {t.transaction_date} · {t.merchant || "—"} · <strong><Amount value={-t.amount} /></strong>
+                              {t.refunded > 0 ? <span className="text-muted"> (net of <Amount value={t.refunded} /> refund)</span> : null}
+                              {t.notes ? ` · ${t.notes}` : ""}
+                            </span>
                           </label>
                         </li>
                       ))}

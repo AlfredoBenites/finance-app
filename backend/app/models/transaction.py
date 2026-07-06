@@ -24,6 +24,7 @@ class TransactionCreate(BaseModel):
     paid_back_date: Optional[date] = None
     paid_to_bank: bool = False  # you paid the card issuer
     account_deducted: bool = False  # a bank/cash expense subtracted from a bucket
+    refund_for_id: Optional[str] = None  # the purchase this refund offsets
     notes: Optional[str] = None
 
 
@@ -41,6 +42,7 @@ class TransactionUpdate(BaseModel):
     paid_to_bank: Optional[bool] = None
     reimbursement_allocated: Optional[bool] = None
     account_deducted: Optional[bool] = None
+    refund_for_id: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -59,6 +61,7 @@ class Transaction(BaseModel):
     paid_back_date: Optional[date] = None
     paid_to_bank: bool = False
     account_deducted: bool = False
+    refund_for_id: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
