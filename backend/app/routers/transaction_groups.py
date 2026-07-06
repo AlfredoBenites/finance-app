@@ -27,6 +27,7 @@ TXN = "transactions"
 class GroupParticipant(BaseModel):
     profile_id: str
     subtotal: Optional[Decimal] = None  # required in itemized mode
+    charged_to: Optional[str] = None  # who pays this share (defaults to profile_id)
 
 
 class GroupPurchase(BaseModel):
@@ -36,10 +37,12 @@ class GroupPurchase(BaseModel):
     merchant: Optional[str] = None
     category: Optional[str] = None
     cashback_rate: Optional[Decimal] = None
-    tax_rate: Decimal = Decimal("0")
+    # Shared costs entered as amounts (from the receipt).
+    tax: Decimal = Decimal("0")
     tip: Decimal = Decimal("0")
     delivery_fee: Decimal = Decimal("0")
     service_fee: Decimal = Decimal("0")
+    discount: Decimal = Decimal("0")
     subtotal: Optional[Decimal] = None  # even mode: the single shared subtotal
     payer_profile_id: Optional[str] = None
     participants: list[GroupParticipant]
@@ -50,10 +53,11 @@ def _shares(payload: GroupPurchase):
         raise HTTPException(status_code=400, detail="Add at least one participant.")
     shares = compute_shares(
         mode=payload.mode,
-        tax_rate=payload.tax_rate,
+        tax=payload.tax,
         tip=payload.tip,
         delivery_fee=payload.delivery_fee,
         service_fee=payload.service_fee,
+        discount=payload.discount,
         participants=[p.model_dump() for p in payload.participants],
         subtotal=payload.subtotal,
         payer_profile_id=payload.payer_profile_id,
