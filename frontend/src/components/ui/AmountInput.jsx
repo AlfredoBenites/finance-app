@@ -1,4 +1,5 @@
 import { cn } from "./cn";
+import { usePrivacy } from "../../privacy/PrivacyContext";
 
 // Money input that formats as you type, calculator-style: the digits you enter
 // fill in from the cents up, so typing "1234" reads as 12.34, and larger amounts
@@ -13,6 +14,10 @@ function format(decimalStr) {
 }
 
 export default function AmountInput({ value, onChange, className, placeholder = "0.00", ...props }) {
+  // When "Hide amounts" is on, mask the typed value like a password field (you can
+  // still edit it) so amounts stay private in input boxes too, not just displays.
+  const { hidden } = usePrivacy();
+
   function handleChange(e) {
     const digits = e.target.value.replace(/\D/g, "");
     if (!digits) {
@@ -34,6 +39,7 @@ export default function AmountInput({ value, onChange, className, placeholder = 
         placeholder={placeholder}
         className="bg-surface text-ink border border-border rounded-md pl-6 pr-3 py-2 text-sm w-full tnum placeholder:text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-accent"
         {...props}
+        {...(hidden ? { type: "password" } : {})}
       />
     </div>
   );
