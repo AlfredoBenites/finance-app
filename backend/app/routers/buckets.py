@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user_id
-from app.database import supabase
+from app.database import supabase, fetch_all
 from app.models.bucket import Bucket, BucketCreate, BucketUpdate
 from app.routers.transactions import sync_refunds_paid_back
 from app.services.money_log import log_move
@@ -50,16 +50,14 @@ def _allocation_groups(user_id: str):
         (p["id"] for p in supabase.table("profiles").select("id, is_primary").eq("owner_id", user_id).execute().data if p.get("is_primary")),
         None,
     )
-    txns = (
-        supabase.table("transactions")
+    txns = fetch_all(
+        lambda: supabase.table("transactions")
         .select(
             "id, amount, credit_card_id, profile_id, reimbursement_allocated, "
             "is_paid_back, paid_to_bank, merchant, transaction_date, category, notes, refund_for_id"
         )
         .eq("owner_id", user_id)
         .order("transaction_date")
-        .execute()
-        .data
     )
     # Sum linked refunds by the purchase they offset (refund amounts are positive).
     refund_by_target: dict[str, Decimal] = {}
@@ -256,13 +254,11 @@ def list_income_allocations(user_id: str = Depends(get_current_user_id)):
     """Income recorded into an account that hasn't been put in a bucket yet.
 
     Each suggestion lets you drop the income into a bucket in the same account."""
-    rows = (
-        supabase.table("income")
+    rows = fetch_all(
+        lambda: supabase.table("income")
         .select("id, source, amount, account_id, income_date, bucket_allocated")
         .eq("owner_id", user_id)
         .order("income_date", desc=True)
-        .execute()
-        .data
     )
     acct_names = {
         a["id"]: a["name"]
@@ -414,13 +410,11 @@ class DismissExpenseRequest(BaseModel):
 def list_account_expenses(user_id: str = Depends(get_current_user_id)):
     """Bank/cash purchases not yet subtracted from a bucket. Each lets you take
     the money out of a bucket in that account (or just its unallocated balance)."""
-    rows = (
-        supabase.table("transactions")
+    rows = fetch_all(
+        lambda: supabase.table("transactions")
         .select("id, merchant, amount, account_id, transaction_date, account_deducted")
         .eq("owner_id", user_id)
         .order("transaction_date", desc=True)
-        .execute()
-        .data
     )
     acct_names = {
         a["id"]: a["name"]

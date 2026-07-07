@@ -1,10 +1,21 @@
 """Endpoint tests for authentication, per-user ownership, and profile sharing."""
 from fastapi.testclient import TestClient
 
+from app.database import fetch_all, supabase
 from app.main import app
 
 USER_A = ("user-a", "a@example.com")
 USER_B = ("user-b", "b@example.com")
+
+
+def test_fetch_all_pages_past_the_row_cap(api):
+    # fetch_all must return EVERY row, paging past PostgREST's max-rows cap —
+    # otherwise wholesale fetches silently drop rows once a table grows past it.
+    api.login(*USER_A)
+    for i in range(5):
+        api.client.post("/api/profiles", json={"name": f"P{i}"})
+    rows = fetch_all(lambda: supabase.table("profiles").select("*").eq("owner_id", "user-a"), page_size=2)
+    assert len(rows) == 5
 
 
 # --- authentication ----------------------------------------------------------

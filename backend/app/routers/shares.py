@@ -8,7 +8,7 @@ from postgrest.exceptions import APIError
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user, get_current_user_id
-from app.database import supabase
+from app.database import supabase, fetch_all
 from app.db_errors import is_unique_violation
 from app.models.share import Share, ShareCreate
 from app.services import calculations as calc
@@ -102,13 +102,11 @@ def shared_with_me(user=Depends(get_current_user)):
         )
         if not profile:
             continue  # profile was deleted
-        txns = (
-            supabase.table("transactions")
+        txns = fetch_all(
+            lambda: supabase.table("transactions")
             .select("*")
             .eq("profile_id", profile_id)
             .order("transaction_date", desc=True)
-            .execute()
-            .data
         )
         summaries.append(
             {

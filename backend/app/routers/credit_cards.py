@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user_id
-from app.database import supabase
+from app.database import supabase, fetch_all
 from app.db_errors import is_foreign_key_violation
 from app.models.credit_card import CreditCard, CreditCardCreate, CreditCardUpdate
 
@@ -59,15 +59,13 @@ def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_c
     if not card.data:
         raise HTTPException(status_code=404, detail="Credit card not found")
 
-    txns = (
-        supabase.table("transactions")
+    txns = fetch_all(
+        lambda: supabase.table("transactions")
         .select("id, amount")
         .eq("owner_id", user_id)
         .eq("credit_card_id", card_id)
         .eq("paid_to_bank", False)
         .order("transaction_date")
-        .execute()
-        .data
     )
     unpaid_total = -sum((Decimal(str(t["amount"])) for t in txns), Decimal("0"))
     amount = payload.amount if payload.amount is not None else unpaid_total

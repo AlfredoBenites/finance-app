@@ -10,7 +10,7 @@ from postgrest.exceptions import APIError
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user_id
-from app.database import supabase
+from app.database import supabase, fetch_all
 from app.db_errors import is_foreign_key_violation
 from app.services import calculations as calc
 
@@ -62,8 +62,8 @@ def cashback_redirected(user_id: str = Depends(get_current_user_id)):
     if not redirecting:
         return []
 
-    all_txns = (
-        supabase.table("transactions").select("*").eq("owner_id", user_id).execute().data
+    all_txns = fetch_all(
+        lambda: supabase.table("transactions").select("*").eq("owner_id", user_id)
     )
     by_profile: dict[str, dict] = {}
     for t in all_txns:
@@ -183,13 +183,11 @@ def profile_summary(profile_id: str, user_id: str = Depends(get_current_user_id)
 
     viewed = profile.data[0]
 
-    all_txns = (
-        supabase.table("transactions")
+    all_txns = fetch_all(
+        lambda: supabase.table("transactions")
         .select("*")
         .eq("owner_id", user_id)
         .order("transaction_date", desc=True)
-        .execute()
-        .data
     )
     own_txns = [t for t in all_txns if t.get("profile_id") == profile_id]
 
@@ -278,14 +276,12 @@ def profile_statement(profile_id: str, user_id: str = Depends(get_current_user_i
     if not profile.data:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    txns = (
-        supabase.table("transactions")
+    txns = fetch_all(
+        lambda: supabase.table("transactions")
         .select("*")
         .eq("profile_id", profile_id)
         .eq("owner_id", user_id)
         .order("transaction_date")
-        .execute()
-        .data
     )
     card_names = {
         c["id"]: c["name"]
