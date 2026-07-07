@@ -302,9 +302,17 @@ export default function TransactionsPage() {
           <GroupPurchaseForm
             profiles={profiles}
             cards={cards}
+            accounts={accounts}
             categoryList={categoryList}
             primaryId={primaryId}
-            onExitGroup={(t) => addForm.setField("type", t)}
+            carry={{
+              transaction_date: addForm.form.transaction_date,
+              merchant: addForm.form.merchant,
+              category: addForm.form.category,
+              paymentSource: addForm.form.paymentSource,
+              cashbackPct: addForm.form.cashbackPct,
+            }}
+            onExitGroup={(t, fields) => addForm.setForm((f) => ({ ...f, ...fields, type: t }))}
             onDone={() => { addForm.reset(); loadTransactions(); }}
             setError={setError}
           />
@@ -452,6 +460,7 @@ export default function TransactionsPage() {
           <GroupPurchaseForm
             profiles={profiles}
             cards={cards}
+            accounts={accounts}
             categoryList={categoryList}
             primaryId={primaryId}
             groupId={groupEdit.id}

@@ -105,6 +105,32 @@ def test_create_group_charged_to_pays_for_someone(api):
     assert api.client.get(f"/api/profiles/{bubu}/summary").json()["total_unpaid"] == 0.0
 
 
+def test_group_can_be_paid_from_an_account(api):
+    api.login(*USER_A)
+    me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    api.client.post(f"/api/profiles/{me}/make-primary")
+    mom = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    acct = api.client.post("/api/accounts", json={"name": "Cash", "balance": 100}).json()["id"]
+    resp = api.client.post("/api/transaction-groups", json={
+        "mode": "itemized", "account_id": acct, "transaction_date": "2026-06-01", "tax": 0, "tip": 0, "notes": "lunch",
+        "participants": [{"profile_id": me, "subtotal": 10}, {"profile_id": mom, "subtotal": 10}],
+    })
+    assert resp.status_code == 201
+    for t in resp.json()["transactions"]:
+        assert t["account_id"] == acct and t["credit_card_id"] is None
+        assert t["notes"] == "lunch"
+
+
+def test_group_requires_exactly_one_payment_source(api):
+    api.login(*USER_A)
+    me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    resp = api.client.post("/api/transaction-groups", json={
+        "mode": "itemized", "transaction_date": "2026-06-01",
+        "participants": [{"profile_id": me, "subtotal": 10}],
+    })
+    assert resp.status_code == 400
+
+
 def test_edit_group_preserves_reimbursed_lines_and_deletes_removed(api):
     api.login(*USER_A)
     me = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]

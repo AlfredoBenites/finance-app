@@ -32,11 +32,15 @@ class GroupParticipant(BaseModel):
 
 class GroupPurchase(BaseModel):
     mode: str = "itemized"  # "itemized" | "even"
-    card_id: str
+    # Exactly one payment source: a credit card OR an account (bank/cash).
+    card_id: Optional[str] = None
+    account_id: Optional[str] = None
     transaction_date: date
     merchant: Optional[str] = None
     category: Optional[str] = None
     cashback_rate: Optional[Decimal] = None
+    notes: Optional[str] = None
+    amount: Optional[Decimal] = None  # actual total charged, kept for the record/verification
     # Shared costs entered as amounts (from the receipt).
     tax: Decimal = Decimal("0")
     tip: Decimal = Decimal("0")
@@ -51,6 +55,8 @@ class GroupPurchase(BaseModel):
 def _shares(payload: GroupPurchase):
     if not payload.participants:
         raise HTTPException(status_code=400, detail="Add at least one participant.")
+    if bool(payload.card_id) == bool(payload.account_id):
+        raise HTTPException(status_code=400, detail="Pick exactly one payment source: a card or an account.")
     shares = compute_shares(
         mode=payload.mode,
         tax=payload.tax,
@@ -69,7 +75,8 @@ def _shares(payload: GroupPurchase):
 
 def _line_fields(payload: GroupPurchase, profile_id: str, owed: Decimal, group_id: str):
     amount = -owed  # a purchase is negative
-    cashback = compute_cashback(amount, payload.cashback_rate)
+    is_card = bool(payload.card_id)
+    cashback = compute_cashback(amount, payload.cashback_rate) if is_card else None
     return {
         "transaction_date": payload.transaction_date.isoformat(),
         "merchant": payload.merchant,
@@ -77,9 +84,10 @@ def _line_fields(payload: GroupPurchase, profile_id: str, owed: Decimal, group_i
         "amount": str(amount),
         "profile_id": profile_id,
         "credit_card_id": payload.card_id,
-        "account_id": None,
-        "cashback_rate": str(payload.cashback_rate) if payload.cashback_rate is not None else None,
+        "account_id": payload.account_id,
+        "cashback_rate": str(payload.cashback_rate) if (is_card and payload.cashback_rate is not None) else None,
         "cashback_amount": str(cashback) if cashback is not None else None,
+        "notes": payload.notes,
         "group_id": group_id,
     }
 
