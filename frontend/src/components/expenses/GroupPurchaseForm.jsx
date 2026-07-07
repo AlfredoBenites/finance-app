@@ -236,7 +236,7 @@ export default function GroupPurchaseForm({
             {participants.map((p, i) => (
               <TR key={i}>
                 <TD>
-                  <Select className="w-full" value={p.profile_id} onChange={(e) => setP(i, { profile_id: e.target.value })}>
+                  <Select className="w-full text-center" value={p.profile_id} onChange={(e) => setP(i, { profile_id: e.target.value })}>
                     <option value="">Whose order…</option>
                     {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
@@ -245,7 +245,7 @@ export default function GroupPurchaseForm({
                   <TD><AmountInput className="w-full" value={p.subtotal} onChange={(v) => setP(i, { subtotal: v })} /></TD>
                 )}
                 <TD>
-                  <Select className="w-full" value={p.charged_to || p.profile_id} onChange={(e) => setP(i, { charged_to: e.target.value })} disabled={!p.profile_id}>
+                  <Select className="w-full text-center" value={p.charged_to || p.profile_id} onChange={(e) => setP(i, { charged_to: e.target.value })} disabled={!p.profile_id}>
                     {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
