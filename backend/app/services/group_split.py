@@ -5,8 +5,8 @@ Shared costs are entered as amounts (matching a receipt, e.g. DoorDash):
 - "itemized": each person has an order subtotal, and ALL shared costs (tax, tip,
   delivery, service, minus discount) are split PROPORTIONALLY to each subtotal —
   the way DoorDash's receipt-split works (bigger orders pay more of the fees).
-- "even": one subtotal; the whole bill (subtotal + tax + tip + fees - discount) is
-  divided EQUALLY among the participants.
+- "even": the total charged is divided EQUALLY among the participants (the cost
+  breakdown doesn't matter — you're just splitting the whole amount).
 
 Each participant's share is charged to `charged_to` (defaults to themselves) — so
 you can pay for someone (their share becomes your own charge) or have one person
@@ -47,8 +47,7 @@ def compute_shares(
         return p.get("charged_to") or p["profile_id"]
 
     if mode == "even":
-        total_sub = _dec(subtotal)
-        grand = total_sub + shared
+        grand = _dec(subtotal)  # the whole total to split equally (costs already included)
         per = grand / n
         per_person = [(charged_to(p), per) for p in participants]
     else:  # itemized — split the shared pool proportionally to each order

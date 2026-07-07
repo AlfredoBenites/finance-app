@@ -22,13 +22,14 @@ def test_itemized_splits_all_shared_costs_proportionally():
     assert owed["b"] == Decimal("13.00")
 
 
-def test_even_split_divides_whole_bill_equally():
+def test_even_split_divides_the_total_equally_ignoring_costs():
+    # Even mode splits the whole total; the cost breakdown is ignored.
     shares = compute_shares(
         mode="even", tax="3", tip="6", delivery_fee="0", service_fee="0", discount="0",
-        participants=[{"profile_id": "a"}, {"profile_id": "b"}], subtotal="30", payer_profile_id="a",
+        participants=[{"profile_id": "a"}, {"profile_id": "b"}], subtotal="40", payer_profile_id="a",
     )
     owed = _owed(shares)
-    assert owed["a"] == Decimal("19.50") and owed["b"] == Decimal("19.50")
+    assert owed["a"] == Decimal("20.00") and owed["b"] == Decimal("20.00")
 
 
 def test_rounding_remainder_goes_to_payer():

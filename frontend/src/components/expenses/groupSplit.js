@@ -4,7 +4,7 @@
 // backend recomputes authoritatively on submit.
 const round = (x) => Math.round(x * 100) / 100;
 
-export function computeSplit({ mode, tax, tip, deliveryFee, serviceFee, discount, subtotal, participants, payerId }) {
+export function computeSplit({ mode, amount, tax, tip, deliveryFee, serviceFee, discount, participants, payerId }) {
   const n = participants.length;
   if (!n) return { perPerson: [], charges: [], grand: 0 };
 
@@ -15,8 +15,7 @@ export function computeSplit({ mode, tax, tip, deliveryFee, serviceFee, discount
   let grand;
   let perPerson;
   if (mode === "even") {
-    const sub = Number(subtotal) || 0;
-    grand = sub + shared;
+    grand = Number(amount) || 0; // split the whole total equally
     const per = grand / n;
     perPerson = participants.map((p) => ({ profile_id: p.profile_id, charged_to: chargedTo(p), owed: per }));
   } else {

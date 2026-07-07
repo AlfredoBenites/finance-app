@@ -130,7 +130,7 @@ export function ExpenseFields({
         >
           <option value="purchase">Purchase</option>
           <option value="refund">Refund</option>
-          {!panel && <option value="group">Group purchase</option>}
+          {!panel && <option value="group">Group Purchase</option>}
         </Select>
       </Field>
       <Field label="Profile">

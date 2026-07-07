@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Trash2, Plus, Info } from "lucide-react";
 import { transactionGroupsApi } from "../../api/client";
-import { Button, Field, Select, Input, Textarea, AmountInput, Amount, DateInput, Table, THead, TH, TR, TD, cn } from "../ui";
+import { Button, Field, Select, Input, AmountInput, Amount, DateInput, Table, THead, TH, TR, TD, cn } from "../ui";
 import { todayLocal, money } from "../../format";
 import { computeSplit } from "./groupSplit";
 
@@ -16,6 +16,7 @@ export default function GroupPurchaseForm({
   profiles,
   cards,
   accounts,
+  rules,
   categoryList,
   primaryId,
   groupId = null,
@@ -37,13 +38,12 @@ export default function GroupPurchaseForm({
   const [category, setCategory] = useState(d?.category ?? c.category ?? "");
   const [paymentSource, setPaymentSource] = useState(initSource);
   const [cashbackPct, setCashbackPct] = useState(d ? decToPct(d.cashback_rate) : c.cashbackPct ?? "");
-  const [amount, setAmount] = useState(d?.amount != null ? String(d.amount) : "");
+  const [amount, setAmount] = useState(d?.amount != null ? String(d.amount) : d?.subtotal != null ? String(d.subtotal) : "");
   const [tax, setTax] = useState(amt(d?.tax));
   const [tip, setTip] = useState(amt(d?.tip));
   const [deliveryFee, setDeliveryFee] = useState(amt(d?.delivery_fee));
   const [serviceFee, setServiceFee] = useState(amt(d?.service_fee));
   const [discount, setDiscount] = useState(amt(d?.discount));
-  const [subtotal, setSubtotal] = useState(amt(d?.subtotal)); // even mode
   const [notes, setNotes] = useState(d?.notes ?? "");
   const [participants, setParticipants] = useState(
     d?.participants?.map((p) => ({
@@ -55,6 +55,29 @@ export default function GroupPurchaseForm({
   const [saving, setSaving] = useState(false);
 
   const isCard = paymentSource.startsWith("card:");
+  const itemized = mode === "itemized";
+
+  // Same cashback auto-fill as the normal expense form: a card+category rule, else
+  // the card's default rate.
+  function resolveRatePct(cardId, cat) {
+    const rule = (rules || []).find((r) => r.card_id === cardId && r.category === cat);
+    let rate = null;
+    if (rule) rate = Number(rule.rate);
+    else {
+      const card = cards.find((c2) => c2.id === cardId);
+      if (card && card.default_cashback_rate != null) rate = Number(card.default_cashback_rate);
+    }
+    return rate == null ? "" : String(Math.round(rate * 10000) / 100);
+  }
+  function onSourceChange(value) {
+    setPaymentSource(value);
+    setCashbackPct(value.startsWith("card:") ? resolveRatePct(value.slice(5), category) : "");
+  }
+  function onCategoryChange(value) {
+    setCategory(value);
+    if (isCard) setCashbackPct(resolveRatePct(paymentSource.slice(5), value));
+  }
+
   const setP = (i, changes) =>
     setParticipants((ps) =>
       ps.map((p, idx) => {
@@ -71,11 +94,11 @@ export default function GroupPurchaseForm({
 
   const valid = participants.filter((p) => p.profile_id);
   const { perPerson, grand } = computeSplit({
-    mode, tax, tip, deliveryFee, serviceFee, discount, subtotal, participants: valid, payerId: primaryId,
+    mode, amount, tax, tip, deliveryFee, serviceFee, discount, participants: valid, payerId: primaryId,
   });
   const owedFor = (pid) => perPerson.find((pp) => pp.profile_id === pid)?.owed ?? 0;
   const enteredAmount = amount === "" ? null : Number(amount);
-  const mismatch = enteredAmount != null && Math.abs(grand - enteredAmount) >= 0.01;
+  const mismatch = itemized && enteredAmount != null && Math.abs(grand - enteredAmount) >= 0.01;
 
   function exit(type) {
     onExitGroup(type, { transaction_date: date, merchant, category, paymentSource, cashbackPct });
@@ -98,16 +121,16 @@ export default function GroupPurchaseForm({
       cashback_rate: isCard && cashbackPct !== "" ? pctToDec(cashbackPct) : null,
       notes: notes.trim() || null,
       amount: amount !== "" ? Number(amount) : null,
-      tax: Number(tax) || 0,
-      tip: Number(tip) || 0,
-      delivery_fee: Number(deliveryFee) || 0,
-      service_fee: Number(serviceFee) || 0,
-      discount: Number(discount) || 0,
-      subtotal: mode === "even" ? Number(subtotal) || 0 : null,
+      tax: itemized ? Number(tax) || 0 : 0,
+      tip: itemized ? Number(tip) || 0 : 0,
+      delivery_fee: itemized ? Number(deliveryFee) || 0 : 0,
+      service_fee: itemized ? Number(serviceFee) || 0 : 0,
+      discount: itemized ? Number(discount) || 0 : 0,
+      subtotal: itemized ? null : Number(amount) || 0, // even: split the whole amount
       payer_profile_id: primaryId || null,
       participants: valid.map((p) => ({
         profile_id: p.profile_id,
-        subtotal: mode === "even" ? null : Number(p.subtotal) || 0,
+        subtotal: itemized ? Number(p.subtotal) || 0 : null,
         charged_to: p.charged_to || p.profile_id,
       })),
     };
@@ -131,7 +154,7 @@ export default function GroupPurchaseForm({
         <Field label="Date"><DateInput value={date} onChange={setDate} /></Field>
         <Field label="Merchant"><Input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="e.g. DoorDash" /></Field>
         <Field label="Category">
-          <Select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <Select value={category} onChange={(e) => onCategoryChange(e.target.value)}>
             <option value="">Category…</option>
             {categoryList.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
           </Select>
@@ -142,11 +165,11 @@ export default function GroupPurchaseForm({
           <Select value="group" onChange={(e) => e.target.value !== "group" && exit(e.target.value)}>
             <option value="purchase">Purchase</option>
             <option value="refund">Refund</option>
-            <option value="group">Group purchase</option>
+            <option value="group">Group Purchase</option>
           </Select>
         </Field>
         <Field label="Payment source">
-          <Select value={paymentSource} onChange={(e) => setPaymentSource(e.target.value)}>
+          <Select value={paymentSource} onChange={(e) => onSourceChange(e.target.value)}>
             <option value="">Payment source…</option>
             <optgroup label="Credit cards">
               {cards.map((c2) => <option key={c2.id} value={`card:${c2.id}`}>{c2.name}</option>)}
@@ -161,65 +184,51 @@ export default function GroupPurchaseForm({
         </Field>
 
         {/* Row 3 */}
-        <Field label="Amount" hint="Actual total, to check the split">
+        <Field label="Amount" hint={itemized ? "Actual total, to check the split" : "Total to split equally"}>
           <AmountInput value={amount} onChange={setAmount} />
         </Field>
-        <Field label="Delivery fee"><AmountInput value={deliveryFee} onChange={setDeliveryFee} /></Field>
-        <Field label="Service fee"><AmountInput value={serviceFee} onChange={setServiceFee} /></Field>
+        {itemized && <Field label="Delivery fee"><AmountInput value={deliveryFee} onChange={setDeliveryFee} /></Field>}
+        {itemized && <Field label="Service fee"><AmountInput value={serviceFee} onChange={setServiceFee} /></Field>}
 
-        {/* Row 4 */}
-        <Field label="Tax"><AmountInput value={tax} onChange={setTax} /></Field>
-        <Field label="Tip"><AmountInput value={tip} onChange={setTip} /></Field>
-        <Field label="Discount"><AmountInput value={discount} onChange={setDiscount} /></Field>
+        {/* Row 4 (itemized only) */}
+        {itemized && <Field label="Tax"><AmountInput value={tax} onChange={setTax} /></Field>}
+        {itemized && <Field label="Tip"><AmountInput value={tip} onChange={setTip} /></Field>}
+        {itemized && <Field label="Discount"><AmountInput value={discount} onChange={setDiscount} /></Field>}
 
         {/* Row 5: notes (2 cols) + split (1 col) */}
         <Field label="Notes" className="sm:col-span-2 lg:col-span-2">
-          <Textarea rows={2} placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Input placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted">Split</span>
+          <span className="flex items-center gap-1 text-xs text-muted">
+            Split
             <span
-              className="text-muted cursor-help"
-              title={mode === "itemized"
-                ? "Tax, tip, fees & discount split by each order size."
-                : "The whole bill is split equally among everyone."}
+              className="cursor-help"
+              title={itemized
+                ? "By each order: tax, tip, fees & discount split by order size."
+                : "Evenly: the whole amount split equally among everyone."}
             >
-              <Info size={14} />
+              <Info size={12} />
             </span>
-          </div>
-          <div className="inline-flex rounded-md border border-border-strong p-0.5">
-            {[["itemized", "By each order"], ["even", "Evenly"]].map(([val, label]) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => setMode(val)}
-                className={cn("flex-1 px-2 h-9 rounded text-sm transition-colors", mode === val ? "bg-control text-ink font-medium" : "text-muted hover:text-ink")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          </span>
+          <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="itemized">By each order</option>
+            <option value="even">Evenly</option>
+          </Select>
         </div>
       </div>
-
-      {mode === "even" && (
-        <Field label="Order subtotal (items only)" className="max-w-xs">
-          <AmountInput value={subtotal} onChange={setSubtotal} />
-        </Field>
-      )}
 
       {/* Participants table */}
       <div className="space-y-2">
         <div className="text-xs font-medium uppercase tracking-wide text-muted">People in this order</div>
-        <Table>
+        <Table className="table-fixed min-w-[34rem]">
           <THead>
             <tr>
-              <TH>Whose order</TH>
-              {mode === "itemized" && <TH className="w-28">Order</TH>}
-              <TH>Charge to</TH>
-              <TH align="right" className="w-28">Share</TH>
-              <TH className="w-10"></TH>
+              <TH className="text-center">Whose order</TH>
+              {itemized && <TH className="text-center">Order</TH>}
+              <TH className="text-center">Charge to</TH>
+              <TH className="text-center">Share</TH>
+              <TH className="w-12"></TH>
             </tr>
           </THead>
           <tbody>
@@ -231,7 +240,7 @@ export default function GroupPurchaseForm({
                     {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
-                {mode === "itemized" && (
+                {itemized && (
                   <TD><AmountInput value={p.subtotal} onChange={(v) => setP(i, { subtotal: v })} /></TD>
                 )}
                 <TD>
@@ -239,10 +248,10 @@ export default function GroupPurchaseForm({
                     {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
-                <TD align="right">
+                <TD align="center">
                   {p.profile_id ? <strong className="text-ink"><Amount value={owedFor(p.profile_id)} /></strong> : <span className="text-muted">—</span>}
                 </TD>
-                <TD align="right">
+                <TD align="center">
                   <button type="button" onClick={() => removeP(i)} title="Remove" className="text-muted hover:text-danger">
                     <Trash2 size={15} />
                   </button>
@@ -256,20 +265,15 @@ export default function GroupPurchaseForm({
         </Button>
       </div>
 
-      {/* Total check */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted">Split total</span>
-        <strong className="text-ink"><Amount value={grand} /></strong>
-        {enteredAmount != null && (
-          mismatch
-            ? <span className="text-danger">doesn't match the {money(enteredAmount)} you entered</span>
-            : <span className="text-green">matches the amount ✓</span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
+      {/* Total + submit, bottom-right */}
+      <div className="flex flex-wrap items-center justify-end gap-4 pt-1">
+        <span className="text-sm">
+          <span className="text-muted">Split Total </span>
+          <strong className="text-ink"><Amount value={grand} /></strong>
+          {mismatch && <span className="text-danger"> — doesn't match {money(enteredAmount)}</span>}
+        </span>
         <Button type="submit" variant="primary" disabled={saving}>
-          {saving ? "Saving…" : groupId ? "Save group" : "Add group purchase"}
+          {saving ? "Saving…" : groupId ? "Save Group" : "Add Group Purchase"}
         </Button>
       </div>
     </form>

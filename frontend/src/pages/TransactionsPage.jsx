@@ -303,6 +303,7 @@ export default function TransactionsPage() {
             profiles={profiles}
             cards={cards}
             accounts={accounts}
+            rules={rules}
             categoryList={categoryList}
             primaryId={primaryId}
             carry={{
@@ -461,6 +462,7 @@ export default function TransactionsPage() {
             profiles={profiles}
             cards={cards}
             accounts={accounts}
+            rules={rules}
             categoryList={categoryList}
             primaryId={primaryId}
             groupId={groupEdit.id}
