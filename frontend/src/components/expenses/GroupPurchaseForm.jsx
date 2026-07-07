@@ -222,30 +222,30 @@ export default function GroupPurchaseForm({
       {/* Participants table */}
       <div className="space-y-2">
         <div className="text-xs font-medium uppercase tracking-wide text-muted">People in this order</div>
-        <Table className="table-fixed min-w-[34rem]">
+        <Table className="table-fixed min-w-[36rem]">
           <THead>
             <tr>
-              <TH className="text-center">Whose order</TH>
-              {itemized && <TH className="text-center">Order</TH>}
-              <TH className="text-center">Charge to</TH>
-              <TH className="text-center">Share</TH>
-              <TH className="w-12"></TH>
+              <TH className="text-center w-[30%]">Whose order</TH>
+              {itemized && <TH className="text-center w-[14%]">Order</TH>}
+              <TH className="text-center w-[30%]">Charge to</TH>
+              <TH className="text-center w-[14%]">Share</TH>
+              <TH className="w-[12%]"></TH>
             </tr>
           </THead>
           <tbody>
             {participants.map((p, i) => (
               <TR key={i}>
                 <TD>
-                  <Select value={p.profile_id} onChange={(e) => setP(i, { profile_id: e.target.value })}>
+                  <Select className="w-full" value={p.profile_id} onChange={(e) => setP(i, { profile_id: e.target.value })}>
                     <option value="">Whose order…</option>
                     {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
                 {itemized && (
-                  <TD><AmountInput value={p.subtotal} onChange={(v) => setP(i, { subtotal: v })} /></TD>
+                  <TD><AmountInput className="w-full" value={p.subtotal} onChange={(v) => setP(i, { subtotal: v })} /></TD>
                 )}
                 <TD>
-                  <Select value={p.charged_to || p.profile_id} onChange={(e) => setP(i, { charged_to: e.target.value })} disabled={!p.profile_id}>
+                  <Select className="w-full" value={p.charged_to || p.profile_id} onChange={(e) => setP(i, { charged_to: e.target.value })} disabled={!p.profile_id}>
                     {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
