@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Info } from "lucide-react";
+import { Info, RotateCcw } from "lucide-react";
 import { creditCardsApi, accountsApi, bucketsApi, dashboardApi } from "../api/client";
 import { money, formatDate, todayLocal } from "../format";
 import { usePrivacy } from "../privacy/PrivacyContext";
@@ -259,11 +259,15 @@ export default function PaymentsPage() {
           To
           <DateInput value={filters.to} onChange={(v) => setFilter("to", v)} />
         </label>
-        {(filters.card || filters.account || filters.from || filters.to) && (
-          <Button size="sm" variant="ghost" onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}>
-            Clear filters
-          </Button>
-        )}
+        <button
+          type="button"
+          onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}
+          title="Reset filters"
+          aria-label="Reset filters"
+          className="grid place-items-center h-9 w-9 rounded-md text-muted transition-colors hover:bg-accent hover:text-accent-ink active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <RotateCcw size={16} />
+        </button>
       </div>
 
       {total === 0 ? (
