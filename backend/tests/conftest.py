@@ -37,6 +37,7 @@ class _Query:
         self._eq = []
         self._like = []  # (col, needle) ANDed
         self._or = []  # list of OR-groups, each a list of (col, needle)
+        self._range = None  # (start, end) inclusive, for pagination
 
     def select(self, *_args, **_kwargs):
         self._op = "select"
@@ -80,6 +81,10 @@ class _Query:
         return self
 
     def order(self, *_a, **_k):
+        return self
+
+    def range(self, start, end):
+        self._range = (start, end)
         return self
 
     @staticmethod
@@ -132,7 +137,10 @@ class _Query:
         matched = [r for r in rows if self._matches(r)]
 
         if self._op == "select":
-            return _Result(list(matched))
+            rows_out = list(matched)
+            if self._range is not None:
+                rows_out = rows_out[self._range[0]:self._range[1] + 1]
+            return _Result(rows_out)
         if self._op == "update":
             for row in matched:
                 row.update(self._payload)

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import get_current_user_id
-from app.database import supabase
+from app.database import supabase, fetch_all
 from app.models.bucket import Bucket, BucketCreate, BucketUpdate
 from app.routers.transactions import sync_refunds_paid_back
 from app.services.money_log import log_move
@@ -50,16 +50,14 @@ def _allocation_groups(user_id: str):
         (p["id"] for p in supabase.table("profiles").select("id, is_primary").eq("owner_id", user_id).execute().data if p.get("is_primary")),
         None,
     )
-    txns = (
-        supabase.table("transactions")
+    txns = fetch_all(
+        lambda: supabase.table("transactions")
         .select(
             "id, amount, credit_card_id, profile_id, reimbursement_allocated, "
             "is_paid_back, paid_to_bank, merchant, transaction_date, category, notes, refund_for_id"
         )
         .eq("owner_id", user_id)
         .order("transaction_date")
-        .execute()
-        .data
     )
     # Sum linked refunds by the purchase they offset (refund amounts are positive).
     refund_by_target: dict[str, Decimal] = {}
@@ -119,16 +117,15 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
     cards = {c["id"]: c["name"] for c in supabase.table("credit_cards").select("id, name").eq("owner_id", user_id).execute().data}
     bks = supabase.table(TABLE).select("id, name, credit_card_id, account_id, current_amount").eq("owner_id", user_id).execute().data
     bk_name = {b["id"]: b["name"] for b in bks}
-    bk_balance = {b["id"]: Decimal(str(b["current_amount"])) for b in bks}
     payoff = {b["credit_card_id"]: b["id"] for b in bks if b["credit_card_id"] and b["account_id"]}
     out = []
     for (pid, cid), g in groups.items():
         prof = profiles.get(pid, {})
         src = prof.get("default_bucket_id")
-        # "only if I have money available": for your OWN charges, only suggest
-        # when the source bucket can actually cover the amount.
-        if g["own"] and bk_balance.get(src, Decimal("0")) < g["total"]:
-            continue
+        # Always surface the suggestion, even if the source bucket can't cover the
+        # full amount — you most want to know when you're short. The allocate step
+        # validates the amount against the bucket, and the per-charge checkboxes
+        # let you set aside a subset that fits.
         dest = payoff.get(cid)
         out.append({
             "profile_id": pid,
@@ -257,13 +254,11 @@ def list_income_allocations(user_id: str = Depends(get_current_user_id)):
     """Income recorded into an account that hasn't been put in a bucket yet.
 
     Each suggestion lets you drop the income into a bucket in the same account."""
-    rows = (
-        supabase.table("income")
+    rows = fetch_all(
+        lambda: supabase.table("income")
         .select("id, source, amount, account_id, income_date, bucket_allocated")
         .eq("owner_id", user_id)
         .order("income_date", desc=True)
-        .execute()
-        .data
     )
     acct_names = {
         a["id"]: a["name"]
@@ -415,13 +410,11 @@ class DismissExpenseRequest(BaseModel):
 def list_account_expenses(user_id: str = Depends(get_current_user_id)):
     """Bank/cash purchases not yet subtracted from a bucket. Each lets you take
     the money out of a bucket in that account (or just its unallocated balance)."""
-    rows = (
-        supabase.table("transactions")
+    rows = fetch_all(
+        lambda: supabase.table("transactions")
         .select("id, merchant, amount, account_id, transaction_date, account_deducted")
         .eq("owner_id", user_id)
         .order("transaction_date", desc=True)
-        .execute()
-        .data
     )
     acct_names = {
         a["id"]: a["name"]

@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from app.auth import get_current_user_id
-from app.database import supabase
+from app.database import supabase, fetch_all
 from app.services import calculations as calc
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -24,7 +24,7 @@ def get_dashboard(
     exclude_repayments: bool = Query(default=False, description="Exclude repayment income from total"),
 ):
     def owned(table, columns="*"):
-        return supabase.table(table).select(columns).eq("owner_id", user_id).execute().data
+        return fetch_all(lambda: supabase.table(table).select(columns).eq("owner_id", user_id))
 
     all_transactions = owned("transactions")  # unfiltered; statement cycles ignore the year filter
     transactions = all_transactions
@@ -196,7 +196,7 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
     Real available money, Net worth, and Cashback.
     """
     def owned(table, columns="*"):
-        return supabase.table(table).select(columns).eq("owner_id", user_id).execute().data
+        return fetch_all(lambda: supabase.table(table).select(columns).eq("owner_id", user_id))
 
     transactions = owned("transactions")
     buckets = owned("buckets")
