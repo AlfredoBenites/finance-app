@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
 import { KindBadge, TAG_COLORS } from "./buckets/tagColors";
+import { BucketIcon, BUCKET_COLORS } from "./buckets/bucketIcons";
 import { useSettings } from "../settings/SettingsContext";
 import { YEARS } from "../components/YearSelect";
 import { profilesApi, creditCardsApi, accountsApi, bucketsApi } from "../api/client";
@@ -110,6 +111,8 @@ export default function SettingsModal() {
     setIncomePerPage,
     paymentsPerPage,
     setPaymentsPerPage,
+    cardIconColors,
+    setCardIconColors,
     dashboardPrefs,
     setDashboardPrefs,
   } = useSettings();
@@ -487,29 +490,70 @@ export default function SettingsModal() {
           )}
 
           {tab === "payments" && (
-            <Section title="Payment history rows per page" hint="How many payments show per page (max 100).">
-              <div className="flex items-center gap-2 flex-wrap">
-                {[25, 50, 100].map((n) => (
-                  <Button
-                    key={n}
-                    size="sm"
-                    variant={paymentsPerPage === n ? "primary" : "secondary"}
-                    onClick={() => setPaymentsPerPage(n)}
-                  >
-                    {n}
-                  </Button>
-                ))}
-                <span className="text-sm text-muted ml-1">Custom:</span>
-                <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={paymentsPerPage}
-                  onChange={(e) => setPaymentsPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
-                  className="w-20"
-                />
-              </div>
-            </Section>
+            <>
+              <Section title="Payment history rows per page" hint="How many payments show per page (max 100).">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[25, 50, 100].map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={paymentsPerPage === n ? "primary" : "secondary"}
+                      onClick={() => setPaymentsPerPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <span className="text-sm text-muted ml-1">Custom:</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={paymentsPerPage}
+                    onChange={(e) => setPaymentsPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                    className="w-20"
+                  />
+                </div>
+              </Section>
+
+              <Section title="Card icon colors" hint="Color for each card's icon in the Pay a card table.">
+                {cards.length === 0 ? (
+                  <p className="text-sm text-muted">No cards yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {cards.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between gap-3 flex-wrap">
+                        <span className="inline-flex items-center gap-2 text-sm text-ink">
+                          <BucketIcon icon="credit-card" color={cardIconColors[c.id]} />
+                          {c.name}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            title="No color"
+                            onClick={() => setCardIconColors({ ...cardIconColors, [c.id]: null })}
+                            className={cn("h-6 w-6 rounded-full border-2", !cardIconColors[c.id] ? "border-ink" : "border-border")}
+                          />
+                          {BUCKET_COLORS.map(([ck, cl, hex]) => (
+                            <button
+                              key={ck}
+                              type="button"
+                              title={cl}
+                              aria-label={cl}
+                              onClick={() => setCardIconColors({ ...cardIconColors, [c.id]: ck })}
+                              className={cn(
+                                "h-6 w-6 rounded-full border-2 transition-transform",
+                                cardIconColors[c.id] === ck ? "border-ink scale-110" : "border-transparent"
+                              )}
+                              style={{ backgroundColor: hex }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+            </>
           )}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { creditCardsApi, accountsApi, bucketsApi, dashboardApi } from "../api/cl
 import { money, formatDate, todayLocal } from "../format";
 import { usePrivacy } from "../privacy/PrivacyContext";
 import { useSettings } from "../settings/SettingsContext";
+import { BucketIcon } from "../components/buckets/bucketIcons";
 import {
   PageHeader,
   Card,
@@ -25,14 +26,19 @@ import {
 
 const today = todayLocal;
 
+// Match the dashboard's upcoming-payment badge (sooner = more urgent color).
+const paymentTone = (days) => (days <= 2 ? "danger" : days <= 7 ? "orange" : "info");
+const daysLabel = (days) => (days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`);
+
 export default function PaymentsPage() {
   const { hidden } = usePrivacy();
-  const { paymentsPerPage } = useSettings();
+  const { paymentsPerPage, cardIconColors } = useSettings();
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [buckets, setBuckets] = useState([]);
   const [owedByCard, setOwedByCard] = useState({});
   const [statementByCard, setStatementByCard] = useState({});
+  const [upcoming, setUpcoming] = useState([]);
   const [history, setHistory] = useState([]);
   const [error, setError] = useState(null);
 
@@ -63,6 +69,7 @@ export default function PaymentsPage() {
       setBuckets(b);
       setOwedByCard(Object.fromEntries((dash.debt_by_card || []).map((d) => [d.credit_card_id, d.owed])));
       setStatementByCard(Object.fromEntries((dash.debt_by_card || []).map((d) => [d.credit_card_id, d.statement])));
+      setUpcoming(dash.upcoming_payments || []);
       setHistory(hist);
     } catch (e) {
       setError(e.message);
@@ -107,6 +114,18 @@ export default function PaymentsPage() {
 
   const accountBuckets = buckets.filter((b) => b.account_id === accountId);
 
+  // "Due in" info comes from the dashboard's upcoming payments (keyed by card name).
+  const dueByName = Object.fromEntries(upcoming.map((u) => [u.name, u]));
+  // Closest due date first; cards with no upcoming due go last (by name).
+  const sortedCards = [...cards].sort((a, b) => {
+    const da = dueByName[a.name]?.days_until;
+    const db = dueByName[b.name]?.days_until;
+    if (da == null && db == null) return a.name.localeCompare(b.name);
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return da - db;
+  });
+
   // Filter options come from what's actually in the history (may include closed cards).
   const historyCards = [...new Set(history.map((p) => p.card))].sort();
   const historyAccounts = [...new Set(history.map((p) => p.account))].sort();
@@ -137,33 +156,41 @@ export default function PaymentsPage() {
       {cards.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-ink mb-2">Cards</h2>
-          <Table className="table-fixed min-w-[30rem]">
+          <Table className="table-fixed min-w-[34rem]">
             <THead>
               <tr>
-                <TH className="w-[50%]">Card</TH>
-                <TH align="right" className="w-[25%]">Owed</TH>
-                <TH align="right" className="w-[25%]">Statement due</TH>
+                <TH className="w-[34%]">Card</TH>
+                <TH className="w-[20%]">Due in</TH>
+                <TH align="right" className="w-[23%]">Statement Due</TH>
+                <TH align="right" className="w-[23%]">Total Balance</TH>
               </tr>
             </THead>
             <tbody>
-              {cards.map((c) => (
-                <TR
-                  key={c.id}
-                  onClick={() => onCardChange(c.id)}
-                  className={cn("cursor-pointer", cardId === c.id && "bg-surface-muted")}
-                >
-                  <TD className="text-ink">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="truncate">{c.name}</span>
-                      {cardId === c.id && <Badge tone="teal">Selected</Badge>}
-                    </span>
-                  </TD>
-                  <TD align="right"><Amount value={owedByCard[c.id] || 0} /></TD>
-                  <TD align="right">
-                    {statementByCard[c.id] != null ? <Amount value={statementByCard[c.id]} /> : <span className="text-muted">—</span>}
-                  </TD>
-                </TR>
-              ))}
+              {sortedCards.map((c) => {
+                const due = dueByName[c.name];
+                return (
+                  <TR
+                    key={c.id}
+                    onClick={() => onCardChange(c.id)}
+                    className={cn("cursor-pointer", cardId === c.id && "bg-surface-muted")}
+                  >
+                    <TD className="text-ink">
+                      <span className="inline-flex items-center gap-2 min-w-0">
+                        <BucketIcon icon="credit-card" color={cardIconColors[c.id]} />
+                        <span className="truncate">{c.name}</span>
+                        {cardId === c.id && <Badge tone="teal">Selected</Badge>}
+                      </span>
+                    </TD>
+                    <TD>
+                      {due ? <Badge tone={paymentTone(due.days_until)}>{daysLabel(due.days_until)}</Badge> : <span className="text-muted">—</span>}
+                    </TD>
+                    <TD align="right">
+                      {statementByCard[c.id] != null ? <Amount value={statementByCard[c.id]} /> : <span className="text-muted">—</span>}
+                    </TD>
+                    <TD align="right"><Amount value={owedByCard[c.id] || 0} /></TD>
+                  </TR>
+                );
+              })}
             </tbody>
           </Table>
         </div>

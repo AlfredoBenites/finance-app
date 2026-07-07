@@ -41,6 +41,8 @@ export function SettingsProvider({ children }) {
   const [incomePerPage, setIncomePerPage] = usePersistedState("settings.incomePerPage", 15);
   // Pay a card: how many payment-history rows show per page (max 100).
   const [paymentsPerPage, setPaymentsPerPage] = usePersistedState("settings.paymentsPerPage", 25);
+  // Pay a card: chosen icon color per card — { [cardId]: colorKey } (bucket palette).
+  const [cardIconColors, setCardIconColors] = usePersistedState("settings.cardIconColors", {});
   // Profiles: remembered statement language PER profile — { [profileId]: "en" | "es" }.
   const [statementLangByProfile, setStatementLangByProfile] = usePersistedState("settings.statementLangByProfile", {});
   // Dashboard / insights calculation preferences (moved off the dashboard).
@@ -78,6 +80,8 @@ export function SettingsProvider({ children }) {
     setIncomePerPage,
     paymentsPerPage,
     setPaymentsPerPage,
+    cardIconColors,
+    setCardIconColors,
     statementLangByProfile,
     setStatementLangByProfile,
     dashboardPrefs,
