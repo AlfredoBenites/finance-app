@@ -253,7 +253,7 @@ export default function DashboardPage() {
                       title="Go to Pay a card"
                     >
                       <TD className="text-ink">{p.name}</TD>
-                      <TD className="text-ink whitespace-nowrap">{formatDate(p.due_date)}</TD>
+                      <TD className="text-ink whitespace-nowrap tabular-nums">{formatDate(p.due_date)}</TD>
                       <TD>
                         <Badge tone={paymentTone(p.days_until)}>{daysLabel(p.days_until)}</Badge>
                       </TD>

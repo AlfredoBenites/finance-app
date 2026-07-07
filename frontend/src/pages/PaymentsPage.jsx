@@ -265,7 +265,7 @@ export default function PaymentsPage() {
             onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}
             title="Reset filters"
             aria-label="Reset filters"
-            className="grid place-items-center h-9 w-9 rounded-md text-muted transition-colors hover:text-accent active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="grid place-items-center h-9 w-9 rounded-md border border-accent text-muted active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <RotateCcw size={16} />
           </button>
