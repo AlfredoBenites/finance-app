@@ -183,7 +183,7 @@ export default function AccountsPage() {
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
       {/* Transfer money */}
-      <CollapsibleSection title={<h2 className="text-lg font-semibold text-ink">Transfer money</h2>}>
+      <CollapsibleSection title="Transfer money" storageKey="accounts.transfer">
         <Card>
           <form onSubmit={doTransfer} className="flex flex-wrap items-end gap-3">
             <Field label="Amount">
@@ -218,16 +218,18 @@ export default function AccountsPage() {
         </Card>
       </CollapsibleSection>
 
-      {/* Your accounts — click the heading to add/reorder/color accounts. */}
+      {/* Your accounts — click the name to collapse; the pencil manages accounts. */}
       <CollapsibleSection
-        title={
+        title="Your accounts"
+        storageKey="accounts.list"
+        actions={
           <button
             onClick={() => setManagerOpen(true)}
             title="Add, reorder, and color accounts"
-            className="group/title inline-flex items-center gap-1.5 text-lg font-semibold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+            aria-label="Manage accounts"
+            className="grid place-items-center h-6 w-6 rounded text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <span className="group-hover/title:underline underline-offset-4 decoration-accent">Your accounts</span>
-            <Pencil size={14} className="text-muted opacity-0 group-hover/title:opacity-100 transition-opacity" />
+            <Pencil size={14} />
           </button>
         }
       >
@@ -240,14 +242,14 @@ export default function AccountsPage() {
 
       {/* Closed accounts */}
       {closedAccounts.length > 0 && (
-        <CollapsibleSection title={<h2 className="text-lg font-semibold text-ink">Closed accounts</h2>}>
+        <CollapsibleSection title="Closed accounts" storageKey="accounts.closed">
           <AccountsTable rows={closedAccounts} closed={true} />
         </CollapsibleSection>
       )}
 
       {/* Transfer history */}
       {transfers.length > 0 && (
-        <CollapsibleSection title={<h2 className="text-lg font-semibold text-ink">Transfer history</h2>}>
+        <CollapsibleSection title="Transfer history" storageKey="accounts.history">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Select value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>

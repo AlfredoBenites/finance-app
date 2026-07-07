@@ -1,37 +1,40 @@
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import usePersistedState from "../../hooks/usePersistedState";
 import { cn } from "./cn";
 
-// A section whose body collapses/expands under its header. The toggle chevron
-// sits to the left of the header and only appears on hover (or keyboard focus).
+// A section whose body collapses/expands when you click its header. There's no
+// chevron: the flush-left header text is the toggle (hover underline hints it's
+// clickable). Pass `actions` for controls that sit after the title and should
+// NOT toggle (e.g. an edit pencil); they reveal on header hover via `group`.
 //
 // The body uses the CSS grid `0fr <-> 1fr` trick so the animation runs for the
-// SAME fixed duration regardless of how tall the content is (a max-height
-// animation would vary with content size). The inner wrapper needs
+// SAME fixed duration regardless of content height. The inner wrapper needs
 // `overflow-hidden` for the collapsed (0fr) state to actually hide the content;
 // popovers that matter here (DateInput's calendar, native selects) render in a
 // portal / popup layer, so they're not clipped by it.
 //
-// Easing starts gently and accelerates ("slow then quick") but still settles, so
-// it reads as fast and smooth rather than abrupt.
+// Pass `storageKey` to remember the open/closed choice across reloads.
 const EASE = "ease-[cubic-bezier(0.45,0,0.2,1)]";
 
-export default function CollapsibleSection({ title, defaultOpen = true, children, className }) {
-  const [open, setOpen] = useState(defaultOpen);
+export default function CollapsibleSection({ title, actions, storageKey, defaultOpen = true, children, className }) {
+  // Persist only when a key is given; otherwise keep it in local state. Both
+  // hooks run every render (hook rules), we just pick which one drives the UI.
+  const localState = useState(defaultOpen);
+  const persistedState = usePersistedState(`ui.collapse.${storageKey || "_scratch"}`, defaultOpen);
+  const [open, setOpen] = storageKey ? persistedState : localState;
 
   return (
     <section className={cn("mb-6", className)}>
-      <div className="group flex items-center gap-1 mb-2">
+      <div className="group flex items-center gap-1.5 mb-2">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          aria-label={open ? "Collapse section" : "Expand section"}
-          className="grid place-items-center h-6 w-6 shrink-0 rounded text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="text-lg font-semibold text-ink text-left rounded hover:underline underline-offset-4 decoration-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          <ChevronDown size={16} className={cn("transition-transform duration-200", EASE, !open && "-rotate-90")} />
+          {title}
         </button>
-        <div className="min-w-0">{title}</div>
+        {actions}
       </div>
 
       <div className={cn("grid transition-[grid-template-rows] duration-200", EASE, open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>

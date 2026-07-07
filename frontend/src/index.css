@@ -116,6 +116,10 @@
     font-size: 110%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Always reserve space for the vertical scrollbar so pages whose height
+       crosses the viewport (e.g. collapsing a section) don't shift sideways as
+       the scrollbar appears/disappears. */
+    scrollbar-gutter: stable;
   }
   body {
     margin: 0;
