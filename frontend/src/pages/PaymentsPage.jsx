@@ -259,15 +259,17 @@ export default function PaymentsPage() {
           To
           <DateInput value={filters.to} onChange={(v) => setFilter("to", v)} />
         </label>
-        <button
-          type="button"
-          onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}
-          title="Reset filters"
-          aria-label="Reset filters"
-          className="grid place-items-center h-9 w-9 rounded-md text-muted transition-colors hover:bg-accent hover:text-accent-ink active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <RotateCcw size={16} />
-        </button>
+        <div className="flex-1 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}
+            title="Reset filters"
+            aria-label="Reset filters"
+            className="grid place-items-center h-9 w-9 rounded-md text-muted transition-colors hover:text-accent active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <RotateCcw size={16} />
+          </button>
+        </div>
       </div>
 
       {total === 0 ? (
