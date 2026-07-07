@@ -6,6 +6,7 @@ import {
   Receipt,
   Banknote,
   PiggyBank,
+  Landmark,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
   ChevronRight,
@@ -21,6 +22,7 @@ const CATEGORIES = [
   ["insights", "Insights", PieChart],
   ["cards", "Credit Cards", CreditCard],
   ["buckets", "Buckets", PiggyBank],
+  ["payments", "Pay a card", Landmark],
   ["expenses", "Expenses", Receipt],
   ["income", "Income", Banknote],
 ];
@@ -106,6 +108,8 @@ export default function SettingsModal() {
     setExpensesFilters,
     incomePerPage,
     setIncomePerPage,
+    paymentsPerPage,
+    setPaymentsPerPage,
     dashboardPrefs,
     setDashboardPrefs,
   } = useSettings();
@@ -476,6 +480,32 @@ export default function SettingsModal() {
                   max="100"
                   value={incomePerPage}
                   onChange={(e) => setIncomePerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                  className="w-20"
+                />
+              </div>
+            </Section>
+          )}
+
+          {tab === "payments" && (
+            <Section title="Payment history rows per page" hint="How many payments show per page (max 100).">
+              <div className="flex items-center gap-2 flex-wrap">
+                {[25, 50, 100].map((n) => (
+                  <Button
+                    key={n}
+                    size="sm"
+                    variant={paymentsPerPage === n ? "primary" : "secondary"}
+                    onClick={() => setPaymentsPerPage(n)}
+                  >
+                    {n}
+                  </Button>
+                ))}
+                <span className="text-sm text-muted ml-1">Custom:</span>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={paymentsPerPage}
+                  onChange={(e) => setPaymentsPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
                   className="w-20"
                 />
               </div>

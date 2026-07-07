@@ -39,6 +39,8 @@ export function SettingsProvider({ children }) {
   });
   // Income page: rows per page.
   const [incomePerPage, setIncomePerPage] = usePersistedState("settings.incomePerPage", 15);
+  // Pay a card: how many payment-history rows show per page (max 100).
+  const [paymentsPerPage, setPaymentsPerPage] = usePersistedState("settings.paymentsPerPage", 25);
   // Profiles: remembered statement language PER profile — { [profileId]: "en" | "es" }.
   const [statementLangByProfile, setStatementLangByProfile] = usePersistedState("settings.statementLangByProfile", {});
   // Dashboard / insights calculation preferences (moved off the dashboard).
@@ -74,6 +76,8 @@ export function SettingsProvider({ children }) {
     setExpensesFilters,
     incomePerPage,
     setIncomePerPage,
+    paymentsPerPage,
+    setPaymentsPerPage,
     statementLangByProfile,
     setStatementLangByProfile,
     dashboardPrefs,

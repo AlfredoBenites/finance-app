@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
+import { Info } from "lucide-react";
 import { creditCardsApi, accountsApi, bucketsApi, dashboardApi } from "../api/client";
 import { money, formatDate, todayLocal } from "../format";
 import { usePrivacy } from "../privacy/PrivacyContext";
+import { useSettings } from "../settings/SettingsContext";
 import {
   PageHeader,
   Card,
   Button,
+  Badge,
   Banner,
   Amount,
   Field,
@@ -17,12 +20,14 @@ import {
   TH,
   TR,
   TD,
+  cn,
 } from "../components/ui";
 
 const today = todayLocal;
 
 export default function PaymentsPage() {
   const { hidden } = usePrivacy();
+  const { paymentsPerPage } = useSettings();
   const [cards, setCards] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [buckets, setBuckets] = useState([]);
@@ -36,6 +41,10 @@ export default function PaymentsPage() {
   const [bucketId, setBucketId] = useState("");
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(today());
+
+  // History filters + pagination.
+  const [filters, setFilters] = useState({ card: "", account: "", from: "", to: "" });
+  const [page, setPage] = useState(0);
 
   // Amounts inside native <option> labels can't use <Amount>, so mask by hand.
   const mask = (v) => (hidden ? "****" : money(v));
@@ -98,12 +107,67 @@ export default function PaymentsPage() {
 
   const accountBuckets = buckets.filter((b) => b.account_id === accountId);
 
+  // Filter options come from what's actually in the history (may include closed cards).
+  const historyCards = [...new Set(history.map((p) => p.card))].sort();
+  const historyAccounts = [...new Set(history.map((p) => p.account))].sort();
+  const filtered = history.filter((p) => {
+    if (filters.card && p.card !== filters.card) return false;
+    if (filters.account && p.account !== filters.account) return false;
+    if (filters.from && (p.paid_on || "") < filters.from) return false;
+    if (filters.to && (p.paid_on || "") > filters.to) return false;
+    return true;
+  });
+  useEffect(() => {
+    setPage(0);
+  }, [filters, paymentsPerPage]);
+  const pageSize = paymentsPerPage || 25;
+  const total = filtered.length;
+  const start = page * pageSize;
+  const pageItems = filtered.slice(start, start + pageSize);
+  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
+
   return (
     <div>
       <PageHeader
         title="Pay a card"
         subtitle="Settle a card by drawing money from an account (and optionally a bucket). The card's debt drops and the money leaves that account. Cards with a statement day prefill the amount due."
       />
+
+      {/* Cards overview — click a row to select it for payment. */}
+      {cards.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-2">Cards</h2>
+          <Table className="table-fixed min-w-[30rem]">
+            <THead>
+              <tr>
+                <TH className="w-[50%]">Card</TH>
+                <TH align="right" className="w-[25%]">Owed</TH>
+                <TH align="right" className="w-[25%]">Statement due</TH>
+              </tr>
+            </THead>
+            <tbody>
+              {cards.map((c) => (
+                <TR
+                  key={c.id}
+                  onClick={() => onCardChange(c.id)}
+                  className={cn("cursor-pointer", cardId === c.id && "bg-surface-muted")}
+                >
+                  <TD className="text-ink">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="truncate">{c.name}</span>
+                      {cardId === c.id && <Badge tone="teal">Selected</Badge>}
+                    </span>
+                  </TD>
+                  <TD align="right"><Amount value={owedByCard[c.id] || 0} /></TD>
+                  <TD align="right">
+                    {statementByCard[c.id] != null ? <Amount value={statementByCard[c.id]} /> : <span className="text-muted">—</span>}
+                  </TD>
+                </TR>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
 
       {/* Pay form */}
       <Card className="mb-6">
@@ -112,18 +176,11 @@ export default function PaymentsPage() {
             <Select value={cardId} onChange={(e) => onCardChange(e.target.value)}>
               <option value="">Card…</option>
               {cards.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {statementByCard[c.id] != null
-                    ? ` — statement ${mask(statementByCard[c.id])}`
-                    : owedByCard[c.id]
-                      ? ` — owes ${mask(owedByCard[c.id])}`
-                      : ""}
-                </option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </Select>
           </Field>
-          <Field label="From account">
+          <Field label="From Account">
             <Select value={accountId} onChange={(e) => { setAccountId(e.target.value); setBucketId(""); }}>
               <option value="">Account…</option>
               {accounts.filter((a) => a.is_active !== false).map((a) => (
@@ -131,18 +188,24 @@ export default function PaymentsPage() {
               ))}
             </Select>
           </Field>
-          <Field label="From bucket" hint="Optional; defaults to the account's unallocated money">
+          <label className="flex flex-col gap-1">
+            <span className="flex items-center gap-1 text-xs text-muted">
+              From Bucket
+              <span className="cursor-help" title="Optional; defaults to the account's unallocated money.">
+                <Info size={12} />
+              </span>
+            </span>
             <Select value={bucketId} onChange={(e) => setBucketId(e.target.value)} disabled={!accountId}>
               <option value="">Unallocated</option>
               {accountBuckets.map((b) => (
                 <option key={b.id} value={b.id}>{b.name} ({mask(b.current_amount)})</option>
               ))}
             </Select>
-          </Field>
+          </label>
           <Field label="Amount"><AmountInput value={amount} onChange={setAmount} /></Field>
-          <Field label="Date paid"><DateInput value={paidOn} onChange={setPaidOn} /></Field>
-          <div className="flex items-end">
-            <Button type="submit" variant="primary">Pay card</Button>
+          <Field label="Date Paid"><DateInput value={paidOn} onChange={setPaidOn} /></Field>
+          <div className="flex items-end justify-end">
+            <Button type="submit" variant="primary">Pay Card</Button>
           </div>
         </form>
       </Card>
@@ -151,31 +214,64 @@ export default function PaymentsPage() {
 
       {/* Payment history */}
       <h2 className="text-lg font-semibold text-ink mb-2">Payment history</h2>
-      {history.length === 0 ? (
-        <p className="text-muted text-sm">No payments yet.</p>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <Select value={filters.card} onChange={(e) => setFilter("card", e.target.value)}>
+          <option value="">All cards</option>
+          {historyCards.map((name) => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        <Select value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
+          <option value="">All accounts</option>
+          {historyAccounts.map((name) => <option key={name} value={name}>{name}</option>)}
+        </Select>
+        <label className="flex items-center gap-1 text-sm text-muted">
+          From
+          <DateInput value={filters.from} onChange={(v) => setFilter("from", v)} />
+        </label>
+        <label className="flex items-center gap-1 text-sm text-muted">
+          To
+          <DateInput value={filters.to} onChange={(v) => setFilter("to", v)} />
+        </label>
+      </div>
+
+      {total === 0 ? (
+        <p className="text-muted text-sm">No payments match.</p>
       ) : (
-        <Table className="table-fixed min-w-[40rem]">
-          <THead>
-            <tr>
-              <TH className="w-[16%]">Date</TH>
-              <TH className="w-[28%]">Card</TH>
-              <TH className="w-[38%]">From</TH>
-              <TH align="right" className="w-[18%]">Amount</TH>
-            </tr>
-          </THead>
-          <tbody>
-            {history.map((p) => (
-              <TR key={p.id}>
-                <TD className="text-ink whitespace-nowrap">{p.paid_on ? formatDate(p.paid_on) : "—"}</TD>
-                <TD className="text-ink truncate">{p.card}</TD>
-                <TD className="text-muted truncate">
-                  from {p.account}{p.bucket && p.bucket !== "—" ? ` / ${p.bucket}` : ""}
-                </TD>
-                <TD align="right"><strong className="text-ink"><Amount value={p.amount} /></strong></TD>
-              </TR>
-            ))}
-          </tbody>
-        </Table>
+        <>
+          <Table className="table-fixed min-w-[40rem]">
+            <THead>
+              <tr>
+                <TH className="w-[16%]">Date</TH>
+                <TH className="w-[28%]">Card</TH>
+                <TH className="w-[38%]">From</TH>
+                <TH align="right" className="w-[18%]">Amount</TH>
+              </tr>
+            </THead>
+            <tbody>
+              {pageItems.map((p) => (
+                <TR key={p.id}>
+                  <TD className="text-ink whitespace-nowrap">{p.paid_on ? formatDate(p.paid_on) : "—"}</TD>
+                  <TD className="text-ink truncate">{p.card}</TD>
+                  <TD className="text-muted truncate">
+                    from {p.account}{p.bucket && p.bucket !== "—" ? ` / ${p.bucket}` : ""}
+                  </TD>
+                  <TD align="right"><strong className="text-ink"><Amount value={p.amount} /></strong></TD>
+                </TR>
+              ))}
+            </tbody>
+          </Table>
+
+          {total > pageSize && (
+            <div className="flex items-center justify-between gap-3 mt-3 text-sm">
+              <span className="text-muted">
+                {start + 1}–{Math.min(start + pageSize, total)} of {total}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>Prev</Button>
+                <Button size="sm" onClick={() => setPage((p) => p + 1)} disabled={start + pageSize >= total}>Next</Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
