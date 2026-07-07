@@ -26,6 +26,7 @@ export function TH({ className, align = "left", ...props }) {
       className={cn(
         "font-medium px-4 py-2.5 border-b border-border",
         align === "right" && "text-right",
+        align === "center" && "text-center",
         className
       )}
       {...props}
@@ -48,6 +49,7 @@ export function TD({ className, align = "left", ...props }) {
       className={cn(
         "px-4 py-2.5 align-middle",
         align === "right" && "text-right",
+        align === "center" && "text-center",
         className
       )}
       {...props}

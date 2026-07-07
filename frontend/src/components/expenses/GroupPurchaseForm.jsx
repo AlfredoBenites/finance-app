@@ -195,10 +195,8 @@ export default function GroupPurchaseForm({
         {itemized && <Field label="Tip"><AmountInput value={tip} onChange={setTip} /></Field>}
         {itemized && <Field label="Discount"><AmountInput value={discount} onChange={setDiscount} /></Field>}
 
-        {/* Row 5: notes (2 cols) + split (1 col) */}
-        <Field label="Notes" className="sm:col-span-2 lg:col-span-2">
-          <Input placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
-        </Field>
+        {/* Split, then Notes. Itemized: Split (col 1) + Notes (cols 2-3) on the last
+            row. Even: Amount · Split · Notes share row 3. */}
         <div className="flex flex-col gap-1">
           <span className="flex items-center gap-1 text-xs text-muted">
             Split
@@ -216,6 +214,9 @@ export default function GroupPurchaseForm({
             <option value="even">Evenly</option>
           </Select>
         </div>
+        <Field label="Notes" className={itemized ? "sm:col-span-2 lg:col-span-2" : ""}>
+          <Input placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
       </div>
 
       {/* Participants table */}
