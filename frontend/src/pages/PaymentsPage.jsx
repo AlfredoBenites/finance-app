@@ -197,6 +197,7 @@ export default function PaymentsPage() {
       )}
 
       {/* Pay form */}
+      <h2 className="text-lg font-semibold text-ink mb-2">New payment</h2>
       <Card className="mb-6">
         <form onSubmit={handlePay} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Field label="Card">
@@ -231,7 +232,7 @@ export default function PaymentsPage() {
           </label>
           <Field label="Amount"><AmountInput value={amount} onChange={setAmount} /></Field>
           <Field label="Date Paid"><DateInput value={paidOn} onChange={setPaidOn} /></Field>
-          <div className="flex items-end justify-end">
+          <div className="flex items-end">
             <Button type="submit" variant="primary">Pay Card</Button>
           </div>
         </form>
@@ -240,7 +241,7 @@ export default function PaymentsPage() {
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
       {/* Payment history */}
-      <h2 className="text-lg font-semibold text-ink mb-2">Payment history</h2>
+      <h2 className="text-lg font-semibold text-ink mb-2">Payment History</h2>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <Select value={filters.card} onChange={(e) => setFilter("card", e.target.value)}>
           <option value="">All cards</option>
@@ -258,6 +259,11 @@ export default function PaymentsPage() {
           To
           <DateInput value={filters.to} onChange={(v) => setFilter("to", v)} />
         </label>
+        {(filters.card || filters.account || filters.from || filters.to) && (
+          <Button size="sm" variant="ghost" onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}>
+            Clear filters
+          </Button>
+        )}
       </div>
 
       {total === 0 ? (
