@@ -237,8 +237,8 @@ export default function GroupPurchaseForm({
               <TR key={i}>
                 <TD>
                   <Select className="w-full text-center" value={p.profile_id} onChange={(e) => setP(i, { profile_id: e.target.value })}>
-                    <option value="">Whose order…</option>
-                    {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
+                    <option value="" className="text-left">Whose order…</option>
+                    {profiles.map((pr) => <option key={pr.id} value={pr.id} className="text-left">{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
                 {itemized && (
@@ -246,7 +246,7 @@ export default function GroupPurchaseForm({
                 )}
                 <TD>
                   <Select className="w-full text-center" value={p.charged_to || p.profile_id} onChange={(e) => setP(i, { charged_to: e.target.value })} disabled={!p.profile_id}>
-                    {profiles.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
+                    {profiles.map((pr) => <option key={pr.id} value={pr.id} className="text-left">{pr.name}{pr.is_primary ? " (me)" : ""}</option>)}
                   </Select>
                 </TD>
                 <TD align="center">
