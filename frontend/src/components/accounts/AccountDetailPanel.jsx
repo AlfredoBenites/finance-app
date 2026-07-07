@@ -131,6 +131,7 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged, 
           />
           Counts as an asset
         </label>
+        <p className="text-xs text-muted -mt-1">Uncheck only for a debt you track as an account, like a car loan or mortgage.</p>
         <div>
           <Button variant="primary" size="sm" onClick={save} disabled={busy}>
             {busy ? "Saving…" : "Save changes"}
@@ -143,7 +144,7 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged, 
         <div>
           <div className="text-sm text-ink">Show on Buckets page</div>
           <div className="text-xs text-muted mt-0.5">
-            List this account on Buckets so you can add envelopes to it, even when it has none yet.
+            Only affects empty accounts. Turn on to list this account on Buckets so you can add its first envelope. Accounts that already have buckets always show there, so turning this off never hides them or their data.
           </div>
         </div>
         <Toggle on={!!account?.show_in_buckets} onClick={toggleShowInBuckets} />
