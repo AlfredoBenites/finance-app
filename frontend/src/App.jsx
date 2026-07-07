@@ -45,7 +45,7 @@ export default function App() {
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/income" element={<IncomePage />} />
         <Route path="/buckets" element={<BucketsPage />} />
-        <Route path="/payments" element={legacy(<PaymentsPage />)} />
+        <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/accounts" element={legacy(<AccountsPage />)} />
         <Route path="/investments" element={legacy(<InvestmentsPage />)} />
         <Route path="/shared" element={legacy(<SharedWithMePage />)} />
