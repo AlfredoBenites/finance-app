@@ -15,6 +15,7 @@ import {
   Select,
   AmountInput,
   DateInput,
+  CollapsibleSection,
   Table,
   THead,
   TH,
@@ -134,40 +135,42 @@ export default function AccountsPage() {
   const histPageItems = filteredTransfers.slice(histStart, histStart + histPageSize);
 
   const AccountsTable = ({ rows, closed }) => (
-    <Table className="table-fixed min-w-[34rem]">
-      <THead>
-        <tr>
-          <TH className="w-[40%]">Account</TH>
-          <TH className="w-[22%]">Type</TH>
-          <TH className="w-[16%]">Kind</TH>
-          <TH align="right" className="w-[22%]">Balance</TH>
-        </tr>
-      </THead>
-      <tbody>
-        {rows.map((a) => (
-          <TR key={a.id} onClick={() => openPanel(a)} className={cn("cursor-pointer", closed && "text-muted")}>
-            <TD className="text-ink">
-              <span className="inline-flex items-center gap-2 min-w-0">
-                <BucketIcon icon="landmark" color={accountIconColors[a.id]} />
-                <span className="truncate">{a.name}</span>
-                {!closed && a.show_in_buckets && <Badge tone="neutral">In Buckets</Badge>}
-              </span>
-            </TD>
-            <TD className="text-muted">{typeLabel(a.account_type)}</TD>
-            <TD>
-              {closed ? (
-                <Badge tone="neutral">Closed</Badge>
-              ) : (
-                <Badge tone={a.is_asset ? "success" : "danger"}>{a.is_asset ? "Asset" : "Liability"}</Badge>
-              )}
-            </TD>
-            <TD align="right">
-              {closed ? <Amount value={a.balance} /> : <strong className="text-ink"><Amount value={a.balance} /></strong>}
-            </TD>
-          </TR>
-        ))}
-      </tbody>
-    </Table>
+    <div className="overflow-x-auto">
+      <Table className="table-fixed min-w-[34rem]">
+        <THead>
+          <tr>
+            <TH className="w-[40%]">Account</TH>
+            <TH className="w-[22%]">Type</TH>
+            <TH className="w-[16%]">Kind</TH>
+            <TH align="right" className="w-[22%]">Balance</TH>
+          </tr>
+        </THead>
+        <tbody>
+          {rows.map((a) => (
+            <TR key={a.id} onClick={() => openPanel(a)} className={cn("cursor-pointer", closed && "text-muted")}>
+              <TD className="text-ink">
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  <BucketIcon icon="landmark" color={accountIconColors[a.id]} />
+                  <span className="truncate">{a.name}</span>
+                  {!closed && a.show_in_buckets && <Badge tone="neutral">In Buckets</Badge>}
+                </span>
+              </TD>
+              <TD className="text-muted">{typeLabel(a.account_type)}</TD>
+              <TD>
+                {closed ? (
+                  <Badge tone="neutral">Closed</Badge>
+                ) : (
+                  <Badge tone={a.is_asset ? "success" : "danger"}>{a.is_asset ? "Asset" : "Liability"}</Badge>
+                )}
+              </TD>
+              <TD align="right">
+                {closed ? <Amount value={a.balance} /> : <strong className="text-ink"><Amount value={a.balance} /></strong>}
+              </TD>
+            </TR>
+          ))}
+        </tbody>
+      </Table>
+    </div>
   );
 
   return (
@@ -180,71 +183,71 @@ export default function AccountsPage() {
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
       {/* Transfer money */}
-      <h2 className="text-lg font-semibold text-ink mb-2">Transfer money</h2>
-      <Card className="mb-6">
-        <form onSubmit={doTransfer} className="flex flex-wrap items-end gap-3">
-          <Field label="Amount">
-            <AmountInput className="w-32" value={xfer.amount} onChange={(v) => setXferField({ amount: v })} />
-          </Field>
-          <Field label="From account">
-            <Select value={xfer.from} onChange={(e) => setXferField({ from: e.target.value, fromBucket: "unallocated" })}>
-              <option value="">Account…</option>
-              {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </Select>
-          </Field>
-          <Field label="From bucket">
-            <Select value={xfer.fromBucket} onChange={(e) => setXferField({ fromBucket: e.target.value })}>
-              <option value="unallocated">Unallocated</option>
-              {buckets.filter((b) => b.account_id === xfer.from).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </Select>
-          </Field>
-          <Field label="To account">
-            <Select value={xfer.to} onChange={(e) => setXferField({ to: e.target.value, toBucket: "unallocated" })}>
-              <option value="">Account…</option>
-              {activeAccounts.filter((a) => a.id !== xfer.from).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </Select>
-          </Field>
-          <Field label="To bucket">
-            <Select value={xfer.toBucket} onChange={(e) => setXferField({ toBucket: e.target.value })}>
-              <option value="unallocated">Unallocated</option>
-              {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </Select>
-          </Field>
-          <Button type="submit" size="sm">Transfer</Button>
-        </form>
-      </Card>
+      <CollapsibleSection title={<h2 className="text-lg font-semibold text-ink">Transfer money</h2>}>
+        <Card>
+          <form onSubmit={doTransfer} className="flex flex-wrap items-end gap-3">
+            <Field label="Amount">
+              <AmountInput className="w-32" value={xfer.amount} onChange={(v) => setXferField({ amount: v })} />
+            </Field>
+            <Field label="From account">
+              <Select value={xfer.from} onChange={(e) => setXferField({ from: e.target.value, fromBucket: "unallocated" })}>
+                <option value="">Account…</option>
+                {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="From bucket">
+              <Select value={xfer.fromBucket} onChange={(e) => setXferField({ fromBucket: e.target.value })}>
+                <option value="unallocated">Unallocated</option>
+                {buckets.filter((b) => b.account_id === xfer.from).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="To account">
+              <Select value={xfer.to} onChange={(e) => setXferField({ to: e.target.value, toBucket: "unallocated" })}>
+                <option value="">Account…</option>
+                {activeAccounts.filter((a) => a.id !== xfer.from).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="To bucket">
+              <Select value={xfer.toBucket} onChange={(e) => setXferField({ toBucket: e.target.value })}>
+                <option value="unallocated">Unallocated</option>
+                {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </Select>
+            </Field>
+            <Button type="submit" size="sm">Transfer</Button>
+          </form>
+        </Card>
+      </CollapsibleSection>
 
       {/* Your accounts — click the heading to add/reorder/color accounts. */}
-      <div className="flex items-baseline gap-2 mb-2">
-        <button
-          onClick={() => setManagerOpen(true)}
-          title="Add, reorder, and color accounts"
-          className="group inline-flex items-center gap-1.5 text-lg font-semibold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
-        >
-          <span className="group-hover:underline underline-offset-4 decoration-accent">Your accounts</span>
-          <Pencil size={14} className="text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
-        </button>
-      </div>
-      {orderedActive.length === 0 ? (
-        <p className="text-muted text-sm mb-6">No accounts yet. Click "Your accounts" to add one.</p>
-      ) : (
-        <div className="mb-6">
+      <CollapsibleSection
+        title={
+          <button
+            onClick={() => setManagerOpen(true)}
+            title="Add, reorder, and color accounts"
+            className="group/title inline-flex items-center gap-1.5 text-lg font-semibold text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            <span className="group-hover/title:underline underline-offset-4 decoration-accent">Your accounts</span>
+            <Pencil size={14} className="text-muted opacity-0 group-hover/title:opacity-100 transition-opacity" />
+          </button>
+        }
+      >
+        {orderedActive.length === 0 ? (
+          <p className="text-muted text-sm">No accounts yet. Click "Your accounts" to add one.</p>
+        ) : (
           <AccountsTable rows={orderedActive} closed={false} />
-        </div>
-      )}
+        )}
+      </CollapsibleSection>
 
       {/* Closed accounts */}
       {closedAccounts.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-ink mb-2">Closed accounts</h2>
+        <CollapsibleSection title={<h2 className="text-lg font-semibold text-ink">Closed accounts</h2>}>
           <AccountsTable rows={closedAccounts} closed={true} />
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Transfer history */}
       {transfers.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-ink mb-2">Transfer history</h2>
+        <CollapsibleSection title={<h2 className="text-lg font-semibold text-ink">Transfer history</h2>}>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Select value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>
@@ -275,24 +278,26 @@ export default function AccountsPage() {
             <p className="text-muted text-sm">No transfers match.</p>
           ) : (
             <>
-              <Table className="table-fixed min-w-[32rem]">
-                <THead>
-                  <tr>
-                    <TH className="w-[22%]">Date</TH>
-                    <TH className="w-[58%]">Summary</TH>
-                    <TH align="right" className="w-[20%]">Amount</TH>
-                  </tr>
-                </THead>
-                <tbody>
-                  {histPageItems.map((t) => (
-                    <TR key={t.id}>
-                      <TD className="text-ink whitespace-nowrap tabular-nums">{formatDate(t.created_at)}</TD>
-                      <TD className="text-muted"><span className="block truncate" title={t.summary}>{t.summary}</span></TD>
-                      <TD align="right"><strong className="text-ink"><Amount value={t.amount} /></strong></TD>
-                    </TR>
-                  ))}
-                </tbody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table className="table-fixed min-w-[32rem]">
+                  <THead>
+                    <tr>
+                      <TH className="w-[22%]">Date</TH>
+                      <TH className="w-[58%]">Summary</TH>
+                      <TH align="right" className="w-[20%]">Amount</TH>
+                    </tr>
+                  </THead>
+                  <tbody>
+                    {histPageItems.map((t) => (
+                      <TR key={t.id}>
+                        <TD className="text-ink whitespace-nowrap tabular-nums">{formatDate(t.created_at)}</TD>
+                        <TD className="text-muted"><span className="block truncate" title={t.summary}>{t.summary}</span></TD>
+                        <TD align="right"><strong className="text-ink"><Amount value={t.amount} /></strong></TD>
+                      </TR>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
 
               {histTotal > histPageSize && (
                 <div className="flex items-center justify-between gap-3 mt-3 text-sm">
@@ -307,7 +312,7 @@ export default function AccountsPage() {
               )}
             </>
           )}
-        </div>
+        </CollapsibleSection>
       )}
 
       <AccountsManagerPanel
