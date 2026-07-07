@@ -209,11 +209,14 @@ def test_own_charge_suggested_when_source_has_money(api):
     assert mine and mine["amount"] == 100.0 and mine["own"] is True  # My money (500) covers it
 
 
-def test_own_charge_hidden_when_source_short(api):
+def test_own_charge_still_suggested_when_source_short(api):
+    # Even if the source bucket can't cover the whole charge, still suggest it —
+    # you most want to know when you're short (allocate validates the amount).
     me, mom, acct, card, moms, payoff = _setup(api)
     api.client.post("/api/transactions", json={"transaction_date": "2026-06-01", "amount": -600,
                     "profile_id": me, "credit_card_id": card})  # My money only has 500
-    assert not any(s["profile_id"] == me for s in api.client.get("/api/buckets/reimbursements").json())
+    mine = next((s for s in api.client.get("/api/buckets/reimbursements").json() if s["profile_id"] == me), None)
+    assert mine and mine["amount"] == 600.0 and mine["own"] is True
 
 
 def test_own_charge_hidden_once_paid_to_bank(api):

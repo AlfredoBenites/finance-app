@@ -119,16 +119,15 @@ def list_reimbursements(user_id: str = Depends(get_current_user_id)):
     cards = {c["id"]: c["name"] for c in supabase.table("credit_cards").select("id, name").eq("owner_id", user_id).execute().data}
     bks = supabase.table(TABLE).select("id, name, credit_card_id, account_id, current_amount").eq("owner_id", user_id).execute().data
     bk_name = {b["id"]: b["name"] for b in bks}
-    bk_balance = {b["id"]: Decimal(str(b["current_amount"])) for b in bks}
     payoff = {b["credit_card_id"]: b["id"] for b in bks if b["credit_card_id"] and b["account_id"]}
     out = []
     for (pid, cid), g in groups.items():
         prof = profiles.get(pid, {})
         src = prof.get("default_bucket_id")
-        # "only if I have money available": for your OWN charges, only suggest
-        # when the source bucket can actually cover the amount.
-        if g["own"] and bk_balance.get(src, Decimal("0")) < g["total"]:
-            continue
+        # Always surface the suggestion, even if the source bucket can't cover the
+        # full amount — you most want to know when you're short. The allocate step
+        # validates the amount against the bucket, and the per-charge checkboxes
+        # let you set aside a subset that fits.
         dest = payoff.get(cid)
         out.append({
             "profile_id": pid,
