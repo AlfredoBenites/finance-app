@@ -136,13 +136,14 @@ export default function AccountsPage() {
 
   const AccountsTable = ({ rows, closed }) => (
     <div className="overflow-x-auto">
-      <Table className="table-fixed min-w-[34rem]">
+      <Table className="table-fixed min-w-[38rem]">
         <THead>
           <tr>
-            <TH className="w-[40%]">Account</TH>
-            <TH className="w-[22%]">Type</TH>
-            <TH className="w-[16%]">Kind</TH>
-            <TH align="right" className="w-[22%]">Balance</TH>
+            <TH className="w-[34%]">Account</TH>
+            <TH className="w-[18%]">Type</TH>
+            <TH className="w-[14%]">Kind</TH>
+            <TH className="w-[16%]">Buckets</TH>
+            <TH align="right" className="w-[18%]">Balance</TH>
           </tr>
         </THead>
         <tbody>
@@ -152,7 +153,6 @@ export default function AccountsPage() {
                 <span className="inline-flex items-center gap-2 min-w-0">
                   <BucketIcon icon="landmark" color={accountIconColors[a.id]} />
                   <span className="truncate">{a.name}</span>
-                  {!closed && a.show_in_buckets && <Badge tone="neutral">In Buckets</Badge>}
                 </span>
               </TD>
               <TD className="text-muted">{typeLabel(a.account_type)}</TD>
@@ -162,6 +162,9 @@ export default function AccountsPage() {
                 ) : (
                   <Badge tone={a.is_asset ? "success" : "danger"}>{a.is_asset ? "Asset" : "Liability"}</Badge>
                 )}
+              </TD>
+              <TD>
+                {!closed && a.show_in_buckets ? <Badge tone="neutral">In Buckets</Badge> : null}
               </TD>
               <TD align="right">
                 {closed ? <Amount value={a.balance} /> : <strong className="text-ink"><Amount value={a.balance} /></strong>}
@@ -183,7 +186,7 @@ export default function AccountsPage() {
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
       {/* Transfer money */}
-      <CollapsibleSection title="Transfer money" storageKey="accounts.transfer">
+      <CollapsibleSection title="Transfer Money" storageKey="accounts.transfer">
         <Card>
           <form onSubmit={doTransfer} className="flex flex-wrap items-end gap-3">
             <Field label="Amount">
@@ -213,14 +216,14 @@ export default function AccountsPage() {
                 {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </Select>
             </Field>
-            <Button type="submit" size="sm">Transfer</Button>
+            <Button type="submit" variant="primary">Transfer</Button>
           </form>
         </Card>
       </CollapsibleSection>
 
       {/* Your accounts — click the name to collapse; the pencil manages accounts. */}
       <CollapsibleSection
-        title="Your accounts"
+        title="Your Accounts"
         storageKey="accounts.list"
         actions={
           <button
@@ -242,14 +245,14 @@ export default function AccountsPage() {
 
       {/* Closed accounts */}
       {closedAccounts.length > 0 && (
-        <CollapsibleSection title="Closed accounts" storageKey="accounts.closed">
+        <CollapsibleSection title="Closed Accounts" storageKey="accounts.closed">
           <AccountsTable rows={closedAccounts} closed={true} />
         </CollapsibleSection>
       )}
 
       {/* Transfer history */}
       {transfers.length > 0 && (
-        <CollapsibleSection title="Transfer history" storageKey="accounts.history">
+        <CollapsibleSection title="Transfer History" storageKey="accounts.history">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Select value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>
@@ -257,11 +260,11 @@ export default function AccountsPage() {
             </Select>
             <label className="flex items-center gap-1 text-sm text-muted">
               From
-              <DateInput value={filters.from} onChange={(v) => setFilter("from", v)} />
+              <DateInput className="w-32" value={filters.from} onChange={(v) => setFilter("from", v)} />
             </label>
             <label className="flex items-center gap-1 text-sm text-muted">
               To
-              <DateInput value={filters.to} onChange={(v) => setFilter("to", v)} />
+              <DateInput className="w-32" value={filters.to} onChange={(v) => setFilter("to", v)} />
             </label>
             <Input type="number" step="0.01" min="0" placeholder="Min $" className="w-28" value={filters.min} onChange={(e) => setFilter("min", e.target.value)} />
             <Input type="number" step="0.01" min="0" placeholder="Max $" className="w-28" value={filters.max} onChange={(e) => setFilter("max", e.target.value)} />

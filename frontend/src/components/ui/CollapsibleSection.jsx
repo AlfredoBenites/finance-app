@@ -30,7 +30,7 @@ export default function CollapsibleSection({ title, actions, storageKey, default
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          className="text-lg font-semibold text-ink text-left rounded hover:underline underline-offset-4 decoration-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="text-lg font-semibold text-ink text-left rounded underline-offset-4 decoration-accent group-hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {title}
         </button>
