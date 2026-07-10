@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
 import { bucketsApi, accountsApi, creditCardsApi } from "../api/client";
 import { useSettings } from "../settings/SettingsContext";
 import { formatDate } from "../format";
@@ -454,12 +453,9 @@ export default function BucketsPage() {
               <button
                 onClick={() => openAccountPanel(a)}
                 title="Add or edit buckets"
-                className="group inline-flex items-center gap-1.5 text-lg font-semibold text-ink hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+                className="text-lg font-semibold text-ink hover:text-green transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
               >
-                <span className="group-hover:underline underline-offset-4 decoration-accent">
-                  {a.name}{a.is_active === false ? " (closed)" : ""}
-                </span>
-                <Pencil size={14} className="text-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                {a.name}{a.is_active === false ? " (closed)" : ""}
               </button>
               <div className="flex items-center gap-4 text-sm text-muted">
                 <span>Balance <Amount value={a.balance} /></span>

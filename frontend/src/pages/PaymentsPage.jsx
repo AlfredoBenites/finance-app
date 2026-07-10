@@ -243,7 +243,7 @@ export default function PaymentsPage() {
       {/* Payment history */}
       <h2 className="text-lg font-semibold text-ink mb-2">Payment History</h2>
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Select value={filters.card} onChange={(e) => setFilter("card", e.target.value)}>
+        <Select className="flex-1 min-w-[9rem]" value={filters.card} onChange={(e) => setFilter("card", e.target.value)}>
           <option value="">All cards</option>
           {historyCards.map((name) => <option key={name} value={name}>{name}</option>)}
         </Select>
@@ -259,17 +259,20 @@ export default function PaymentsPage() {
           To
           <DateInput value={filters.to} onChange={(v) => setFilter("to", v)} />
         </label>
-        <div className="flex-1 flex justify-center">
-          <button
-            type="button"
-            onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}
-            title="Reset filters"
-            aria-label="Reset filters"
-            className="grid place-items-center h-9 w-9 rounded-md text-muted transition-colors hover:bg-accent hover:text-accent-ink active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <RotateCcw size={16} />
-          </button>
-        </div>
+        {/* Keep the reset button as a plain inline item. Do NOT wrap it in a
+            flex-1 / justify-center container: in this flex-wrap row that makes it
+            center itself in the leftover space and, once the filters get wide
+            enough to wrap, drift to the middle of a second row. The flex-1 on the
+            first select above absorbs the slack so this sits at the right edge. */}
+        <button
+          type="button"
+          onClick={() => setFilters({ card: "", account: "", from: "", to: "" })}
+          title="Reset filters"
+          aria-label="Reset filters"
+          className="grid place-items-center h-9 w-9 rounded-md text-muted transition-colors hover:bg-accent hover:text-accent-ink active:brightness-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <RotateCcw size={16} />
+        </button>
       </div>
 
       {total === 0 ? (
