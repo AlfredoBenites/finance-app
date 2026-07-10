@@ -45,6 +45,8 @@ export function SettingsProvider({ children }) {
   const [transferHistoryPerPage, setTransferHistoryPerPage] = usePersistedState("settings.transferHistoryPerPage", 25);
   // Accounts: chosen icon color per account — { [accountId]: colorKey } (bucket palette).
   const [accountIconColors, setAccountIconColors] = usePersistedState("settings.accountIconColors", {});
+  // Investments: how many purchase-history rows show per page (max 100).
+  const [investmentHistoryPerPage, setInvestmentHistoryPerPage] = usePersistedState("settings.investmentHistoryPerPage", 25);
   // Pay a card: chosen icon color per card — { [cardId]: colorKey } (bucket palette).
   const [cardIconColors, setCardIconColors] = usePersistedState("settings.cardIconColors", {});
   // Profiles: remembered statement language PER profile — { [profileId]: "en" | "es" }.
@@ -88,6 +90,8 @@ export function SettingsProvider({ children }) {
     setTransferHistoryPerPage,
     accountIconColors,
     setAccountIconColors,
+    investmentHistoryPerPage,
+    setInvestmentHistoryPerPage,
     cardIconColors,
     setCardIconColors,
     statementLangByProfile,

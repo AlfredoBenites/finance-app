@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { holdingsApi, accountsApi } from "../api/client";
+import { formatDate, todayLocal } from "../format";
+import { useSettings } from "../settings/SettingsContext";
 import {
   PageHeader,
   Card,
@@ -12,6 +14,7 @@ import {
   Field,
   Input,
   Select,
+  DateInput,
   Table,
   THead,
   TH,
@@ -21,6 +24,7 @@ import {
 import HoldingDetailPanel from "../components/investments/HoldingDetailPanel";
 
 const EMPTY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" };
+const EMPTY_BUY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", price: "" };
 
 const KINDS = [
   ["stock", "Stock / ETF"],
@@ -37,21 +41,26 @@ const holdingValue = (h) => (effPrice(h) == null ? null : Number(h.shares) * Num
 export default function InvestmentsPage() {
   const [holdings, setHoldings] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState(EMPTY);
+  const [buy, setBuy] = useState({ ...EMPTY_BUY, traded_on: todayLocal() });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [histPage, setHistPage] = useState(0);
 
   // Edit panel — keep the id set through the close animation.
   const [panelHoldingId, setPanelHoldingId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
+  const { investmentHistoryPerPage } = useSettings();
   const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "Unassigned";
 
   async function load() {
     try {
-      const [h, a] = await Promise.all([holdingsApi.list(), accountsApi.list()]);
+      const [h, a, t] = await Promise.all([holdingsApi.list(), accountsApi.list(), holdingsApi.transactions()]);
       setHoldings(h);
       setAccounts(a);
+      setTransactions(t);
     } catch (e) {
       setError(e.message);
     }
@@ -61,7 +70,36 @@ export default function InvestmentsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    setHistPage(0);
+  }, [investmentHistoryPerPage]);
+
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setBuyField = (k, v) => setBuy((b) => ({ ...b, [k]: v }));
+
+  async function handleBuy(e) {
+    e.preventDefault();
+    if (!buy.account_id || !buy.symbol.trim() || buy.shares === "" || buy.price === "") {
+      setError("Account, symbol, shares, and price are required to buy.");
+      return;
+    }
+    try {
+      await holdingsApi.buy({
+        account_id: buy.account_id,
+        symbol: buy.symbol.trim().toUpperCase(),
+        kind: buy.kind,
+        category: buy.category.trim() || null,
+        shares: Number(buy.shares),
+        price: Number(buy.price),
+        traded_on: buy.traded_on || null,
+      });
+      setBuy({ ...EMPTY_BUY, traded_on: todayLocal() });
+      setError(null);
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -112,6 +150,10 @@ export default function InvestmentsPage() {
   const panelHolding = holdings.find((h) => h.id === panelHoldingId) || null;
   const categories = [...new Set(holdings.map((h) => h.category).filter(Boolean))].sort();
   const total = holdings.reduce((s, h) => s + (holdingValue(h) || 0), 0);
+  const activeAccounts = accounts.filter((a) => a.is_active !== false);
+
+  const buyingPower = buy.account_id ? Number(accounts.find((a) => a.id === buy.account_id)?.balance ?? 0) : null;
+  const buyCost = buy.shares && buy.price ? Number(buy.shares) * Number(buy.price) : 0;
 
   // Group: account -> category -> holdings.
   const grouped = {};
@@ -122,11 +164,17 @@ export default function InvestmentsPage() {
   }
   const sum = (list) => list.reduce((s, h) => s + (holdingValue(h) || 0), 0);
 
+  // Purchase-history pagination.
+  const histPageSize = investmentHistoryPerPage || 25;
+  const histTotal = transactions.length;
+  const histStart = histPage * histPageSize;
+  const histPageItems = transactions.slice(histStart, histStart + histPageSize);
+
   return (
     <div>
       <PageHeader
         title="Investments"
-        subtitle="Enter your shares; prices come from Finnhub (stocks) and CoinGecko (crypto). An account's value becomes the sum of its holdings and flows into net worth."
+        subtitle="Buy shares with an account's cash, or record what you already own. Prices come from Finnhub (stocks) and CoinGecko (crypto); each account is worth its cash plus its holdings."
         actions={
           <Button variant="secondary" onClick={refresh} disabled={busy}>
             <RefreshCw size={16} className={busy ? "animate-spin" : undefined} />
@@ -145,47 +193,54 @@ export default function InvestmentsPage() {
         />
       </div>
 
-      {/* Add a holding */}
-      <h2 className="text-lg font-semibold text-ink mb-2">Add a holding</h2>
+      {/* Buy investments */}
+      <h2 className="text-lg font-semibold text-ink mb-2">Buy investments</h2>
       <Card className="mb-6">
-        <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          <Field label="Account">
-            <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)}>
+        <form onSubmit={handleBuy} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Field label="Account (buying power)">
+            <Select value={buy.account_id} onChange={(e) => setBuyField("account_id", e.target.value)}>
               <option value="">Account…</option>
-              {accounts.filter((a) => a.is_active !== false).map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
+              {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </Select>
           </Field>
           <Field label="Type">
-            <Select value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
+            <Select value={buy.kind} onChange={(e) => setBuyField("kind", e.target.value)}>
               {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </Select>
           </Field>
           <Field label="Symbol">
-            <Input value={form.symbol} onChange={(e) => setField("symbol", e.target.value)} placeholder="AAPL, BTC" />
+            <Input value={buy.symbol} onChange={(e) => setBuyField("symbol", e.target.value)} placeholder="AAPL, BTC" />
           </Field>
           <Field label="Category">
-            <Input value={form.category} onChange={(e) => setField("category", e.target.value)} placeholder="Roth IRA" list="holding-categories" />
-            <datalist id="holding-categories">
-              {categories.map((c) => <option key={c} value={c} />)}
-            </datalist>
+            <Input value={buy.category} onChange={(e) => setBuyField("category", e.target.value)} placeholder="Roth IRA" list="holding-categories" />
           </Field>
           <Field label="Shares">
-            <Input type="number" step="any" value={form.shares} onChange={(e) => setField("shares", e.target.value)} />
+            <Input type="number" step="any" value={buy.shares} onChange={(e) => setBuyField("shares", e.target.value)} />
           </Field>
-          <Field label="Manual price">
-            <Input type="number" step="any" value={form.manual_price} onChange={(e) => setField("manual_price", e.target.value)} placeholder="auto" />
+          <Field label="Price per share">
+            <Input type="number" step="any" value={buy.price} onChange={(e) => setBuyField("price", e.target.value)} placeholder="0.00" />
           </Field>
-          <div className="sm:col-span-2 lg:col-span-6">
-            <Button type="submit" variant="primary" size="sm">Add holding</Button>
+          <Field label="Date">
+            <DateInput value={buy.traded_on} onChange={(v) => setBuyField("traded_on", v)} />
+          </Field>
+          <div className="flex items-end">
+            <Button type="submit" variant="primary" className="w-full">Buy</Button>
           </div>
         </form>
+        {buy.account_id && (
+          <p className="mt-3 text-sm text-muted">
+            Buying power in {accountName(buy.account_id)}:{" "}
+            <span className={buyingPower != null && buyCost > buyingPower ? "text-danger" : "text-ink"}>
+              <Amount value={buyingPower} />
+            </span>
+            {buyCost > 0 && <> · Cost: <strong className="text-ink"><Amount value={buyCost} /></strong></>}
+          </p>
+        )}
       </Card>
 
       {/* Holdings by account */}
       {holdings.length === 0 ? (
-        <p className="text-muted text-sm">No holdings yet. Add one above.</p>
+        <p className="text-muted text-sm mb-6">No holdings yet. Buy some above.</p>
       ) : (
         Object.entries(grouped).map(([accId, cats]) => {
           const accHoldings = Object.values(cats).flat();
@@ -216,6 +271,89 @@ export default function InvestmentsPage() {
             </section>
           );
         })
+      )}
+
+      {/* Record shares you already own (no cash movement) */}
+      <h2 className="text-lg font-semibold text-ink mb-1">Record shares you already own</h2>
+      <p className="text-sm text-muted mb-2">For positions you already hold. This does not move any cash — use Buy above for new purchases.</p>
+      <Card className="mb-6">
+        <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <Field label="Account">
+            <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)}>
+              <option value="">Account…</option>
+              {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="Type">
+            <Select value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
+              {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </Select>
+          </Field>
+          <Field label="Symbol">
+            <Input value={form.symbol} onChange={(e) => setField("symbol", e.target.value)} placeholder="AAPL, BTC" />
+          </Field>
+          <Field label="Category">
+            <Input value={form.category} onChange={(e) => setField("category", e.target.value)} placeholder="Roth IRA" list="holding-categories" />
+          </Field>
+          <Field label="Shares">
+            <Input type="number" step="any" value={form.shares} onChange={(e) => setField("shares", e.target.value)} />
+          </Field>
+          <Field label="Manual price">
+            <Input type="number" step="any" value={form.manual_price} onChange={(e) => setField("manual_price", e.target.value)} placeholder="auto" />
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-6">
+            <Button type="submit" variant="secondary" size="sm">Record holding</Button>
+          </div>
+        </form>
+      </Card>
+
+      <datalist id="holding-categories">
+        {categories.map((c) => <option key={c} value={c} />)}
+      </datalist>
+
+      {/* Purchase history */}
+      {transactions.length > 0 && (
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-2">Purchase history</h2>
+          <div className="overflow-x-auto">
+            <Table className="table-fixed min-w-[40rem]">
+              <THead>
+                <tr>
+                  <TH className="w-[18%]">Date</TH>
+                  <TH className="w-[24%]">Account</TH>
+                  <TH className="w-[16%]">Holding</TH>
+                  <TH className="w-[14%]">Shares</TH>
+                  <TH align="right" className="w-[14%]">Price</TH>
+                  <TH align="right" className="w-[14%]">Amount</TH>
+                </tr>
+              </THead>
+              <tbody>
+                {histPageItems.map((t) => (
+                  <TR key={t.id}>
+                    <TD className="text-ink whitespace-nowrap tabular-nums">{formatDate(t.traded_on)}</TD>
+                    <TD className="text-muted"><span className="block truncate">{accountName(t.account_id)}</span></TD>
+                    <TD className="text-ink"><span className="block truncate">{t.symbol}</span></TD>
+                    <TD className="text-muted tabular-nums">{Number(t.shares)}</TD>
+                    <TD align="right" className="text-muted tabular-nums">{priceStr(t.price)}</TD>
+                    <TD align="right"><strong className="text-ink"><Amount value={t.amount} /></strong></TD>
+                  </TR>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+
+          {histTotal > histPageSize && (
+            <div className="flex items-center justify-between gap-3 mt-3 text-sm">
+              <span className="text-muted">
+                {histStart + 1}–{Math.min(histStart + histPageSize, histTotal)} of {histTotal}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={() => setHistPage((p) => p - 1)} disabled={histPage === 0}>Prev</Button>
+                <Button size="sm" onClick={() => setHistPage((p) => p + 1)} disabled={histStart + histPageSize >= histTotal}>Next</Button>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       <HoldingDetailPanel

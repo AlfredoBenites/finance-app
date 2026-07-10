@@ -30,8 +30,10 @@ def get_dashboard(
     transactions = all_transactions
     buckets = owned("buckets")
     accounts = owned("accounts")
-    # An account holding investments is valued at the sum of its holdings
-    # (shares x manual-or-last price), overriding its manual balance.
+    # An investment account is worth its cash (uninvested buying power) PLUS the
+    # value of its holdings (shares x manual-or-last price). Buying shares moves
+    # cash into holdings, so the total is unchanged at purchase and then tracks
+    # the market.
     holdings = owned("holdings", "account_id, shares, last_price, manual_price")
     holdings_value = {}
     for h in holdings:
@@ -42,7 +44,9 @@ def get_dashboard(
                 calc._dec(h.get("shares")) * calc._dec(price)
             )
     accounts = [
-        {**a, "balance": str(holdings_value[a["id"]])} if a["id"] in holdings_value else a
+        {**a, "balance": str(calc._dec(a["balance"]) + holdings_value[a["id"]])}
+        if a["id"] in holdings_value
+        else a
         for a in accounts
     ]
     profiles = owned("profiles", "id, name, is_primary")
@@ -204,8 +208,8 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
     profiles = owned("profiles", "id, name, is_primary")
     cards = owned("credit_cards", "id, name")
 
-    # Value investment accounts at the sum of their holdings (same override the
-    # main dashboard applies), so totals match exactly.
+    # Value investment accounts at cash + holdings (same as the main dashboard),
+    # so totals match exactly.
     holdings = owned("holdings", "account_id, shares, last_price, manual_price")
     holdings_value = {}
     for h in holdings:
@@ -216,7 +220,9 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
                 calc._dec(h.get("shares")) * calc._dec(price)
             )
     accounts = [
-        {**a, "balance": str(holdings_value[a["id"]])} if a["id"] in holdings_value else a
+        {**a, "balance": str(calc._dec(a["balance"]) + holdings_value[a["id"]])}
+        if a["id"] in holdings_value
+        else a
         for a in accounts
     ]
 

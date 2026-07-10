@@ -15,16 +15,16 @@ def test_holding_crud(api):
     assert api.client.get("/api/holdings").json() == []
 
 
-def test_holdings_value_overrides_account_balance_in_net_worth(api):
+def test_holdings_value_adds_to_account_cash_in_net_worth(api):
     api.login(*USER_A)
-    # manual balance 999 is ignored once the account has holdings
+    # balance 999 is the account's uninvested cash (buying power); holdings add on top
     acct = api.client.post("/api/accounts", json={"name": "Robinhood", "balance": 999}).json()["id"]
     api.client.post("/api/holdings", json={"account_id": acct, "symbol": "AAPL",
                                            "kind": "stock", "shares": 10, "manual_price": 200})
     d = api.client.get("/api/dashboard").json()
-    # account value = 10 * 200 = 2000 (not 999)
-    assert d["total_assets"] == 2000.0
-    assert d["net_worth"] == 2000.0
+    # account value = 999 cash + 10 * 200 holdings = 2999
+    assert d["total_assets"] == 2999.0
+    assert d["net_worth"] == 2999.0
 
 
 def test_refresh_prices_with_no_holdings_is_noop(api):

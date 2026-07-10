@@ -1,5 +1,5 @@
 """Pydantic models for investment holdings."""
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -36,3 +36,30 @@ class Holding(BaseModel):
     price_updated_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+
+class HoldingBuy(BaseModel):
+    """Buy shares using an account's buying power (cash)."""
+    account_id: str
+    symbol: str
+    kind: str = "stock"
+    category: Optional[str] = None
+    shares: Decimal
+    price: Decimal  # per-share price paid
+    traded_on: Optional[str] = None  # ISO date; defaults to today
+    notes: Optional[str] = None
+
+
+class InvestmentTransaction(BaseModel):
+    id: str
+    account_id: Optional[str] = None
+    holding_id: Optional[str] = None
+    symbol: str
+    kind: str
+    type: str
+    shares: Decimal
+    price: Decimal
+    amount: Decimal
+    traded_on: date
+    notes: Optional[str] = None
+    created_at: datetime
