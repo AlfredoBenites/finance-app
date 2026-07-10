@@ -7,6 +7,7 @@ import {
   Banknote,
   PiggyBank,
   Landmark,
+  Wallet,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
   ChevronRight,
@@ -24,6 +25,7 @@ const CATEGORIES = [
   ["cards", "Credit Cards", CreditCard],
   ["buckets", "Buckets", PiggyBank],
   ["payments", "Pay a card", Landmark],
+  ["accounts", "Accounts", Wallet],
   ["expenses", "Expenses", Receipt],
   ["income", "Income", Banknote],
 ];
@@ -111,6 +113,8 @@ export default function SettingsModal() {
     setIncomePerPage,
     paymentsPerPage,
     setPaymentsPerPage,
+    transferHistoryPerPage,
+    setTransferHistoryPerPage,
     cardIconColors,
     setCardIconColors,
     dashboardPrefs,
@@ -552,6 +556,34 @@ export default function SettingsModal() {
                     ))}
                   </div>
                 )}
+              </Section>
+            </>
+          )}
+
+          {tab === "accounts" && (
+            <>
+              <Section title="Transfer history rows per page" hint="How many transfers show per page (max 100).">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[10, 25, 50].map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={transferHistoryPerPage === n ? "primary" : "secondary"}
+                      onClick={() => setTransferHistoryPerPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <span className="text-sm text-muted ml-1">Custom:</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={transferHistoryPerPage}
+                    onChange={(e) => setTransferHistoryPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                    className="w-20"
+                  />
+                </div>
               </Section>
             </>
           )}
