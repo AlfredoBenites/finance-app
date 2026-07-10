@@ -19,7 +19,6 @@ import {
   TH,
   TR,
   TD,
-  cn,
 } from "../components/ui";
 import { BucketIcon } from "../components/buckets/bucketIcons";
 import { typeLabel } from "../components/accounts/accountTypes";
@@ -79,7 +78,6 @@ export default function AccountsPage() {
 
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
   const orderedActive = applyOrder(activeAccounts, accountOrder);
-  const closedAccounts = accounts.filter((a) => a.is_active === false);
 
   async function doTransfer(e) {
     e.preventDefault();
@@ -132,7 +130,7 @@ export default function AccountsPage() {
   const histStart = histPage * histPageSize;
   const histPageItems = filteredTransfers.slice(histStart, histStart + histPageSize);
 
-  const AccountsTable = ({ rows, closed }) => (
+  const AccountsTable = ({ rows }) => (
     <div className="overflow-x-auto">
       <Table className="table-fixed min-w-[38rem]">
         <THead>
@@ -146,7 +144,7 @@ export default function AccountsPage() {
         </THead>
         <tbody>
           {rows.map((a) => (
-            <TR key={a.id} onClick={() => openPanel(a)} className={cn("cursor-pointer", closed && "text-muted")}>
+            <TR key={a.id} onClick={() => openPanel(a)} className="cursor-pointer">
               <TD className="text-ink">
                 <span className="inline-flex items-center gap-2 min-w-0">
                   <BucketIcon icon="landmark" color={accountIconColors[a.id]} />
@@ -155,17 +153,13 @@ export default function AccountsPage() {
               </TD>
               <TD className="text-muted">{typeLabel(a.account_type)}</TD>
               <TD>
-                {closed ? (
-                  <Badge tone="neutral">Closed</Badge>
-                ) : (
-                  <Badge tone={a.is_asset ? "success" : "danger"}>{a.is_asset ? "Asset" : "Liability"}</Badge>
-                )}
+                <Badge tone={a.is_asset ? "success" : "danger"}>{a.is_asset ? "Asset" : "Liability"}</Badge>
               </TD>
               <TD>
-                {!closed && a.show_in_buckets ? <Badge tone="neutral">In Buckets</Badge> : null}
+                {a.show_in_buckets ? <Badge tone="neutral">In Buckets</Badge> : null}
               </TD>
               <TD align="right">
-                {closed ? <Amount value={a.balance} /> : <strong className="text-ink"><Amount value={a.balance} /></strong>}
+                <strong className="text-ink"><Amount value={a.balance} /></strong>
               </TD>
             </TR>
           ))}
@@ -231,21 +225,11 @@ export default function AccountsPage() {
         </button>
       </div>
       {orderedActive.length === 0 ? (
-        <p className="text-muted text-sm mb-6">No accounts yet. Use the pencil to add one.</p>
+        <p className="text-muted text-sm mb-6">No accounts yet. Click "Your Accounts" to add one.</p>
       ) : (
         <div className="mb-6">
-          <AccountsTable rows={orderedActive} closed={false} />
+          <AccountsTable rows={orderedActive} />
         </div>
-      )}
-
-      {/* Closed accounts */}
-      {closedAccounts.length > 0 && (
-        <>
-          <h2 className="text-lg font-semibold text-ink mb-2">Closed Accounts</h2>
-          <div className="mb-6">
-            <AccountsTable rows={closedAccounts} closed={true} />
-          </div>
-        </>
       )}
 
       {/* Transfer history */}

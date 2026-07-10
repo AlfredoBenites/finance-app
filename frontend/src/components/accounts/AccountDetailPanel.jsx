@@ -53,8 +53,6 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged }
     }
   }
 
-  const closed = account?.is_active === false;
-
   const save = () =>
     run(async () => {
       await accountsApi.update(account.id, {
@@ -70,13 +68,6 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged }
     run(async () => {
       await accountsApi.update(account.id, { show_in_buckets: !account.show_in_buckets });
       await onChanged();
-    });
-
-  const setClosed = (value) =>
-    run(async () => {
-      await accountsApi.update(account.id, { is_active: !value });
-      await onChanged();
-      if (value) onClose();
     });
 
   const remove = () =>
@@ -105,7 +96,6 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged }
           <Badge tone={account?.is_asset ? "success" : "danger"}>
             {account?.is_asset ? "Asset" : "Liability"}
           </Badge>
-          {closed && <Badge tone="neutral">Closed</Badge>}
         </div>
       </div>
 
@@ -150,35 +140,20 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged }
         <Toggle on={!!account?.show_in_buckets} onClick={toggleShowInBuckets} />
       </div>
 
-      {/* Danger / lifecycle actions */}
-      <div className="mt-6 pt-5 border-t border-border space-y-3">
-        {closed ? (
-          <Button variant="secondary" size="sm" onClick={() => setClosed(false)} disabled={busy}>
-            Reopen account
-          </Button>
+      {/* Delete */}
+      <div className="mt-6 pt-5 border-t border-border">
+        {confirmDelete ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-ink">Delete this account for good?</span>
+            <Button variant="danger" size="sm" onClick={remove} disabled={busy}>Delete</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setConfirmDelete(false); setActionError(null); }} disabled={busy}>Cancel</Button>
+          </div>
         ) : (
-          <Button variant="secondary" size="sm" onClick={() => setClosed(true)} disabled={busy}>
-            Close account
+          <Button variant="danger" size="sm" onClick={() => { setActionError(null); setConfirmDelete(true); }} disabled={busy}>
+            Delete account
           </Button>
         )}
-        <p className="text-xs text-muted">
-          Closed accounts are kept for history but don't count toward net worth.
-        </p>
-
-        <div className="pt-2">
-          {confirmDelete ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-ink">Delete this account for good?</span>
-              <Button variant="danger" size="sm" onClick={remove} disabled={busy}>Delete</Button>
-              <Button variant="ghost" size="sm" onClick={() => { setConfirmDelete(false); setActionError(null); }} disabled={busy}>Cancel</Button>
-            </div>
-          ) : (
-            <Button variant="danger" size="sm" onClick={() => { setActionError(null); setConfirmDelete(true); }} disabled={busy}>
-              Delete account
-            </Button>
-          )}
-          {actionError && <p className="mt-2 text-sm text-danger">{actionError}</p>}
-        </div>
+        {actionError && <p className="mt-2 text-sm text-danger">{actionError}</p>}
       </div>
     </SlideOver>
   );
