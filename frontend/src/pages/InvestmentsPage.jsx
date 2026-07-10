@@ -199,10 +199,11 @@ export default function InvestmentsPage() {
                 <Table className="table-fixed min-w-[36rem]">
                   <THead>
                     <tr>
-                      <TH className="w-[30%]">Holding</TH>
-                      <TH className="w-[22%]">Shares</TH>
-                      <TH align="right" className="w-[24%]">Price</TH>
-                      <TH align="right" className="w-[24%]">Value</TH>
+                      <TH className="w-[24%]">Holding</TH>
+                      <TH className="w-[16%]">Type</TH>
+                      <TH className="w-[18%]">Shares</TH>
+                      <TH align="right" className="w-[21%]">Price</TH>
+                      <TH align="right" className="w-[21%]">Value</TH>
                     </tr>
                   </THead>
                   <tbody>
@@ -235,9 +236,7 @@ function CategoryGroup({ cat, list, onRowClick }) {
   return (
     <>
       <tr className="bg-surface-muted">
-        <TD className="text-xs font-medium uppercase tracking-wide text-muted">{cat}</TD>
-        <TD />
-        <TD />
+        <TD colSpan={4} className="text-xs font-medium uppercase tracking-wide text-muted">{cat}</TD>
         <TD align="right" className="text-xs text-muted"><Amount value={catTotal} /></TD>
       </tr>
       {list.map((h) => {
@@ -245,10 +244,10 @@ function CategoryGroup({ cat, list, onRowClick }) {
         return (
           <TR key={h.id} onClick={() => onRowClick(h)} className="cursor-pointer">
             <TD className="text-ink">
-              <span className="inline-flex items-center gap-2 min-w-0">
-                <span className="font-medium truncate">{h.symbol}</span>
-                <Badge tone={h.kind === "crypto" ? "orange" : "info"}>{h.kind === "crypto" ? "Crypto" : "Stock"}</Badge>
-              </span>
+              <span className="font-medium block truncate">{h.symbol}</span>
+            </TD>
+            <TD>
+              <Badge tone={h.kind === "crypto" ? "orange" : "info"}>{h.kind === "crypto" ? "Crypto" : "Stock"}</Badge>
             </TD>
             <TD className="text-muted tabular-nums">{Number(h.shares)}</TD>
             <TD align="right" className="text-muted tabular-nums">
