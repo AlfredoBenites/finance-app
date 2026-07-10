@@ -220,12 +220,17 @@ export default function AccountsPage() {
         </form>
       </Card>
 
-      {/* Your accounts — the pencil opens the manage panel (add/reorder/color). */}
+      {/* Your accounts — click the heading (or pencil) to open the manage panel. */}
       <div className="group flex items-center gap-1.5 mb-2">
-        <h2 className="text-lg font-semibold text-ink">Your Accounts</h2>
         <button
           onClick={() => setManagerOpen(true)}
           title="Add, reorder, and color accounts"
+          className="text-lg font-semibold text-ink hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+        >
+          Your Accounts
+        </button>
+        <button
+          onClick={() => setManagerOpen(true)}
           aria-label="Manage accounts"
           className="grid place-items-center h-6 w-6 rounded text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
