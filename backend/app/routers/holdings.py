@@ -1,6 +1,6 @@
 """CRUD for investment holdings + a price refresh. Scoped to the logged-in user."""
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -73,9 +73,18 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
     purchase. You can only buy with money already sitting in the account."""
     if payload.shares <= 0:
         raise HTTPException(status_code=400, detail="Shares must be positive.")
-    if payload.price < 0:
-        raise HTTPException(status_code=400, detail="Price can't be negative.")
-    amount = (payload.shares * payload.price).quantize(Decimal("0.01"))
+    if payload.amount is None and payload.price is None:
+        raise HTTPException(status_code=400, detail="Enter a price per share or a total cost.")
+    # The exact total wins when given (brokerages round the average price, so
+    # shares x price is off by a cent); otherwise derive it from shares x price.
+    if payload.amount is not None:
+        amount = payload.amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        price = payload.price if payload.price is not None else (amount / payload.shares)
+    else:
+        price = payload.price
+        amount = (payload.shares * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if price < 0 or amount < 0:
+        raise HTTPException(status_code=400, detail="Price and total can't be negative.")
 
     acc = (
         supabase.table("accounts")
@@ -126,7 +135,7 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
                     "kind": payload.kind,
                     "category": payload.category,
                     "shares": str(payload.shares),
-                    "last_price": str(payload.price),
+                    "last_price": str(price),
                     "price_updated_at": now,
                 }
             )
@@ -149,7 +158,7 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
             "kind": payload.kind,
             "type": "buy",
             "shares": str(payload.shares),
-            "price": str(payload.price),
+            "price": str(price),
             "amount": str(amount),
             "traded_on": traded_on,
             "notes": payload.notes,

@@ -39,13 +39,20 @@ class Holding(BaseModel):
 
 
 class HoldingBuy(BaseModel):
-    """Buy shares using an account's buying power (cash)."""
+    """Buy shares using an account's buying power (cash).
+
+    Give a per-share `price`, an exact `amount` (total charged), or both. When
+    `amount` is provided it's authoritative for the cash debited — brokerages
+    round the displayed average price, so shares x price often differs from the
+    real total by a cent.
+    """
     account_id: str
     symbol: str
     kind: str = "stock"
     category: Optional[str] = None
     shares: Decimal
-    price: Decimal  # per-share price paid
+    price: Optional[Decimal] = None  # per-share price paid
+    amount: Optional[Decimal] = None  # exact total charged (wins over shares x price)
     traded_on: Optional[str] = None  # ISO date; defaults to today
     notes: Optional[str] = None
 

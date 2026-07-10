@@ -24,7 +24,7 @@ import {
 import HoldingDetailPanel from "../components/investments/HoldingDetailPanel";
 
 const EMPTY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" };
-const EMPTY_BUY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", price: "" };
+const EMPTY_BUY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", price: "", total: "" };
 
 const KINDS = [
   ["stock", "Stock / ETF"],
@@ -79,8 +79,8 @@ export default function InvestmentsPage() {
 
   async function handleBuy(e) {
     e.preventDefault();
-    if (!buy.account_id || !buy.symbol.trim() || buy.shares === "" || buy.price === "") {
-      setError("Account, symbol, shares, and price are required to buy.");
+    if (!buy.account_id || !buy.symbol.trim() || buy.shares === "" || (buy.price === "" && buy.total === "")) {
+      setError("Account, symbol, shares, and a price or total are required to buy.");
       return;
     }
     try {
@@ -90,7 +90,8 @@ export default function InvestmentsPage() {
         kind: buy.kind,
         category: buy.category.trim() || null,
         shares: Number(buy.shares),
-        price: Number(buy.price),
+        price: buy.price === "" ? null : Number(buy.price),
+        amount: buy.total === "" ? null : Number(buy.total),
         traded_on: buy.traded_on || null,
       });
       setBuy({ ...EMPTY_BUY, traded_on: todayLocal() });
@@ -153,7 +154,12 @@ export default function InvestmentsPage() {
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
 
   const buyingPower = buy.account_id ? Number(accounts.find((a) => a.id === buy.account_id)?.balance ?? 0) : null;
-  const buyCost = buy.shares && buy.price ? Number(buy.shares) * Number(buy.price) : 0;
+  const buyCost =
+    buy.total !== ""
+      ? Number(buy.total)
+      : buy.shares && buy.price
+      ? Number(buy.shares) * Number(buy.price)
+      : 0;
 
   // Group: account -> category -> holdings.
   const grouped = {};
@@ -220,11 +226,14 @@ export default function InvestmentsPage() {
           <Field label="Price per share">
             <Input type="number" step="any" value={buy.price} onChange={(e) => setBuyField("price", e.target.value)} placeholder="0.00" />
           </Field>
+          <Field label="Total cost" hint="Optional. The exact amount charged; overrides shares x price.">
+            <Input type="number" step="0.01" value={buy.total} onChange={(e) => setBuyField("total", e.target.value)} placeholder="auto" />
+          </Field>
           <Field label="Date">
             <DateInput value={buy.traded_on} onChange={(v) => setBuyField("traded_on", v)} />
           </Field>
-          <div className="flex items-end">
-            <Button type="submit" variant="primary" className="w-full">Buy</Button>
+          <div className="sm:col-span-2 lg:col-span-4">
+            <Button type="submit" variant="primary">Buy</Button>
           </div>
         </form>
         {buy.account_id && (

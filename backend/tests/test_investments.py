@@ -52,6 +52,22 @@ def test_buying_more_adds_to_existing_holding(api):
     assert float(acc_row["balance"]) == 650
 
 
+def test_buy_uses_exact_total_when_given(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    # shares * price rounds to 463.51, but the real charge was 463.50.
+    r = api.client.post(
+        "/api/holdings/buy",
+        json={"account_id": acc, "symbol": "NVDA", "shares": 2.289841, "price": 202.42, "amount": 463.50},
+    )
+    assert r.status_code == 200, r.text
+    acc_row = next(a for a in api.client.get("/api/accounts").json() if a["id"] == acc)
+    assert float(acc_row["balance"]) == 536.50  # 1000 - 463.50, not 463.51
+    txn = api.client.get("/api/holdings/transactions").json()[0]
+    assert float(txn["amount"]) == 463.50
+    assert float(txn["price"]) == 202.42
+
+
 def test_buy_rejects_insufficient_buying_power(api):
     api.login("user-a", "a@example.com")
     acc = _account(api, 50)
