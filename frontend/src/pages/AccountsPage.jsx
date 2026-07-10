@@ -226,6 +226,7 @@ export default function AccountsPage() {
       <CollapsibleSection
         title="Your Accounts"
         storageKey="accounts.list"
+        summary={`${orderedActive.length} ${orderedActive.length === 1 ? "account" : "accounts"}`}
         actions={
           <button
             onClick={() => setManagerOpen(true)}
@@ -246,14 +247,22 @@ export default function AccountsPage() {
 
       {/* Closed accounts */}
       {closedAccounts.length > 0 && (
-        <CollapsibleSection title="Closed Accounts" storageKey="accounts.closed">
+        <CollapsibleSection
+          title="Closed Accounts"
+          storageKey="accounts.closed"
+          summary={`${closedAccounts.length} closed`}
+        >
           <AccountsTable rows={closedAccounts} closed={true} />
         </CollapsibleSection>
       )}
 
       {/* Transfer history */}
       {transfers.length > 0 && (
-        <CollapsibleSection title="Transfer History" storageKey="accounts.history">
+        <CollapsibleSection
+          title="Transfer History"
+          storageKey="accounts.history"
+          summary={`${transfers.length} ${transfers.length === 1 ? "transfer" : "transfers"}`}
+        >
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Select className="flex-1 min-w-[10rem]" value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>

@@ -1,11 +1,16 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import usePersistedState from "../../hooks/usePersistedState";
 import { cn } from "./cn";
 
-// A section whose body collapses/expands when you click its header. There's no
-// chevron: the flush-left header text is the toggle (hover underline hints it's
-// clickable). Pass `actions` for controls that sit after the title and should
-// NOT toggle (e.g. an edit pencil); they reveal on header hover via `group`.
+// A section whose body collapses/expands when you click its header. The header
+// text is the toggle (flush left, hover underline hints it's clickable) with a
+// small chevron after it that rotates to show the current state: pointing down
+// when open, right when collapsed. When collapsed you can also show a muted
+// `summary` (e.g. a count) so it's clear there's hidden content, not nothing.
+//
+// Pass `actions` for controls that sit after the header and should NOT toggle
+// (e.g. an edit pencil); they reveal on header hover via `group`.
 //
 // The body uses the CSS grid `0fr <-> 1fr` trick so the animation runs for the
 // SAME fixed duration regardless of content height. The inner wrapper needs
@@ -16,7 +21,7 @@ import { cn } from "./cn";
 // Pass `storageKey` to remember the open/closed choice across reloads.
 const EASE = "ease-[cubic-bezier(0.45,0,0.2,1)]";
 
-export default function CollapsibleSection({ title, actions, storageKey, defaultOpen = true, children, className }) {
+export default function CollapsibleSection({ title, summary, actions, storageKey, defaultOpen = true, children, className }) {
   // Persist only when a key is given; otherwise keep it in local state. Both
   // hooks run every render (hook rules), we just pick which one drives the UI.
   const localState = useState(defaultOpen);
@@ -30,10 +35,14 @@ export default function CollapsibleSection({ title, actions, storageKey, default
           type="button"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
-          className="text-lg font-semibold text-ink text-left rounded underline-offset-4 decoration-accent group-hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="inline-flex items-center gap-1.5 text-lg font-semibold text-ink text-left rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
-          {title}
+          <span className="underline-offset-4 decoration-accent group-hover:underline">{title}</span>
+          <ChevronDown size={18} className={cn("text-muted transition-transform duration-200", EASE, !open && "-rotate-90")} />
         </button>
+        {!open && summary != null && summary !== "" && (
+          <span className="text-sm text-muted">{summary}</span>
+        )}
         {actions}
       </div>
 
