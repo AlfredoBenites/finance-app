@@ -129,12 +129,12 @@ export default function AccountsManagerPanel({ accounts, open, onClose, onChange
         {/* Add an account */}
         <form onSubmit={add} className="space-y-3">
           <div className="text-xs font-medium uppercase tracking-wide text-muted">Add an account</div>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Account name (e.g. Chase Checking)" />
           <div className="flex gap-2">
-            <Select className="flex-1" value={type} onChange={(e) => setType(e.target.value)}>
+            <Input className="flex-1 min-w-0" value={name} onChange={(e) => setName(e.target.value)} placeholder="Account name" />
+            <Select className="w-32 shrink-0" value={type} onChange={(e) => setType(e.target.value)}>
               {ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
             </Select>
-            <Input type="number" step="0.01" className="w-32" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
+            <Input type="number" step="0.01" className="w-24 shrink-0" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
           </div>
           <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" className="h-4 w-4 accent-green" checked={isAsset} onChange={(e) => setIsAsset(e.target.checked)} />
