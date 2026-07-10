@@ -136,7 +136,7 @@ export default function Sidebar({
                   )}
                 />
                 <Icon size={18} strokeWidth={2} className="shrink-0" />
-                <span className={cn("truncate transition-opacity duration-300", collapsed && "md:opacity-0")}>{label}</span>
+                <span className={cn("overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-40")}>{label}</span>
               </>
             )}
           </NavLink>
@@ -156,7 +156,7 @@ export default function Sidebar({
           )}
         >
           <Settings size={18} className="shrink-0" />
-          <span className={cn("transition-opacity duration-300", collapsed && "md:opacity-0")}>Settings</span>
+          <span className={cn("overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-40")}>Settings</span>
         </button>
         <button
           onClick={togglePrivacy}
@@ -167,7 +167,7 @@ export default function Sidebar({
           )}
         >
           {amountsHidden ? <EyeOff size={18} className="shrink-0" /> : <Eye size={18} className="shrink-0" />}
-          <span className={cn("whitespace-nowrap transition-opacity duration-300", collapsed && "md:opacity-0")}>
+          <span className={cn("overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-40")}>
             {amountsHidden ? "Show Amounts" : "Hide Amounts"}
           </span>
         </button>
@@ -180,7 +180,7 @@ export default function Sidebar({
           )}
         >
           {dark ? <Sun size={18} className="shrink-0" /> : <Moon size={18} className="shrink-0" />}
-          <span className={cn("whitespace-nowrap transition-opacity duration-300", collapsed && "md:opacity-0")}>{dark ? "Light Mode" : "Dark Mode"}</span>
+          <span className={cn("overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-40")}>{dark ? "Light Mode" : "Dark Mode"}</span>
         </button>
 
         <div
@@ -196,7 +196,7 @@ export default function Sidebar({
             >
               {(user?.email?.[0] || "?").toUpperCase()}
             </span>
-            <span className={cn("text-sm text-ink truncate transition-opacity duration-300", collapsed && "md:opacity-0")} title={user?.email}>
+            <span className={cn("text-sm text-ink overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-32")} title={user?.email}>
               {user?.email?.split("@")[0] || "Account"}
             </span>
           </div>
