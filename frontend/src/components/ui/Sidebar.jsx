@@ -136,7 +136,7 @@ export default function Sidebar({
                   )}
                 />
                 <Icon size={18} strokeWidth={2} className="shrink-0" />
-                <span className={cn("truncate", collapsed && "md:hidden")}>{label}</span>
+                <span className={cn("truncate transition-opacity duration-300", collapsed && "md:opacity-0")}>{label}</span>
               </>
             )}
           </NavLink>
@@ -156,7 +156,7 @@ export default function Sidebar({
           )}
         >
           <Settings size={18} className="shrink-0" />
-          <span className={cn(collapsed && "md:hidden")}>Settings</span>
+          <span className={cn("transition-opacity duration-300", collapsed && "md:opacity-0")}>Settings</span>
         </button>
         <button
           onClick={togglePrivacy}
@@ -167,7 +167,7 @@ export default function Sidebar({
           )}
         >
           {amountsHidden ? <EyeOff size={18} className="shrink-0" /> : <Eye size={18} className="shrink-0" />}
-          <span className={cn("whitespace-nowrap", collapsed && "md:hidden")}>
+          <span className={cn("whitespace-nowrap transition-opacity duration-300", collapsed && "md:opacity-0")}>
             {amountsHidden ? "Show Amounts" : "Hide Amounts"}
           </span>
         </button>
@@ -180,7 +180,7 @@ export default function Sidebar({
           )}
         >
           {dark ? <Sun size={18} className="shrink-0" /> : <Moon size={18} className="shrink-0" />}
-          <span className={cn("whitespace-nowrap", collapsed && "md:hidden")}>{dark ? "Light Mode" : "Dark Mode"}</span>
+          <span className={cn("whitespace-nowrap transition-opacity duration-300", collapsed && "md:opacity-0")}>{dark ? "Light Mode" : "Dark Mode"}</span>
         </button>
 
         <div
@@ -196,7 +196,7 @@ export default function Sidebar({
             >
               {(user?.email?.[0] || "?").toUpperCase()}
             </span>
-            <span className={cn("text-sm text-ink truncate", collapsed && "md:hidden")} title={user?.email}>
+            <span className={cn("text-sm text-ink truncate transition-opacity duration-300", collapsed && "md:opacity-0")} title={user?.email}>
               {user?.email?.split("@")[0] || "Account"}
             </span>
           </div>

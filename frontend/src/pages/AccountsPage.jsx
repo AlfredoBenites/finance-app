@@ -172,7 +172,7 @@ export default function AccountsPage() {
     <div>
       <PageHeader
         title="Accounts"
-        subtitle="Bank, cash, and investment accounts. Balances are manual for now; net worth lives on the Dashboard."
+        subtitle="Your bank, cash, and investment accounts. Click the Your Accounts heading below to add, reorder, or recolor them."
       />
 
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
@@ -215,7 +215,7 @@ export default function AccountsPage() {
       </Card>
 
       {/* Your accounts — click the heading to open the manage panel. */}
-      <div className="mb-1">
+      <div className="mb-2">
         <button
           onClick={() => setManagerOpen(true)}
           title="Add, reorder, and color accounts"
@@ -224,7 +224,6 @@ export default function AccountsPage() {
           Your Accounts
         </button>
       </div>
-      <p className="text-sm text-muted mb-3">Click "Your Accounts" above to add, reorder, or recolor your accounts.</p>
       {orderedActive.length === 0 ? (
         <p className="text-muted text-sm mb-6">No accounts yet. Click "Your Accounts" to add one.</p>
       ) : (
