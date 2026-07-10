@@ -174,7 +174,7 @@ def delete_account(account_id: str, user_id: str = Depends(get_current_user_id))
         if is_foreign_key_violation(e):
             raise HTTPException(
                 status_code=409,
-                detail="Account has transactions. Delete or reassign them first.",
+                detail="Account still has linked transactions or income. Reassign or delete those first.",
             )
         raise
     if not result.data:

@@ -16,10 +16,13 @@ import { ACCOUNT_TYPES, typeLabel } from "./accountTypes";
 // Slide-over to edit a single account, toggle its Buckets visibility, close /
 // reopen it, or delete it. The parent keeps `account` non-null through the close
 // animation (it never clears the selected id), so we don't guard for null here.
-export default function AccountDetailPanel({ account, open, onClose, onChanged, onError }) {
+export default function AccountDetailPanel({ account, open, onClose, onChanged }) {
   const [form, setForm] = useState({ name: "", account_type: "checking", balance: "", is_asset: true });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Errors from panel actions show inline (next to the button that failed)
+  // rather than in the page banner, so the user sees them without scrolling up.
+  const [actionError, setActionError] = useState(null);
 
   // Reset the form only when a different account is opened (not on every list
   // refresh), so an in-progress edit isn't clobbered by a background reload.
@@ -32,6 +35,7 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged, 
       is_asset: account.is_asset,
     });
     setConfirmDelete(false);
+    setActionError(null);
   }, [account?.id]);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -39,11 +43,11 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged, 
   async function run(fn) {
     if (busy) return;
     setBusy(true);
+    setActionError(null);
     try {
       await fn();
-      onError?.(null);
     } catch (e) {
-      onError?.(e.message);
+      setActionError(e.message);
     } finally {
       setBusy(false);
     }
@@ -166,13 +170,14 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged, 
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-ink">Delete this account for good?</span>
               <Button variant="danger" size="sm" onClick={remove} disabled={busy}>Delete</Button>
-              <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)} disabled={busy}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setConfirmDelete(false); setActionError(null); }} disabled={busy}>Cancel</Button>
             </div>
           ) : (
-            <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)} disabled={busy}>
+            <Button variant="danger" size="sm" onClick={() => { setActionError(null); setConfirmDelete(true); }} disabled={busy}>
               Delete account
             </Button>
           )}
+          {actionError && <p className="mt-2 text-sm text-danger">{actionError}</p>}
         </div>
       </div>
     </SlideOver>

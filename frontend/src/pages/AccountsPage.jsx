@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { accountsApi, bucketsApi } from "../api/client";
 import { formatDate } from "../format";
 import { useSettings } from "../settings/SettingsContext";
@@ -220,21 +220,16 @@ export default function AccountsPage() {
         </form>
       </Card>
 
-      {/* Your accounts — click the heading (or pencil) to open the manage panel. */}
-      <div className="group flex items-center gap-1.5 mb-2">
+      {/* Your accounts — click the heading to open the manage panel. Hover uses
+          the darker green in light mode (the accent yellow is too faint there) and
+          the highlighter accent in dark mode. */}
+      <div className="mb-2">
         <button
           onClick={() => setManagerOpen(true)}
           title="Add, reorder, and color accounts"
-          className="text-lg font-semibold text-ink hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          className="text-lg font-semibold text-ink hover:text-green dark:hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         >
           Your Accounts
-        </button>
-        <button
-          onClick={() => setManagerOpen(true)}
-          aria-label="Manage accounts"
-          className="grid place-items-center h-6 w-6 rounded text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <Pencil size={14} />
         </button>
       </div>
       {orderedActive.length === 0 ? (
@@ -339,7 +334,6 @@ export default function AccountsPage() {
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
         onChanged={load}
-        onError={setError}
       />
     </div>
   );
