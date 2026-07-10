@@ -188,9 +188,9 @@ export default function AccountsPage() {
       {/* Transfer money */}
       <CollapsibleSection title="Transfer Money" storageKey="accounts.transfer">
         <Card>
-          <form onSubmit={doTransfer} className="flex flex-wrap items-end gap-3">
+          <form onSubmit={doTransfer} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <Field label="Amount">
-              <AmountInput className="w-32" value={xfer.amount} onChange={(v) => setXferField({ amount: v })} />
+              <AmountInput value={xfer.amount} onChange={(v) => setXferField({ amount: v })} />
             </Field>
             <Field label="From account">
               <Select value={xfer.from} onChange={(e) => setXferField({ from: e.target.value, fromBucket: "unallocated" })}>
@@ -216,7 +216,9 @@ export default function AccountsPage() {
                 {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </Select>
             </Field>
-            <Button type="submit" variant="primary">Transfer</Button>
+            <div className="flex items-end">
+              <Button type="submit" variant="primary" className="w-full">Transfer</Button>
+            </div>
           </form>
         </Card>
       </CollapsibleSection>
@@ -254,17 +256,17 @@ export default function AccountsPage() {
       {transfers.length > 0 && (
         <CollapsibleSection title="Transfer History" storageKey="accounts.history">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <Select value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
+            <Select className="flex-1 min-w-[10rem]" value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </Select>
             <label className="flex items-center gap-1 text-sm text-muted">
               From
-              <DateInput className="w-32" value={filters.from} onChange={(v) => setFilter("from", v)} />
+              <DateInput className="w-40" value={filters.from} onChange={(v) => setFilter("from", v)} />
             </label>
             <label className="flex items-center gap-1 text-sm text-muted">
               To
-              <DateInput className="w-32" value={filters.to} onChange={(v) => setFilter("to", v)} />
+              <DateInput className="w-40" value={filters.to} onChange={(v) => setFilter("to", v)} />
             </label>
             <Input type="number" step="0.01" min="0" placeholder="Min $" className="w-28" value={filters.min} onChange={(e) => setFilter("min", e.target.value)} />
             <Input type="number" step="0.01" min="0" placeholder="Max $" className="w-28" value={filters.max} onChange={(e) => setFilter("max", e.target.value)} />
