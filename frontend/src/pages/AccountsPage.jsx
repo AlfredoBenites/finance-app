@@ -14,7 +14,6 @@ import {
   Select,
   AmountInput,
   DateInput,
-  CollapsibleSection,
   Table,
   THead,
   TH,
@@ -185,84 +184,76 @@ export default function AccountsPage() {
       {error && <Banner tone="danger" className="mb-4">Error: {error}</Banner>}
 
       {/* Transfer money */}
-      <CollapsibleSection title="Transfer Money" storageKey="accounts.transfer">
-        <Card>
-          <form onSubmit={doTransfer} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <Field label="Amount">
-              <AmountInput value={xfer.amount} onChange={(v) => setXferField({ amount: v })} />
-            </Field>
-            <Field label="From account">
-              <Select value={xfer.from} onChange={(e) => setXferField({ from: e.target.value, fromBucket: "unallocated" })}>
-                <option value="">Account…</option>
-                {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="From bucket">
-              <Select value={xfer.fromBucket} onChange={(e) => setXferField({ fromBucket: e.target.value })}>
-                <option value="unallocated">Unallocated</option>
-                {buckets.filter((b) => b.account_id === xfer.from).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="To account">
-              <Select value={xfer.to} onChange={(e) => setXferField({ to: e.target.value, toBucket: "unallocated" })}>
-                <option value="">Account…</option>
-                {activeAccounts.filter((a) => a.id !== xfer.from).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </Select>
-            </Field>
-            <Field label="To bucket">
-              <Select value={xfer.toBucket} onChange={(e) => setXferField({ toBucket: e.target.value })}>
-                <option value="unallocated">Unallocated</option>
-                {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </Select>
-            </Field>
-            <div className="flex items-end">
-              <Button type="submit" variant="primary" className="w-full">Transfer</Button>
-            </div>
-          </form>
-        </Card>
-      </CollapsibleSection>
+      <h2 className="text-lg font-semibold text-ink mb-2">Transfer Money</h2>
+      <Card className="mb-6">
+        <form onSubmit={doTransfer} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <Field label="Amount">
+            <AmountInput value={xfer.amount} onChange={(v) => setXferField({ amount: v })} />
+          </Field>
+          <Field label="From account">
+            <Select value={xfer.from} onChange={(e) => setXferField({ from: e.target.value, fromBucket: "unallocated" })}>
+              <option value="">Account…</option>
+              {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="From bucket">
+            <Select value={xfer.fromBucket} onChange={(e) => setXferField({ fromBucket: e.target.value })}>
+              <option value="unallocated">Unallocated</option>
+              {buckets.filter((b) => b.account_id === xfer.from).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="To account">
+            <Select value={xfer.to} onChange={(e) => setXferField({ to: e.target.value, toBucket: "unallocated" })}>
+              <option value="">Account…</option>
+              {activeAccounts.filter((a) => a.id !== xfer.from).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="To bucket">
+            <Select value={xfer.toBucket} onChange={(e) => setXferField({ toBucket: e.target.value })}>
+              <option value="unallocated">Unallocated</option>
+              {buckets.filter((b) => b.account_id === xfer.to).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+          </Field>
+          <div className="flex items-end">
+            <Button type="submit" variant="primary" className="w-full">Transfer</Button>
+          </div>
+        </form>
+      </Card>
 
-      {/* Your accounts — click the name to collapse; the pencil manages accounts. */}
-      <CollapsibleSection
-        title="Your Accounts"
-        storageKey="accounts.list"
-        summary={`${orderedActive.length} ${orderedActive.length === 1 ? "account" : "accounts"}`}
-        actions={
-          <button
-            onClick={() => setManagerOpen(true)}
-            title="Add, reorder, and color accounts"
-            aria-label="Manage accounts"
-            className="grid place-items-center h-6 w-6 rounded text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <Pencil size={14} />
-          </button>
-        }
-      >
-        {orderedActive.length === 0 ? (
-          <p className="text-muted text-sm">No accounts yet. Click "Your accounts" to add one.</p>
-        ) : (
+      {/* Your accounts — the pencil opens the manage panel (add/reorder/color). */}
+      <div className="group flex items-center gap-1.5 mb-2">
+        <h2 className="text-lg font-semibold text-ink">Your Accounts</h2>
+        <button
+          onClick={() => setManagerOpen(true)}
+          title="Add, reorder, and color accounts"
+          aria-label="Manage accounts"
+          className="grid place-items-center h-6 w-6 rounded text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          <Pencil size={14} />
+        </button>
+      </div>
+      {orderedActive.length === 0 ? (
+        <p className="text-muted text-sm mb-6">No accounts yet. Use the pencil to add one.</p>
+      ) : (
+        <div className="mb-6">
           <AccountsTable rows={orderedActive} closed={false} />
-        )}
-      </CollapsibleSection>
+        </div>
+      )}
 
       {/* Closed accounts */}
       {closedAccounts.length > 0 && (
-        <CollapsibleSection
-          title="Closed Accounts"
-          storageKey="accounts.closed"
-          summary={`${closedAccounts.length} closed`}
-        >
-          <AccountsTable rows={closedAccounts} closed={true} />
-        </CollapsibleSection>
+        <>
+          <h2 className="text-lg font-semibold text-ink mb-2">Closed Accounts</h2>
+          <div className="mb-6">
+            <AccountsTable rows={closedAccounts} closed={true} />
+          </div>
+        </>
       )}
 
       {/* Transfer history */}
       {transfers.length > 0 && (
-        <CollapsibleSection
-          title="Transfer History"
-          storageKey="accounts.history"
-          summary={`${transfers.length} ${transfers.length === 1 ? "transfer" : "transfers"}`}
-        >
+        <>
+          <h2 className="text-lg font-semibold text-ink mb-2">Transfer History</h2>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Select className="flex-1 min-w-[10rem]" value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>
@@ -327,7 +318,7 @@ export default function AccountsPage() {
               )}
             </>
           )}
-        </CollapsibleSection>
+        </>
       )}
 
       <AccountsManagerPanel
