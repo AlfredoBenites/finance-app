@@ -11,7 +11,6 @@ import {
   Banner,
   Amount,
   Field,
-  Input,
   Select,
   AmountInput,
   DateInput,
@@ -268,8 +267,8 @@ export default function AccountsPage() {
               To
               <DateInput className="w-40" value={filters.to} onChange={(v) => setFilter("to", v)} />
             </label>
-            <Input type="number" step="0.01" min="0" placeholder="Min $" className="w-28" value={filters.min} onChange={(e) => setFilter("min", e.target.value)} />
-            <Input type="number" step="0.01" min="0" placeholder="Max $" className="w-28" value={filters.max} onChange={(e) => setFilter("max", e.target.value)} />
+            <AmountInput className="w-28" placeholder="Min" value={filters.min} onChange={(v) => setFilter("min", v)} />
+            <AmountInput className="w-28" placeholder="Max" value={filters.max} onChange={(v) => setFilter("max", v)} />
             <button
               type="button"
               onClick={() => setFilters(EMPTY_FILTERS)}
