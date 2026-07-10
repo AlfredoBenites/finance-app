@@ -1,24 +1,51 @@
 import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { holdingsApi, accountsApi } from "../api/client";
-import { money } from "../format";
+import {
+  PageHeader,
+  Card,
+  Button,
+  Badge,
+  Banner,
+  StatCard,
+  Amount,
+  Field,
+  Input,
+  Select,
+  Table,
+  THead,
+  TH,
+  TR,
+  TD,
+} from "../components/ui";
+import HoldingDetailPanel from "../components/investments/HoldingDetailPanel";
 
 const EMPTY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" };
 
-// shares can be fractional + crypto prices are tiny, so don't force 2 decimals
-const price = (n) =>
+const KINDS = [
+  ["stock", "Stock / ETF"],
+  ["crypto", "Crypto"],
+];
+
+// Fractional shares + tiny crypto prices, so show up to 6 decimals (not cents).
+const priceStr = (n) =>
   n == null ? "—" : `$${Number(n).toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
+
+const effPrice = (h) => (h.manual_price != null ? h.manual_price : h.last_price);
+const holdingValue = (h) => (effPrice(h) == null ? null : Number(h.shares) * Number(effPrice(h)));
 
 export default function InvestmentsPage() {
   const [holdings, setHoldings] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(EMPTY);
-  const [editingId, setEditingId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "—";
-  const effPrice = (h) => (h.manual_price != null ? h.manual_price : h.last_price);
-  const value = (h) => (effPrice(h) == null ? null : Number(h.shares) * Number(effPrice(h)));
+  // Edit panel — keep the id set through the close animation.
+  const [panelHoldingId, setPanelHoldingId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  const accountName = (id) => accounts.find((a) => a.id === id)?.name ?? "Unassigned";
 
   async function load() {
     try {
@@ -29,53 +56,30 @@ export default function InvestmentsPage() {
       setError(e.message);
     }
   }
-  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    load();
+  }, []);
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  async function handleSubmit(e) {
+  async function handleAdd(e) {
     e.preventDefault();
     if (!form.account_id || !form.symbol.trim() || form.shares === "") {
       setError("Account, symbol, and shares are required.");
       return;
     }
-    const payload = {
-      account_id: form.account_id,
-      symbol: form.symbol.trim().toUpperCase(),
-      kind: form.kind,
-      category: form.category.trim() || null,
-      shares: Number(form.shares),
-      manual_price: form.manual_price === "" ? null : Number(form.manual_price),
-    };
     try {
-      if (editingId) await holdingsApi.update(editingId, payload);
-      else await holdingsApi.create(payload);
+      await holdingsApi.create({
+        account_id: form.account_id,
+        symbol: form.symbol.trim().toUpperCase(),
+        kind: form.kind,
+        category: form.category.trim() || null,
+        shares: Number(form.shares),
+        manual_price: form.manual_price === "" ? null : Number(form.manual_price),
+      });
       setForm(EMPTY);
-      setEditingId(null);
       setError(null);
-      load();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  function startEdit(h) {
-    setEditingId(h.id);
-    setError(null);
-    setForm({
-      account_id: h.account_id,
-      symbol: h.symbol,
-      kind: h.kind,
-      category: h.category ?? "",
-      shares: String(h.shares),
-      manual_price: h.manual_price != null ? String(h.manual_price) : "",
-    });
-  }
-
-  async function handleDelete(id) {
-    try {
-      await holdingsApi.remove(id);
-      if (editingId === id) { setEditingId(null); setForm(EMPTY); }
       load();
     } catch (e) {
       setError(e.message);
@@ -87,7 +91,11 @@ export default function InvestmentsPage() {
     setBusy(true);
     try {
       const r = await holdingsApi.refreshPrices();
-      setError(r.updated < r.total ? `Updated ${r.updated} of ${r.total} (some symbols had no price — set a manual price).` : null);
+      setError(
+        r.updated < r.total
+          ? `Updated ${r.updated} of ${r.total} (some symbols had no price — set a manual price).`
+          : null
+      );
       await load();
     } catch (e) {
       setError(e.message);
@@ -96,96 +104,160 @@ export default function InvestmentsPage() {
     }
   }
 
-  const total = holdings.reduce((s, h) => s + (value(h) || 0), 0);
-  // group: account -> category -> holdings
+  function openPanel(h) {
+    setPanelHoldingId(h.id);
+    setPanelOpen(true);
+  }
+
+  const panelHolding = holdings.find((h) => h.id === panelHoldingId) || null;
+  const categories = [...new Set(holdings.map((h) => h.category).filter(Boolean))].sort();
+  const total = holdings.reduce((s, h) => s + (holdingValue(h) || 0), 0);
+
+  // Group: account -> category -> holdings.
   const grouped = {};
   for (const h of holdings) {
     const cat = h.category || "Uncategorized";
     grouped[h.account_id] = grouped[h.account_id] || {};
     (grouped[h.account_id][cat] = grouped[h.account_id][cat] || []).push(h);
   }
-  const sum = (list) => list.reduce((s, h) => s + (value(h) || 0), 0);
+  const sum = (list) => list.reduce((s, h) => s + (holdingValue(h) || 0), 0);
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Investments</h1>
-        <button onClick={refresh} disabled={busy}>{busy ? "Refreshing…" : "Refresh prices"}</button>
-      </div>
-      <p><small>
-        Enter your shares; prices come from Finnhub (stocks) and CoinGecko (crypto).
-        An account's value becomes the sum of its holdings (overriding its manual balance),
-        and that flows into net worth. Set a manual price to override anything not found.
-      </small></p>
+      <PageHeader
+        title="Investments"
+        subtitle="Enter your shares; prices come from Finnhub (stocks) and CoinGecko (crypto). An account's value becomes the sum of its holdings and flows into net worth."
+        actions={
+          <Button variant="secondary" onClick={refresh} disabled={busy}>
+            <RefreshCw size={16} className={busy ? "animate-spin" : undefined} />
+            {busy ? "Refreshing…" : "Refresh prices"}
+          </Button>
+        }
+      />
 
-      <form onSubmit={handleSubmit} style={{ flexWrap: "wrap" }}>
-        <select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)}>
-          <option value="">Account…</option>
-          {accounts.filter((a) => a.is_active !== false).map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </select>
-        <select value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
-          <option value="stock">Stock / ETF</option>
-          <option value="crypto">Crypto</option>
-        </select>
-        <input placeholder="Symbol (AAPL, BTC)" value={form.symbol} onChange={(e) => setField("symbol", e.target.value)} />
-        <input placeholder="Category (Roth IRA, Crypto…)" list="holding-categories" value={form.category} onChange={(e) => setField("category", e.target.value)} />
-        <datalist id="holding-categories">
-          {[...new Set(holdings.map((h) => h.category).filter(Boolean))].map((c) => <option key={c} value={c} />)}
-        </datalist>
-        <input type="number" step="any" placeholder="Shares" value={form.shares} onChange={(e) => setField("shares", e.target.value)} />
-        <input type="number" step="any" placeholder="Manual price (optional)" value={form.manual_price} onChange={(e) => setField("manual_price", e.target.value)} />
-        <button type="submit">{editingId ? "Save" : "Add holding"}</button>
-        {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(EMPTY); }}>Cancel</button>}
-      </form>
+      {error && <Banner tone="danger" className="mb-4">{error}</Banner>}
 
-      {error && <p style={{ color: "#dc2626" }}>{error}</p>}
-
-      <div className="card">
-        <span><strong>Total investments</strong></span>
-        <strong>{money(total)}</strong>
+      <div className="mb-6 max-w-sm">
+        <StatCard
+          label="Total investments"
+          value={<Amount value={total} />}
+          hint="Sum of every holding at its current or manual price."
+        />
       </div>
 
-      {holdings.length === 0 && <p>No holdings yet.</p>}
-
-      {Object.entries(grouped).map(([accId, cats]) => {
-        const accHoldings = Object.values(cats).flat();
-        return (
-          <div key={accId} style={{ marginTop: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", borderBottom: "2px solid #2563eb" }}>
-              <h2 style={{ margin: "0 0 4px" }}>{accountName(accId)}</h2>
-              <strong>{money(sum(accHoldings))}</strong>
-            </div>
-            {Object.entries(cats).map(([cat, list]) => (
-              <div key={cat}>
-                <div style={{ display: "flex", justifyContent: "space-between", margin: "8px 0 2px", color: "#6b7280" }}>
-                  <small><strong>{cat}</strong></small>
-                  <small>{money(sum(list))}</small>
-                </div>
-                {list.map((h) => (
-                  <div className="card" key={h.id}>
-                    <span>
-                      <strong>{h.symbol}</strong> · {h.kind} · {Number(h.shares)} shares
-                      <br />
-                      <small>
-                        {h.manual_price != null ? "manual " : ""}price {price(effPrice(h))}
-                        {h.last_price != null && h.manual_price == null && h.price_updated_at
-                          ? ` · updated ${(h.price_updated_at || "").slice(0, 10)}` : ""}
-                        {" · value "}<strong>{value(h) == null ? "—" : money(value(h))}</strong>
-                      </small>
-                    </span>
-                    <span style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => startEdit(h)}>Edit</button>
-                      <button className="danger" onClick={() => handleDelete(h.id)}>Delete</button>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
+      {/* Add a holding */}
+      <h2 className="text-lg font-semibold text-ink mb-2">Add a holding</h2>
+      <Card className="mb-6">
+        <form onSubmit={handleAdd} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <Field label="Account">
+            <Select value={form.account_id} onChange={(e) => setField("account_id", e.target.value)}>
+              <option value="">Account…</option>
+              {accounts.filter((a) => a.is_active !== false).map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Type">
+            <Select value={form.kind} onChange={(e) => setField("kind", e.target.value)}>
+              {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </Select>
+          </Field>
+          <Field label="Symbol">
+            <Input value={form.symbol} onChange={(e) => setField("symbol", e.target.value)} placeholder="AAPL, BTC" />
+          </Field>
+          <Field label="Category">
+            <Input value={form.category} onChange={(e) => setField("category", e.target.value)} placeholder="Roth IRA" list="holding-categories" />
+            <datalist id="holding-categories">
+              {categories.map((c) => <option key={c} value={c} />)}
+            </datalist>
+          </Field>
+          <Field label="Shares">
+            <Input type="number" step="any" value={form.shares} onChange={(e) => setField("shares", e.target.value)} />
+          </Field>
+          <Field label="Manual price">
+            <Input type="number" step="any" value={form.manual_price} onChange={(e) => setField("manual_price", e.target.value)} placeholder="auto" />
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-6">
+            <Button type="submit" variant="primary" size="sm">Add holding</Button>
           </div>
+        </form>
+      </Card>
+
+      {/* Holdings by account */}
+      {holdings.length === 0 ? (
+        <p className="text-muted text-sm">No holdings yet. Add one above.</p>
+      ) : (
+        Object.entries(grouped).map(([accId, cats]) => {
+          const accHoldings = Object.values(cats).flat();
+          return (
+            <section key={accId} className="mb-6">
+              <div className="flex items-baseline justify-between gap-3 mb-2">
+                <h2 className="text-lg font-semibold text-ink">{accountName(accId)}</h2>
+                <strong className="text-ink"><Amount value={sum(accHoldings)} /></strong>
+              </div>
+              <div className="overflow-x-auto">
+                <Table className="table-fixed min-w-[36rem]">
+                  <THead>
+                    <tr>
+                      <TH className="w-[30%]">Holding</TH>
+                      <TH className="w-[22%]">Shares</TH>
+                      <TH align="right" className="w-[24%]">Price</TH>
+                      <TH align="right" className="w-[24%]">Value</TH>
+                    </tr>
+                  </THead>
+                  <tbody>
+                    {Object.entries(cats).map(([cat, list]) => (
+                      <CategoryGroup key={cat} cat={cat} list={list} onRowClick={openPanel} />
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            </section>
+          );
+        })
+      )}
+
+      <HoldingDetailPanel
+        holding={panelHolding}
+        accounts={accounts}
+        categories={categories}
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        onChanged={load}
+      />
+    </div>
+  );
+}
+
+// A category subheader row followed by its holdings, inside an account's table.
+function CategoryGroup({ cat, list, onRowClick }) {
+  const catTotal = list.reduce((s, h) => s + (holdingValue(h) || 0), 0);
+  return (
+    <>
+      <tr className="bg-surface-muted">
+        <TD className="text-xs font-medium uppercase tracking-wide text-muted">{cat}</TD>
+        <TD />
+        <TD />
+        <TD align="right" className="text-xs text-muted"><Amount value={catTotal} /></TD>
+      </tr>
+      {list.map((h) => {
+        const val = holdingValue(h);
+        return (
+          <TR key={h.id} onClick={() => onRowClick(h)} className="cursor-pointer">
+            <TD className="text-ink">
+              <span className="inline-flex items-center gap-2 min-w-0">
+                <span className="font-medium truncate">{h.symbol}</span>
+                <Badge tone={h.kind === "crypto" ? "orange" : "info"}>{h.kind === "crypto" ? "Crypto" : "Stock"}</Badge>
+              </span>
+            </TD>
+            <TD className="text-muted tabular-nums">{Number(h.shares)}</TD>
+            <TD align="right" className="text-muted tabular-nums">
+              {h.manual_price != null ? "manual " : ""}{priceStr(effPrice(h))}
+            </TD>
+            <TD align="right"><strong className="text-ink">{val == null ? <span className="text-muted">—</span> : <Amount value={val} />}</strong></TD>
+          </TR>
         );
       })}
-    </div>
+    </>
   );
 }
