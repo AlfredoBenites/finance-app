@@ -220,14 +220,12 @@ export default function AccountsPage() {
         </form>
       </Card>
 
-      {/* Your accounts — click the heading to open the manage panel. Hover uses
-          the darker green in light mode (the accent yellow is too faint there) and
-          the highlighter accent in dark mode. */}
+      {/* Your accounts — click the heading to open the manage panel. */}
       <div className="mb-2">
         <button
           onClick={() => setManagerOpen(true)}
           title="Add, reorder, and color accounts"
-          className="text-lg font-semibold text-ink hover:text-green dark:hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          className="text-lg font-semibold text-ink hover:text-green transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         >
           Your Accounts
         </button>
