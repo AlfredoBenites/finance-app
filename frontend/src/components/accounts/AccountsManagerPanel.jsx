@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { GripVertical, Ban } from "lucide-react";
 import { accountsApi } from "../../api/client";
 import { useSettings } from "../../settings/SettingsContext";
-import { SlideOver, Button, Input, Select, cn } from "../ui";
+import { SlideOver, Button, Input, Select, AmountInput, cn } from "../ui";
 import { BucketIcon, BUCKET_COLORS } from "../buckets/bucketIcons";
 import { ACCOUNT_TYPES, typeLabel } from "./accountTypes";
 
@@ -134,7 +134,7 @@ export default function AccountsManagerPanel({ accounts, open, onClose, onChange
             <Select className="w-32 shrink-0" value={type} onChange={(e) => setType(e.target.value)}>
               {ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}
             </Select>
-            <Input type="number" step="0.01" className="w-24 shrink-0" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="Balance" />
+            <AmountInput className="w-28 shrink-0" value={balance} onChange={setBalance} placeholder="Balance" />
           </div>
           <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" className="h-4 w-4 accent-green" checked={isAsset} onChange={(e) => setIsAsset(e.target.checked)} />

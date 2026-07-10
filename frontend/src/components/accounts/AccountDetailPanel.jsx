@@ -8,6 +8,7 @@ import {
   Select,
   Toggle,
   Amount,
+  AmountInput,
   Badge,
 } from "../ui";
 import { ACCOUNT_TYPES, typeLabel } from "./accountTypes";
@@ -115,12 +116,7 @@ export default function AccountDetailPanel({ account, open, onClose, onChanged, 
           </Select>
         </Field>
         <Field label="Balance" hint="Manually tracked. Investment accounts with holdings are valued by their holdings instead.">
-          <Input
-            type="number"
-            step="0.01"
-            value={form.balance}
-            onChange={(e) => set("balance", e.target.value)}
-          />
+          <AmountInput value={form.balance} onChange={(v) => set("balance", v)} />
         </Field>
         <label className="flex items-center gap-2 text-sm text-ink">
           <input
