@@ -77,3 +77,43 @@ def test_buy_rejects_insufficient_buying_power(api):
     # Nothing changed.
     assert api.client.get("/api/holdings").json() == []
     assert api.client.get("/api/holdings/transactions").json() == []
+
+
+def test_sell_reduces_shares_and_returns_cash(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    api.client.post("/api/holdings/buy", json={"account_id": acc, "symbol": "AAPL", "shares": 5, "price": 100})
+    hid = api.client.get("/api/holdings").json()[0]["id"]
+
+    r = api.client.post("/api/holdings/sell", json={"holding_id": hid, "shares": 2, "price": 120})
+    assert r.status_code == 200, r.text
+    assert r.json()["shares_left"] == 3
+
+    assert float(api.client.get("/api/holdings").json()[0]["shares"]) == 3
+    acc_row = next(a for a in api.client.get("/api/accounts").json() if a["id"] == acc)
+    # 1000 - 500 (buy) + 240 (sell) = 740
+    assert float(acc_row["balance"]) == 740
+    sells = [t for t in api.client.get("/api/holdings/transactions").json() if t["type"] == "sell"]
+    assert len(sells) == 1 and float(sells[0]["amount"]) == 240
+
+
+def test_selling_all_shares_deletes_the_holding(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    api.client.post("/api/holdings/buy", json={"account_id": acc, "symbol": "AAPL", "shares": 5, "price": 100})
+    hid = api.client.get("/api/holdings").json()[0]["id"]
+    r = api.client.post("/api/holdings/sell", json={"holding_id": hid, "shares": 5, "price": 100})
+    assert r.status_code == 200 and r.json()["shares_left"] == 0
+    assert api.client.get("/api/holdings").json() == []
+    acc_row = next(a for a in api.client.get("/api/accounts").json() if a["id"] == acc)
+    assert float(acc_row["balance"]) == 1000  # cash fully returned
+
+
+def test_sell_more_than_owned_is_rejected(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    api.client.post("/api/holdings/buy", json={"account_id": acc, "symbol": "AAPL", "shares": 2, "price": 100})
+    hid = api.client.get("/api/holdings").json()[0]["id"]
+    r = api.client.post("/api/holdings/sell", json={"holding_id": hid, "shares": 3, "price": 100})
+    assert r.status_code == 400
+    assert "only have" in r.json()["detail"].lower()

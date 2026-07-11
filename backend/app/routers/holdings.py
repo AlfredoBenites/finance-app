@@ -10,10 +10,12 @@ from app.models.holding import (
     Holding,
     HoldingBuy,
     HoldingCreate,
+    HoldingSell,
     HoldingUpdate,
     InvestmentTransaction,
 )
 from app.services import prices
+from app.services.money_log import log_move
 
 router = APIRouter(prefix="/api/holdings", tags=["holdings"])
 
@@ -165,7 +167,81 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
         }
     ).execute()
 
+    # Also record the cash leaving the account so it shows in Accounts history.
+    log_move(user_id, "account", amount, f"Bought {payload.shares} {symbol} · {acc[0]['name']}")
+
     return supabase.table(TABLE).select("*").eq("id", holding_id).eq("owner_id", user_id).execute().data[0]
+
+
+@router.post("/sell")
+def sell_holding(payload: HoldingSell, user_id: str = Depends(get_current_user_id)):
+    """Sell shares of a holding: reduce its shares (deleting it if it hits zero),
+    return the proceeds to the holding's account cash, and log the sale."""
+    if payload.shares <= 0:
+        raise HTTPException(status_code=400, detail="Shares must be positive.")
+    if payload.amount is None and payload.price is None:
+        raise HTTPException(status_code=400, detail="Enter a price per share or a total.")
+
+    found = (
+        supabase.table(TABLE).select("*").eq("id", payload.holding_id).eq("owner_id", user_id).execute().data
+    )
+    if not found:
+        raise HTTPException(status_code=404, detail="Holding not found")
+    holding = found[0]
+    owned = Decimal(str(holding["shares"]))
+    if payload.shares > owned:
+        raise HTTPException(status_code=400, detail=f"You only have {owned} shares to sell.")
+
+    if payload.amount is not None:
+        amount = payload.amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        price = payload.price if payload.price is not None else (amount / payload.shares)
+    else:
+        price = payload.price
+        amount = (payload.shares * price).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if price < 0 or amount < 0:
+        raise HTTPException(status_code=400, detail="Price and total can't be negative.")
+
+    traded_on = payload.traded_on or date.today().isoformat()
+    # Log first (holding still exists); the FK nulls holding_id if we delete it.
+    supabase.table("investment_transactions").insert(
+        {
+            "owner_id": user_id,
+            "account_id": holding["account_id"],
+            "holding_id": holding["id"],
+            "symbol": holding["symbol"],
+            "kind": holding["kind"],
+            "type": "sell",
+            "shares": str(payload.shares),
+            "price": str(price),
+            "amount": str(amount),
+            "traded_on": traded_on,
+            "notes": payload.notes,
+        }
+    ).execute()
+
+    new_shares = owned - payload.shares
+    if new_shares == 0:
+        supabase.table(TABLE).delete().eq("id", holding["id"]).eq("owner_id", user_id).execute()
+    else:
+        supabase.table(TABLE).update({"shares": str(new_shares)}).eq("id", holding["id"]).eq(
+            "owner_id", user_id
+        ).execute()
+
+    acc = (
+        supabase.table("accounts")
+        .select("id, name, balance")
+        .eq("id", holding["account_id"])
+        .eq("owner_id", user_id)
+        .execute()
+        .data
+    )
+    if acc:
+        supabase.table("accounts").update({"balance": str(Decimal(str(acc[0]["balance"])) + amount)}).eq(
+            "id", acc[0]["id"]
+        ).eq("owner_id", user_id).execute()
+        log_move(user_id, "account", amount, f"Sold {payload.shares} {holding['symbol']} · {acc[0]['name']}")
+
+    return {"ok": True, "shares_left": float(new_shares)}
 
 
 @router.put("/{holding_id}", response_model=Holding)

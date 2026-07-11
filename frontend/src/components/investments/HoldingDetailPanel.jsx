@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { holdingsApi } from "../../api/client";
-import { SlideOver, Button, Field, Input, Select, Amount, Badge } from "../ui";
+import { todayLocal } from "../../format";
+import { SlideOver, Button, Field, Input, Select, DateInput, Amount, Badge } from "../ui";
 
 const KINDS = [
   ["stock", "Stock / ETF"],
@@ -15,6 +16,7 @@ const priceStr = (n) =>
 // non-null through the close animation.
 export default function HoldingDetailPanel({ holding, accounts, categories, open, onClose, onChanged }) {
   const [form, setForm] = useState({ account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" });
+  const [sell, setSell] = useState({ shares: "", price: "", total: "", traded_on: todayLocal() });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -29,9 +31,12 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
       shares: String(holding.shares),
       manual_price: holding.manual_price != null ? String(holding.manual_price) : "",
     });
+    setSell({ shares: "", price: "", total: "", traded_on: todayLocal() });
     setConfirmDelete(false);
     setActionError(null);
   }, [holding?.id]);
+
+  const setSellField = (key, value) => setSell((s) => ({ ...s, [key]: value }));
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -74,7 +79,25 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
       onClose();
     });
 
+  const doSell = () =>
+    run(async () => {
+      if (sell.shares === "" || (sell.price === "" && sell.total === "")) {
+        throw new Error("Enter shares and a price or total.");
+      }
+      const res = await holdingsApi.sell({
+        holding_id: holding.id,
+        shares: Number(sell.shares),
+        price: sell.price === "" ? null : Number(sell.price),
+        amount: sell.total === "" ? null : Number(sell.total),
+        traded_on: sell.traded_on || null,
+      });
+      await onChanged();
+      if (res?.shares_left === 0) onClose();
+      else setSell({ shares: "", price: "", total: "", traded_on: todayLocal() });
+    });
+
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
+  const sellAccountName = accounts.find((a) => a.id === holding?.account_id)?.name ?? "its account";
 
   return (
     <SlideOver open={open} onClose={onClose} title={holding?.symbol || "Holding"} subtitle={holding?.category || undefined}>
@@ -130,6 +153,31 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
           <Button variant="primary" size="sm" onClick={save} disabled={busy}>
             {busy ? "Saving…" : "Save changes"}
           </Button>
+        </div>
+      </div>
+
+      {/* Sell shares */}
+      <div className="mt-6 pt-5 border-t border-border">
+        <div className="text-sm font-medium text-ink">Sell shares</div>
+        <p className="text-xs text-muted mt-0.5 mb-2">
+          You own {Number(holding?.shares || 0)}. Proceeds return to {sellAccountName} as cash.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Shares">
+            <Input type="number" step="any" value={sell.shares} onChange={(e) => setSellField("shares", e.target.value)} />
+          </Field>
+          <Field label="Price per share">
+            <Input type="number" step="any" value={sell.price} onChange={(e) => setSellField("price", e.target.value)} placeholder={effPrice != null ? String(effPrice) : "0.00"} />
+          </Field>
+          <Field label="Total received" hint="Optional. Overrides shares x price.">
+            <Input type="number" step="0.01" value={sell.total} onChange={(e) => setSellField("total", e.target.value)} placeholder="auto" />
+          </Field>
+          <Field label="Date">
+            <DateInput value={sell.traded_on} onChange={(v) => setSellField("traded_on", v)} />
+          </Field>
+        </div>
+        <div className="mt-2">
+          <Button variant="green" size="sm" onClick={doSell} disabled={busy}>Sell</Button>
         </div>
       </div>
 

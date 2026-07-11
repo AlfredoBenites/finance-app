@@ -57,6 +57,16 @@ class HoldingBuy(BaseModel):
     notes: Optional[str] = None
 
 
+class HoldingSell(BaseModel):
+    """Sell shares of a holding; the proceeds go back to its account's cash."""
+    holding_id: str
+    shares: Decimal
+    price: Optional[Decimal] = None  # per-share price sold at
+    amount: Optional[Decimal] = None  # exact total received (wins over shares x price)
+    traded_on: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class InvestmentTransaction(BaseModel):
     id: str
     account_id: Optional[str] = None

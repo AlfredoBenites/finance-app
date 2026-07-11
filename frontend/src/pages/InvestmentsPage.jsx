@@ -320,28 +320,32 @@ export default function InvestmentsPage() {
         {categories.map((c) => <option key={c} value={c} />)}
       </datalist>
 
-      {/* Purchase history */}
+      {/* Trade history */}
       {transactions.length > 0 && (
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-ink mb-2">Purchase history</h2>
+          <h2 className="text-lg font-semibold text-ink mb-2">Trade history</h2>
           <div className="overflow-x-auto">
-            <Table className="table-fixed min-w-[40rem]">
+            <Table className="table-fixed min-w-[46rem]">
               <THead>
                 <tr>
-                  <TH className="w-[18%]">Date</TH>
-                  <TH className="w-[24%]">Account</TH>
-                  <TH className="w-[16%]">Holding</TH>
-                  <TH className="w-[14%]">Shares</TH>
-                  <TH align="right" className="w-[14%]">Price</TH>
-                  <TH align="right" className="w-[14%]">Amount</TH>
+                  <TH className="w-[15%]">Date</TH>
+                  <TH className="w-[12%]">Type</TH>
+                  <TH className="w-[15%]">Holding</TH>
+                  <TH className="w-[20%]">Account</TH>
+                  <TH className="w-[12%]">Shares</TH>
+                  <TH align="right" className="w-[13%]">Price</TH>
+                  <TH align="right" className="w-[13%]">Amount</TH>
                 </tr>
               </THead>
               <tbody>
                 {histPageItems.map((t) => (
                   <TR key={t.id}>
                     <TD className="text-ink whitespace-nowrap tabular-nums">{formatDate(t.traded_on)}</TD>
-                    <TD className="text-muted"><span className="block truncate">{accountName(t.account_id)}</span></TD>
+                    <TD>
+                      <Badge tone={t.type === "sell" ? "success" : "info"}>{t.type === "sell" ? "Sell" : "Buy"}</Badge>
+                    </TD>
                     <TD className="text-ink"><span className="block truncate">{t.symbol}</span></TD>
+                    <TD className="text-muted"><span className="block truncate">{accountName(t.account_id)}</span></TD>
                     <TD className="text-muted tabular-nums">{Number(t.shares)}</TD>
                     <TD align="right" className="text-muted tabular-nums">{priceStr(t.price)}</TD>
                     <TD align="right"><strong className="text-ink"><Amount value={t.amount} /></strong></TD>

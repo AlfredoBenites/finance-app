@@ -165,6 +165,7 @@ export const holdingsApi = {
   remove: (id) => request(`/api/holdings/${id}`, { method: "DELETE" }),
   refreshPrices: () => request("/api/holdings/refresh-prices", { method: "POST" }),
   buy: (data) => request("/api/holdings/buy", { method: "POST", body: JSON.stringify(data) }),
+  sell: (data) => request("/api/holdings/sell", { method: "POST", body: JSON.stringify(data) }),
   transactions: () => request("/api/holdings/transactions"),
 };
 
