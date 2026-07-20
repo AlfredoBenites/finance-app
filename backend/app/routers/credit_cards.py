@@ -13,6 +13,7 @@ from app.auth import get_current_user_id
 from app.database import supabase, fetch_all
 from app.db_errors import is_foreign_key_violation
 from app.models.credit_card import CreditCard, CreditCardCreate, CreditCardUpdate
+from app.services import calculations as calc
 
 router = APIRouter(prefix="/api/credit-cards", tags=["credit_cards"])
 
@@ -22,6 +23,10 @@ TABLE = "credit_cards"
 class UpgradeRequest(BaseModel):
     new_card_id: str
     upgraded_on: Optional[date] = None
+
+
+class StatementOverrideRequest(BaseModel):
+    amount: Optional[Decimal] = None  # null clears the override
 
 
 class PaymentRequest(BaseModel):
@@ -121,6 +126,32 @@ def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_c
         "paid_on": paid_on,
     }).execute()
     return {"ok": True, "paid": float(amount), "charges_settled": len(to_settle)}
+
+
+@router.post("/{card_id}/statement-override", response_model=CreditCard)
+def set_statement_override(
+    card_id: str, payload: StatementOverrideRequest, user_id: str = Depends(get_current_user_id)
+):
+    """Pin the ACTUAL statement balance for this card's current cycle (or clear it
+    with a null amount). Stored with the current close date so it auto-expires once
+    the next cycle closes."""
+    card = supabase.table(TABLE).select("statement_day").eq("id", card_id).eq("owner_id", user_id).execute()
+    if not card.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    sd = card.data[0].get("statement_day")
+    if not sd:
+        raise HTTPException(status_code=400, detail="Set a statement day on this card first.")
+    if payload.amount is None:
+        changes = {"statement_override": None, "statement_override_close": None}
+    else:
+        if payload.amount < 0:
+            raise HTTPException(status_code=400, detail="Amount can't be negative.")
+        _open, close = calc.statement_window(int(sd), date.today())
+        changes = {"statement_override": str(payload.amount), "statement_override_close": close.isoformat()}
+    result = supabase.table(TABLE).update(changes).eq("id", card_id).eq("owner_id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    return result.data[0]
 
 
 @router.get("/upgrades")

@@ -52,6 +52,25 @@ export default function PaymentsPage() {
   const [filters, setFilters] = useState({ card: "", account: "", from: "", to: "" });
   const [page, setPage] = useState(0);
 
+  // Manual "actual statement balance" override for the selected card.
+  const [stmtInput, setStmtInput] = useState("");
+  const [stmtBusy, setStmtBusy] = useState(false);
+
+  async function setOverride(value) {
+    if (!cardId || stmtBusy) return;
+    setStmtBusy(true);
+    try {
+      await creditCardsApi.setStatementOverride(cardId, value);
+      setStmtInput("");
+      setError(null);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setStmtBusy(false);
+    }
+  }
+
   // Amounts inside native <option> labels can't use <Amount>, so mask by hand.
   const mask = (v) => (hidden ? "****" : money(v));
 
@@ -193,6 +212,30 @@ export default function PaymentsPage() {
               })}
             </tbody>
           </Table>
+        </div>
+      )}
+
+      {/* Actual statement balance (fixes posting-date drift for the selected card) */}
+      {cardId && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-1">Actual statement balance</h2>
+          <p className="text-sm text-muted mb-2">
+            The app estimates {cards.find((c) => c.id === cardId)?.name}'s statement from your transaction dates. Card issuers bill by posting date, so it can drift a little near the cycle's edge. If your real statement differs, set the exact amount here. It applies to this cycle and clears automatically next cycle.
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <AmountInput
+              className="w-40"
+              value={stmtInput}
+              onChange={setStmtInput}
+              placeholder={statementByCard[cardId] != null ? money(statementByCard[cardId]) : "0.00"}
+            />
+            <Button size="sm" variant="primary" onClick={() => setOverride(Number(stmtInput))} disabled={stmtBusy || stmtInput === ""}>
+              Set statement
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setOverride(null)} disabled={stmtBusy}>
+              Use estimate
+            </Button>
+          </div>
         </div>
       )}
 
