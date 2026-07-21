@@ -140,7 +140,10 @@ class _Query:
             rows_out = list(matched)
             if self._range is not None:
                 rows_out = rows_out[self._range[0]:self._range[1] + 1]
-            return _Result(rows_out)
+            # PostgREST never returns more than its max-rows cap, with or without
+            # a range. Enforcing it here is what makes a fetch that forgets to
+            # page show up as a failing test instead of only in production.
+            return _Result(rows_out[: database.PAGE_SIZE])
         if self._op == "update":
             for row in matched:
                 row.update(self._payload)
