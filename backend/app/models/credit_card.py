@@ -1,5 +1,5 @@
 """Pydantic request/response models for credit cards."""
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -46,6 +46,8 @@ class CreditCard(BaseModel):
     color: Optional[str] = None
     due_day: Optional[int] = None
     statement_day: Optional[int] = None
+    statement_override: Optional[Decimal] = None
+    statement_override_close: Optional[date] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
