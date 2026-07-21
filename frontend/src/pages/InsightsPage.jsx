@@ -48,9 +48,10 @@ export default function InsightsPage() {
       {!data && !error && <p className="text-muted text-sm">Loading…</p>}
 
       {data && (
-        // All four on one line from a tablet up. On a phone they stay two by
-        // two, where four across would squeeze a six-figure number off the card.
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        // All four on one line once there's room for it. Below that they stay
+        // two by two: with the sidebar taking 15rem, four across on a narrower
+        // window would push a six-figure number off its card.
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           <StatCard size="sm" label="Total income" value={<Amount value={data.total_income} />} tone="green" />
           <StatCard size="sm" label="Total assets" value={<Amount value={data.total_assets} />} />
           <StatCard size="sm" label="Total card balance" value={<Amount value={data.total_credit_card_debt} />} tone="danger" />
