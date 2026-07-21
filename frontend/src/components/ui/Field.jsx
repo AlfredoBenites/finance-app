@@ -23,7 +23,7 @@ export function Textarea({ className, ...props }) {
 export function Select({ className, autofilled = false, ...props }) {
   return (
     <select
-      className={cn(base, "cursor-pointer", autofilled && "bg-autofill", className)}
+      className={cn(base, "cursor-pointer appearance-none select-chevron pr-9", autofilled && "bg-autofill", className)}
       {...props}
     />
   );

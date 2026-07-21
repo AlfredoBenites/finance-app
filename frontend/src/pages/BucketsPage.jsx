@@ -418,20 +418,35 @@ export default function BucketsPage() {
                     <summary className="cursor-pointer text-xs text-info">
                       {chosen.length} of {lines.length} transaction{lines.length === 1 ? "" : "s"} selected
                     </summary>
-                    <ul className="mt-1.5 space-y-1 text-xs">
-                      {lines.map((t) => (
-                        <li key={t.id}>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" className="h-4 w-4 accent-green" checked={!!picked[t.id]} onChange={() => toggleTxn(t.id)} />
-                            <span className="text-ink">
-                              {t.transaction_date} · {t.merchant || "—"} · <strong><Amount value={-t.amount} /></strong>
-                              {t.refunded > 0 ? <span className="text-muted"> (net of <Amount value={t.refunded} /> refund)</span> : null}
-                              {t.notes ? ` · ${t.notes}` : ""}
-                            </span>
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
+                    <table className="mt-1.5 w-full text-xs border-separate border-spacing-x-3 border-spacing-y-1">
+                      <tbody>
+                        {lines.map((t) => (
+                          <tr key={t.id}>
+                            <td className="w-4 align-middle">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-green align-middle"
+                                checked={!!picked[t.id]}
+                                onChange={() => toggleTxn(t.id)}
+                                aria-label={`Select ${t.merchant || "transaction"}`}
+                              />
+                            </td>
+                            <td className="align-middle whitespace-nowrap tabular-nums text-muted">{formatDate(t.transaction_date)}</td>
+                            <td className="align-middle whitespace-nowrap text-ink">{t.merchant || "Unknown"}</td>
+                            {/* The note takes the leftover width so it never gets
+                                squeezed into a sliver; the amount stays last. */}
+                            <td className="w-full align-middle text-muted">
+                              {t.refunded > 0 ? <span>(net of <Amount value={t.refunded} /> refund)</span> : null}
+                              {t.refunded > 0 && t.notes ? " " : null}
+                              {t.notes || null}
+                            </td>
+                            <td className="align-middle whitespace-nowrap text-right tabular-nums text-ink">
+                              <strong><Amount value={-t.amount} /></strong>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </details>
                 )}
               </Banner>

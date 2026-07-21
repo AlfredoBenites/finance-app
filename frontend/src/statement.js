@@ -39,27 +39,50 @@ function esc(s) {
   );
 }
 
+// Tiny, dependency-free date formatter -> "Jul 12, 2026".
+// Parses plain "YYYY-MM-DD" without timezone drift; falls back to Date otherwise.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtDate(v) {
+  if (!v) return "—";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+  if (iso) return `${MONTHS[+iso[2] - 1]} ${+iso[3]}, ${+iso[1]}`;
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  return String(v);
+}
+
 export function writeStatement(win, s, lang = "en") {
   const t = STRINGS[lang] || STRINGS.en;
   const cardSections = s.cards
     .map((c) => {
       const rows = c.transactions
         .map(
-          (t) => `
+          (tx) => `
         <tr>
-          <td>${esc(t.transaction_date)}</td>
-          <td>${esc(t.merchant || "—")}</td>
-          <td>${esc(t.category || "—")}</td>
-          <td class="note">${esc(t.notes || "")}</td>
-          <td class="amt">${money(-t.amount)}</td>
+          <td class="date">${esc(fmtDate(tx.transaction_date))}</td>
+          <td>${esc(tx.merchant || "—")}</td>
+          <td class="cat">${esc(tx.category || "—")}</td>
+          <td class="note">${esc(tx.notes || "")}</td>
+          <td class="amt">${money(-tx.amount)}</td>
         </tr>`
         )
         .join("");
       return `
       <section>
-        <div class="cardhead"><h2>${esc(c.card_name)}</h2><div class="cardowed">${money(c.owed)}</div></div>
         <table>
-          <thead><tr><th>${t.date}</th><th>${t.merchant}</th><th>${t.category}</th><th>${t.note}</th><th class="amt">${t.amount}</th></tr></thead>
+          <thead>
+            <tr class="cardhead">
+              <th colspan="4"><span class="cardname">${esc(c.card_name)}</span></th>
+              <th class="amt cardowed">${money(c.owed)}</th>
+            </tr>
+            <tr class="colhead">
+              <th class="date">${t.date}</th>
+              <th>${t.merchant}</th>
+              <th class="cat">${t.category}</th>
+              <th class="note">${t.note}</th>
+              <th class="amt">${t.amount}</th>
+            </tr>
+          </thead>
           <tbody>${rows}</tbody>
         </table>
       </section>`;
@@ -69,32 +92,103 @@ export function writeStatement(win, s, lang = "en") {
   const html = `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><title>${t.title} — ${esc(s.profile_name)}</title>
 <style>
+  @page { margin: 16mm; }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; max-width: 760px; margin: 32px auto; padding: 0 24px; }
-  header { border-bottom: 3px solid #2563eb; padding-bottom: 12px; }
-  h1 { margin: 0 0 4px; font-size: 24px; }
-  .meta { color: #6b7280; font-size: 13px; margin: 0; }
-  .total { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin: 20px 0; display: flex; justify-content: space-between; align-items: center; font-size: 18px; }
-  .total strong { font-size: 22px; color: #1d4ed8; }
-  section { margin: 22px 0; page-break-inside: avoid; }
-  .cardhead { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #e3e3e3; padding-bottom: 4px; }
-  h2 { font-size: 17px; margin: 0; }
-  .cardowed { font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #f0f0f0; }
-  th { color: #6b7280; font-weight: 600; border-bottom: 1px solid #e3e3e3; }
-  .amt { text-align: right; white-space: nowrap; }
+  html, body { background: #ffffff; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #0d0b09;
+    max-width: 720px;
+    margin: 28px auto;
+    padding: 0 24px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  header { padding-bottom: 14px; border-bottom: 3px solid #e4f222; }
+  h1 { margin: 0 0 4px; font-size: 23px; font-weight: 700; letter-spacing: -0.01em; color: #0d0b09; }
+  h1 .who { color: #6b7280; font-weight: 500; }
+  .meta { color: #6b7280; font-size: 12.5px; margin: 0; }
+
+  /* Summary: label on the left, total figure highlighted with the brand accent. */
+  .total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin: 22px 0 8px;
+    padding: 16px 18px;
+    border: 1px solid #ececec;
+    border-radius: 10px;
+    background: #fafafa;
+  }
+  .total .label { color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .total .figure {
+    font-size: 24px;
+    font-weight: 800;
+    color: #0d0b09;
+    padding: 2px 10px;
+    border-radius: 4px;
+    background: #e4f222;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  section { margin: 26px 0 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
+  /* Card title row: keep it glued to the column headers and first data rows so a
+     card never leaves its heading stranded at the bottom of a page. */
+  thead { display: table-header-group; }
+  tr.cardhead th {
+    padding: 0 0 6px;
+    border-bottom: 2px solid #0d0b09;
+    text-align: left;
+    vertical-align: baseline;
+  }
+  .cardname { font-size: 16px; font-weight: 700; color: #0d0b09; }
+  .cardowed { font-size: 14px; font-weight: 700; color: #26753b; white-space: nowrap; }
+
+  tr.colhead th {
+    padding: 8px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+    border-bottom: 1px solid #ececec;
+  }
+  tbody td { padding: 7px 8px; border-bottom: 1px solid #ececec; vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tr { break-inside: avoid; }
+
+  .date { white-space: nowrap; color: #0d0b09; }
+  .cat { color: #6b7280; }
   .note { color: #6b7280; }
-  footer { margin-top: 28px; color: #9ca3af; font-size: 12px; border-top: 1px solid #e3e3e3; padding-top: 10px; }
-  @media print { body { margin: 0 auto; } }
+  .amt {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  tbody .amt { font-weight: 600; color: #0d0b09; }
+
+  .empty { margin: 28px 0; color: #6b7280; font-size: 14px; }
+  footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #ececec; color: #9ca3af; font-size: 11.5px; }
+
+  @media print { body { margin: 0 auto; max-width: none; padding: 0; } }
 </style></head>
 <body onload="window.print()">
   <header>
-    <h1>${t.title} — ${esc(s.profile_name)}</h1>
+    <h1>${t.title} <span class="who">— ${esc(s.profile_name)}</span></h1>
     <p class="meta">${t.generated} ${esc(s.generated_on)}</p>
   </header>
-  <div class="total"><span>${t.totalOwed}</span><strong>${money(s.total_owed)}</strong></div>
-  ${s.cards.length ? cardSections : `<p>${t.nothing}</p>`}
+  <div class="total">
+    <span class="label">${t.totalOwed}</span>
+    <span class="figure">${money(s.total_owed)}</span>
+  </div>
+  ${s.cards.length ? cardSections : `<p class="empty">${t.nothing}</p>`}
   <footer>${t.footer}</footer>
 </body></html>`;
 

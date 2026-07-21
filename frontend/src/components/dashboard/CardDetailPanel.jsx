@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { transactionsApi, profilesApi, creditCardsApi } from "../../api/client";
 import { SlideOver, Banner, Badge, Amount, CardArt, Button, cn } from "../ui";
 import { useSettings } from "../../settings/SettingsContext";
+import { formatDate } from "../../format";
 
 // Guess the card network from its name/issuer for the unambiguous brands. The
 // data model has no network field yet, so this is best-effort; ambiguous cards
@@ -162,19 +163,20 @@ export default function CardDetailPanel({ cardId, cardName, open, onClose }) {
                     </div>
                     <ul className="divide-y divide-border border border-border rounded-lg">
                       {g.items.map((t) => (
-                        <li key={t.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                          <span className="min-w-0">
-                            <span className="text-ink">{t.merchant || "—"}</span>
-                            <span className="text-muted">
-                              {" "}
-                              · {t.transaction_date}
+                        <li key={t.id} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                          <div className="min-w-0">
+                            <div className="text-ink truncate">{t.merchant || "Unknown"}</div>
+                            <div className="text-xs text-muted">
+                              {formatDate(t.transaction_date)}
                               {t.category ? ` · ${t.category}` : ""}
-                            </span>
-                          </span>
-                          <span className="flex items-center gap-2 shrink-0">
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
                             {statusBadge(t)}
-                            <Amount value={t.amount} />
-                          </span>
+                            <div className="text-right tabular-nums">
+                              <Amount value={t.amount} />
+                            </div>
+                          </div>
                         </li>
                       ))}
                     </ul>
