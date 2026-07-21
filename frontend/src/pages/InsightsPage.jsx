@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { dashboardApi, profilesApi } from "../api/client";
 import { useSettings } from "../settings/SettingsContext";
 import { PageHeader, StatCard, Banner, Amount, Card } from "../components/ui";
 import { NetWorthPanel } from "../components/dashboard/BreakdownPanels";
 
+// The charting library is only used here, and it is the heaviest thing the app
+// pulls in, so the other pages don't download it.
+const SpendingSection = lazy(() => import("../components/insights/SpendingSection"));
+
 // Private/overview figures live here (kept off the dashboard so they aren't on
-// screen in public): total income, total assets, net worth. Spending charts
-// land next.
+// screen in public): total income, total assets, net worth, and where the
+// money actually goes.
 export default function InsightsPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -78,7 +82,9 @@ export default function InsightsPage() {
         </section>
       )}
 
-      <Card className="text-sm text-muted">Spending charts coming next.</Card>
+      <Suspense fallback={<p className="text-muted text-sm">Loading…</p>}>
+        <SpendingSection />
+      </Suspense>
 
       <NetWorthPanel open={panelParam === "networth"} onClose={() => setSearchParams({})} />
     </div>

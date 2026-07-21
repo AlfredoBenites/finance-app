@@ -1,4 +1,4 @@
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 // Format an ISO date string ("2026-07-08") as "Jul 8, 2026". Parsed by hand so
 // it doesn't shift a day across time zones the way new Date("2026-07-08") can.
