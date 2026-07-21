@@ -5,6 +5,7 @@ import { money, formatDate, todayLocal } from "../format";
 import { usePrivacy } from "../privacy/PrivacyContext";
 import { useSettings } from "../settings/SettingsContext";
 import { BucketIcon } from "../components/buckets/bucketIcons";
+import StatementReconcile from "../components/payments/StatementReconcile";
 import {
   PageHeader,
   Card,
@@ -235,6 +236,10 @@ export default function PaymentsPage() {
             <Button size="sm" variant="ghost" onClick={() => setOverride(null)} disabled={stmtBusy}>
               Use estimate
             </Button>
+          </div>
+          <div className="mt-3">
+            <p className="text-xs text-muted mb-1">Or fix it at the source, so both this and next month's statements stay right:</p>
+            <StatementReconcile cardId={cardId} onApplied={load} onError={setError} />
           </div>
         </div>
       )}

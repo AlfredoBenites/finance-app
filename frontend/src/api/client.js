@@ -108,6 +108,10 @@ export const creditCardsApi = {
   // Pin the actual statement balance for this cycle (amount:null clears it).
   setStatementOverride: (id, amount) =>
     request(`/api/credit-cards/${id}/statement-override`, { method: "POST", body: JSON.stringify({ amount }) }),
+  // Charges near the statement close, so drifted ones can be reassigned.
+  reconcile: (id) => request(`/api/credit-cards/${id}/reconcile`),
+  applyReconcile: (id, moves) =>
+    request(`/api/credit-cards/${id}/reconcile`, { method: "POST", body: JSON.stringify({ moves }) }),
 };
 
 export const bucketsApi = {

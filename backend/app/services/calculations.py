@@ -116,7 +116,9 @@ def statement_balance(transactions: list[dict], statement_day: int, today: date)
     for t in transactions:
         if not t.get("credit_card_id"):
             continue
-        d = date.fromisoformat(str(t["transaction_date"]))
+        # Use the posting date when set (issuer assigns statements by posting date);
+        # otherwise fall back to the transaction date.
+        d = date.fromisoformat(str(t.get("posting_date") or t["transaction_date"]))
         if open_ < d <= close:
             total += -_dec(t["amount"])
     return total
