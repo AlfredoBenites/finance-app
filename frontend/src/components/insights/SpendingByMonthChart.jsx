@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { Card, Amount } from "../ui";
-import { AXIS, GRID, NO_ANIM, ChartTooltip, useMask } from "./chartTheme";
+import { AXIS, CLICKABLE_CHART, GRID, NO_ANIM, TOOLTIP, ChartTooltip, useMask } from "./chartTheme";
 import { compactMoney, monthLabel } from "./spending";
 
 // Spending per month for the chosen year, and the picker for the two charts
@@ -62,7 +62,7 @@ export default function SpendingByMonthChart({ months, average, selectedMonth, o
           Total <strong className="text-ink"><Amount value={total} /></strong>
         </span>
       </div>
-      <div className="h-56">
+      <div className={`h-56 ${CLICKABLE_CHART}`}>
         <ResponsiveContainer>
           {/* The right margin is the gutter the average line's label sits in. */}
           <BarChart data={months} margin={{ top: 4, right: 30, bottom: 0, left: 0 }} accessibilityLayer>
@@ -80,17 +80,23 @@ export default function SpendingByMonthChart({ months, average, selectedMonth, o
                 label={{ value: "avg", position: "right", fill: "var(--muted)", fontSize: 11 }}
               />
             )}
-            <Tooltip
-              content={<MonthTooltip />}
-              cursor={{ fill: "var(--surface-muted)" }}
-              wrapperStyle={{ zIndex: 10 }}
-            />
+            <Tooltip content={<MonthTooltip />} {...TOOLTIP} />
+            {/* `background` puts an invisible full-height rectangle behind each
+                column and gives it the same click handler, so the whole column
+                is the target, not just a bar that may be a few pixels tall.
+                It has to be a real element like this: a tap on a phone never
+                sets the chart's hover state, so a handler that reads which bar
+                is "active" would do nothing on touch. */}
             <Bar
               dataKey="total"
               radius={[4, 4, 0, 0]}
               maxBarSize={44}
+              background={{ fill: "transparent" }}
+              onClick={(entry) => {
+                const ym = entry?.payload?.ym ?? entry?.ym;
+                if (ym) onSelectMonth(ym);
+              }}
               {...NO_ANIM}
-              onClick={(d) => onSelectMonth(d?.payload?.ym || d?.ym || null)}
             >
               {months.map((m) => (
                 <Cell

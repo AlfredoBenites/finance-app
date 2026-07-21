@@ -18,9 +18,11 @@ export function normalize(rows) {
     const iso = String(t.transaction_date); // never new Date(iso): it shifts a day
     return {
       id: t.id,
+      date: iso,
       ym: iso.slice(0, 7), // "2026-07"
       monthIndex: Number(iso.slice(5, 7)) - 1,
       category: (t.category || "").trim() || "Uncategorized",
+      merchant: t.merchant || "",
       cents: Math.round(-Number(t.amount) * 100), // > 0 spent, < 0 refunded
       sourceKey: t.credit_card_id ? `card:${t.credit_card_id}` : `account:${t.account_id}`,
     };
@@ -151,6 +153,27 @@ export function bySource(txns, ym, cards, accounts, maxSlices = 6) {
   }
 
   return { list, grand: list.reduce((sum, r) => sum + r.total, 0) };
+}
+
+// The transactions behind one row of the category chart, biggest first. The
+// roll-up row stands for several categories at once, so it matches any of them.
+// Only ever called for a single month: a whole year would be a wall of rows.
+export function transactionsFor(txns, ym, row) {
+  if (!row || !ym) return [];
+  const names = row.rolledUp
+    ? new Set(row.rolledUp.map((r) => r.name))
+    : new Set([row.name]);
+  return txns
+    .filter((t) => t.ym === ym && names.has(t.category))
+    .sort((a, b) => b.cents - a.cents);
+}
+
+// key ("card:abc") -> the card or account's name, for showing what paid.
+export function sourceNames(cards, accounts) {
+  const map = new Map();
+  cards.forEach((c) => map.set(`card:${c.id}`, c.name));
+  accounts.forEach((a) => map.set(`account:${a.id}`, a.name));
+  return (key) => map.get(key) || "";
 }
 
 // Short axis money, e.g. $1.2k / $12k. Full amounts live in the tooltips.
