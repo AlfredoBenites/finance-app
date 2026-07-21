@@ -151,7 +151,7 @@ export default function Sidebar({
           onClick={openSettings}
           title="Settings"
           className={cn(
-            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-left text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             "px-3"
           )}
         >
@@ -162,7 +162,7 @@ export default function Sidebar({
           onClick={togglePrivacy}
           title={amountsHidden ? "Show amounts" : "Hide amounts"}
           className={cn(
-            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-left text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             "px-3"
           )}
         >
@@ -175,7 +175,7 @@ export default function Sidebar({
           onClick={onToggleDark}
           title={dark ? "Light mode" : "Dark mode"}
           className={cn(
-            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+            "w-full flex items-center gap-3 h-9 rounded-md text-sm text-left text-muted hover:bg-surface-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
             "px-3"
           )}
         >
