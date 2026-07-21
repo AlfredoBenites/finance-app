@@ -30,8 +30,10 @@ def get_dashboard(
     transactions = all_transactions
     buckets = owned("buckets")
     accounts = owned("accounts")
-    # An account holding investments is valued at the sum of its holdings
-    # (shares x manual-or-last price), overriding its manual balance.
+    # An investment account is worth its cash (uninvested buying power) PLUS the
+    # value of its holdings (shares x manual-or-last price). Buying shares moves
+    # cash into holdings, so the total is unchanged at purchase and then tracks
+    # the market.
     holdings = owned("holdings", "account_id, shares, last_price, manual_price")
     holdings_value = {}
     for h in holdings:
@@ -42,11 +44,13 @@ def get_dashboard(
                 calc._dec(h.get("shares")) * calc._dec(price)
             )
     accounts = [
-        {**a, "balance": str(holdings_value[a["id"]])} if a["id"] in holdings_value else a
+        {**a, "balance": str(calc._dec(a["balance"]) + holdings_value[a["id"]])}
+        if a["id"] in holdings_value
+        else a
         for a in accounts
     ]
     profiles = owned("profiles", "id, name, is_primary")
-    cards = owned("credit_cards", "id, name, due_day, statement_day, is_active")
+    cards = owned("credit_cards", "id, name, due_day, statement_day, is_active, statement_override, statement_override_close")
     card_payments = owned("card_payments", "credit_card_id, amount, paid_on")
     income_rows = owned("income", "amount, income_date, category")
 
@@ -101,7 +105,10 @@ def get_dashboard(
         if sd:
             card_txns = [t for t in all_transactions if t.get("credit_card_id") == c["id"]]
             card_pays = [p for p in card_payments if p.get("credit_card_id") == c["id"]]
-            statement_by_card[c["id"]] = calc.statement_due(card_txns, card_pays, int(sd), today)
+            statement_by_card[c["id"]] = calc.statement_due(
+                card_txns, card_pays, int(sd), today,
+                c.get("statement_override"), c.get("statement_override_close"),
+            )
 
     # "Unallocated" = charges a person hasn't reimbursed yet (is_paid_back based).
     # That's the red figure on the dashboard's "Unallocated Balance by Card".
@@ -130,29 +137,36 @@ def get_dashboard(
     # card's due day. (Uses all profiles' charges — you pay the bank the total.)
     full_debts = calc.bank_debt_by_card(all_transactions)
 
+    def on_day(y, m, day):
+        return date(y, m, min(day, calendar.monthrange(y, m)[1]))
+
     def next_due(day):
-        def on(y, m):
-            return date(y, m, min(day, calendar.monthrange(y, m)[1]))
-        this_month = on(today.year, today.month)
+        this_month = on_day(today.year, today.month, day)
         if this_month >= today:
             return this_month
         y, m = (today.year + 1, 1) if today.month == 12 else (today.year, today.month + 1)
-        return on(y, m)
+        return on_day(y, m, day)
 
     upcoming_payments = []
     for c in cards:
-        # With a statement day, the upcoming payment is the closed statement
-        # balance (what's due to the bank); otherwise fall back to total unpaid.
-        if c.get("statement_day"):
+        if not c.get("due_day"):
+            continue
+        # With a statement day, the payment is the closed statement balance, due on
+        # the due_day following that close (so an unpaid statement shows as past due
+        # once that date passes). Otherwise fall back to total unpaid, next due_day.
+        sd = c.get("statement_day")
+        if sd:
             amt = float(statement_by_card.get(c["id"], calc.Decimal("0")))
+            _open, close = calc.statement_window(int(sd), today)
+            nd = calc.statement_due_date(close, int(c["due_day"]))
         else:
             amt = float(full_debts.get(c["id"], calc.Decimal("0")))
-        if c.get("due_day") and amt > 0:
             nd = next_due(int(c["due_day"]))
+        if amt > 0:
             upcoming_payments.append({
                 "name": c["name"],
                 "due_date": nd.isoformat(),
-                "days_until": (nd - today).days,
+                "days_until": (nd - today).days,  # negative = past due
                 "amount": amt,
             })
     upcoming_payments.sort(key=lambda x: x["days_until"])
@@ -204,8 +218,8 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
     profiles = owned("profiles", "id, name, is_primary")
     cards = owned("credit_cards", "id, name")
 
-    # Value investment accounts at the sum of their holdings (same override the
-    # main dashboard applies), so totals match exactly.
+    # Value investment accounts at cash + holdings (same as the main dashboard),
+    # so totals match exactly.
     holdings = owned("holdings", "account_id, shares, last_price, manual_price")
     holdings_value = {}
     for h in holdings:
@@ -216,7 +230,9 @@ def get_breakdown(user_id: str = Depends(get_current_user_id)):
                 calc._dec(h.get("shares")) * calc._dec(price)
             )
     accounts = [
-        {**a, "balance": str(holdings_value[a["id"]])} if a["id"] in holdings_value else a
+        {**a, "balance": str(calc._dec(a["balance"]) + holdings_value[a["id"]])}
+        if a["id"] in holdings_value
+        else a
         for a in accounts
     ]
 

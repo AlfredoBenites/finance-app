@@ -8,6 +8,7 @@ import {
   PiggyBank,
   Landmark,
   Wallet,
+  TrendingUp,
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
   ChevronRight,
@@ -26,6 +27,7 @@ const CATEGORIES = [
   ["buckets", "Buckets", PiggyBank],
   ["payments", "Pay a card", Landmark],
   ["accounts", "Accounts", Wallet],
+  ["investments", "Investments", TrendingUp],
   ["expenses", "Expenses", Receipt],
   ["income", "Income", Banknote],
 ];
@@ -115,6 +117,8 @@ export default function SettingsModal() {
     setPaymentsPerPage,
     transferHistoryPerPage,
     setTransferHistoryPerPage,
+    investmentHistoryPerPage,
+    setInvestmentHistoryPerPage,
     cardIconColors,
     setCardIconColors,
     dashboardPrefs,
@@ -581,6 +585,34 @@ export default function SettingsModal() {
                     max="100"
                     value={transferHistoryPerPage}
                     onChange={(e) => setTransferHistoryPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                    className="w-20"
+                  />
+                </div>
+              </Section>
+            </>
+          )}
+
+          {tab === "investments" && (
+            <>
+              <Section title="Purchase history rows per page" hint="How many buys show per page (max 100).">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[10, 25, 50].map((n) => (
+                    <Button
+                      key={n}
+                      size="sm"
+                      variant={investmentHistoryPerPage === n ? "primary" : "secondary"}
+                      onClick={() => setInvestmentHistoryPerPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <span className="text-sm text-muted ml-1">Custom:</span>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={investmentHistoryPerPage}
+                    onChange={(e) => setInvestmentHistoryPerPage(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
                     className="w-20"
                   />
                 </div>

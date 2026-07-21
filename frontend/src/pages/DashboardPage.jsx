@@ -25,7 +25,8 @@ import { RealAvailablePanel, CashbackPanel } from "../components/dashboard/Break
 // Upcoming payments warm up as the due date nears: blue (plenty of time),
 // orange (within a week), red (2 days or less).
 const paymentTone = (days) => (days <= 2 ? "danger" : days <= 7 ? "orange" : "info");
-const daysLabel = (days) => (days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`);
+const daysLabel = (days) =>
+  days < 0 ? "Past due" : days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`;
 
 // Section heading shown above each card on the dashboard.
 function SectionTitle({ children }) {

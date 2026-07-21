@@ -105,6 +105,13 @@ export const creditCardsApi = {
   pay: (id, data) =>
     request(`/api/credit-cards/${id}/pay`, { method: "POST", body: JSON.stringify(data) }),
   payments: () => request("/api/credit-cards/payments"),
+  // Pin the actual statement balance for this cycle (amount:null clears it).
+  setStatementOverride: (id, amount) =>
+    request(`/api/credit-cards/${id}/statement-override`, { method: "POST", body: JSON.stringify({ amount }) }),
+  // Charges near the statement close, so drifted ones can be reassigned.
+  reconcile: (id) => request(`/api/credit-cards/${id}/reconcile`),
+  applyReconcile: (id, moves) =>
+    request(`/api/credit-cards/${id}/reconcile`, { method: "POST", body: JSON.stringify({ moves }) }),
 };
 
 export const bucketsApi = {
@@ -164,6 +171,9 @@ export const holdingsApi = {
     request(`/api/holdings/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   remove: (id) => request(`/api/holdings/${id}`, { method: "DELETE" }),
   refreshPrices: () => request("/api/holdings/refresh-prices", { method: "POST" }),
+  buy: (data) => request("/api/holdings/buy", { method: "POST", body: JSON.stringify(data) }),
+  sell: (data) => request("/api/holdings/sell", { method: "POST", body: JSON.stringify(data) }),
+  transactions: () => request("/api/holdings/transactions"),
 };
 
 export const dashboardApi = {
