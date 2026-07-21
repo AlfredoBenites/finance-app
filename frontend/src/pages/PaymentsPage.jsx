@@ -228,7 +228,7 @@ export default function PaymentsPage() {
               className="w-40"
               value={stmtInput}
               onChange={setStmtInput}
-              placeholder={statementByCard[cardId] != null ? money(statementByCard[cardId]) : "0.00"}
+              placeholder={statementByCard[cardId] != null ? mask(statementByCard[cardId]).replace("$", "") : "0.00"}
             />
             <Button size="sm" variant="primary" onClick={() => setOverride(Number(stmtInput))} disabled={stmtBusy || stmtInput === ""}>
               Set statement
