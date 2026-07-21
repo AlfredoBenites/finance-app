@@ -48,20 +48,28 @@ export default function InsightsPage() {
       {!data && !error && <p className="text-muted text-sm">Loading…</p>}
 
       {data && (
-        <section className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-          <StatCard label="Total income" value={<Amount value={data.total_income} />} tone="green" />
-          <StatCard label="Total assets" value={<Amount value={data.total_assets} />} />
-          <StatCard label="Total card balance" value={<Amount value={data.total_credit_card_debt} />} tone="danger" />
+        // All four on one line from a tablet up. On a phone they stay two by
+        // two, where four across would squeeze a six-figure number off the card.
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          <StatCard size="sm" label="Total income" value={<Amount value={data.total_income} />} tone="green" />
+          <StatCard size="sm" label="Total assets" value={<Amount value={data.total_assets} />} />
+          <StatCard size="sm" label="Total card balance" value={<Amount value={data.total_credit_card_debt} />} tone="danger" />
           <Link to="?panel=networth" className="block">
             <StatCard
+              size="sm"
               label="Net worth ›"
               value={<Amount value={data.net_worth} />}
-              className="cursor-pointer hover:bg-surface-muted hover:border-border-strong transition-colors"
+              className="h-full cursor-pointer hover:bg-surface-muted hover:border-border-strong transition-colors"
             />
           </Link>
         </section>
       )}
 
+      <Suspense fallback={<p className="text-muted text-sm">Loading…</p>}>
+        <SpendingSection />
+      </Suspense>
+
+      {/* Sits under the charts: it's a footnote to the year, not a headline. */}
       {redirected.length > 0 && (
         <section className="mb-8">
           <h2 className="text-sm font-semibold text-ink mb-1">Cashback from other profiles</h2>
@@ -81,10 +89,6 @@ export default function InsightsPage() {
           </Card>
         </section>
       )}
-
-      <Suspense fallback={<p className="text-muted text-sm">Loading…</p>}>
-        <SpendingSection />
-      </Suspense>
 
       <NetWorthPanel open={panelParam === "networth"} onClose={() => setSearchParams({})} />
     </div>
