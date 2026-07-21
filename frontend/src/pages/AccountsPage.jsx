@@ -235,7 +235,7 @@ export default function AccountsPage() {
       {/* Transfer history */}
       {transfers.length > 0 && (
         <>
-          <h2 className="text-lg font-semibold text-ink mb-2">Transfer History</h2>
+          <h2 className="text-lg font-semibold text-ink mb-2">Account History</h2>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <Select className="flex-1 min-w-[10rem]" value={filters.account} onChange={(e) => setFilter("account", e.target.value)}>
               <option value="">All accounts</option>
@@ -263,7 +263,7 @@ export default function AccountsPage() {
           </div>
 
           {histTotal === 0 ? (
-            <p className="text-muted text-sm">No transfers match.</p>
+            <p className="text-muted text-sm">Nothing matches.</p>
           ) : (
             <>
               <div className="overflow-x-auto">
