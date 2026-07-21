@@ -47,6 +47,7 @@ class HoldingBuy(BaseModel):
     real total by a cent.
     """
     account_id: str
+    bucket_id: Optional[str] = None  # optional bucket in that account to draw from
     symbol: str
     kind: str = "stock"
     category: Optional[str] = None
@@ -60,6 +61,7 @@ class HoldingBuy(BaseModel):
 class HoldingSell(BaseModel):
     """Sell shares of a holding; the proceeds go back to its account's cash."""
     holding_id: str
+    bucket_id: Optional[str] = None  # optional bucket in that account to return the money to
     shares: Decimal
     price: Optional[Decimal] = None  # per-share price sold at
     amount: Optional[Decimal] = None  # exact total received (wins over shares x price)

@@ -14,9 +14,9 @@ const priceStr = (n) =>
 
 // Slide-over to edit or delete a single holding. The parent keeps `holding`
 // non-null through the close animation.
-export default function HoldingDetailPanel({ holding, accounts, categories, open, onClose, onChanged }) {
+export default function HoldingDetailPanel({ holding, accounts, buckets = [], categories, open, onClose, onChanged }) {
   const [form, setForm] = useState({ account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" });
-  const [sell, setSell] = useState({ shares: "", price: "", total: "", traded_on: todayLocal() });
+  const [sell, setSell] = useState({ shares: "", price: "", total: "", bucket_id: "", traded_on: todayLocal() });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -31,7 +31,7 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
       shares: String(holding.shares),
       manual_price: holding.manual_price != null ? String(holding.manual_price) : "",
     });
-    setSell({ shares: "", price: "", total: "", traded_on: todayLocal() });
+    setSell({ shares: "", price: "", total: "", bucket_id: "", traded_on: todayLocal() });
     setConfirmDelete(false);
     setActionError(null);
   }, [holding?.id]);
@@ -86,6 +86,7 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
       }
       const res = await holdingsApi.sell({
         holding_id: holding.id,
+        bucket_id: sell.bucket_id || null,
         shares: Number(sell.shares),
         price: sell.price === "" ? null : Number(sell.price),
         amount: sell.total === "" ? null : Number(sell.total),
@@ -98,6 +99,7 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
 
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
   const sellAccountName = accounts.find((a) => a.id === holding?.account_id)?.name ?? "its account";
+  const sellBuckets = buckets.filter((b) => b.account_id === holding?.account_id);
 
   return (
     <SlideOver open={open} onClose={onClose} title={holding?.symbol || "Holding"} subtitle={holding?.category || undefined}>
@@ -174,6 +176,12 @@ export default function HoldingDetailPanel({ holding, accounts, categories, open
           </Field>
           <Field label="Date">
             <DateInput value={sell.traded_on} onChange={(v) => setSellField("traded_on", v)} />
+          </Field>
+          <Field label="To bucket" className="col-span-2" hint="Optional. Puts the proceeds back into a bucket instead of leaving them unallocated.">
+            <Select value={sell.bucket_id} onChange={(e) => setSellField("bucket_id", e.target.value)}>
+              <option value="">Unallocated</option>
+              {sellBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
           </Field>
         </div>
         <div className="mt-2">
