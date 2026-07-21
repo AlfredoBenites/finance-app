@@ -148,6 +148,7 @@ export default function ProfilesPage() {
       writeStatement(win, s, statementLangByProfile[detailId] || "en", {
         cards,
         cashback: summary?.cashback_earned ?? null,
+        cashbackByCard: summary?.cashback_by_card ?? [],
       });
     } catch (e) {
       win.close();

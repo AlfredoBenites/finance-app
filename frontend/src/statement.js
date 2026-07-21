@@ -17,6 +17,7 @@ const STRINGS = {
     category: "Category",
     note: "Note",
     amount: "Amount",
+    otherCashback: "Other",
     nothing: "Nothing currently owed. 🎉",
     footer: "Only unpaid charges are listed. Each amount is what is still owed on that card.",
   },
@@ -30,6 +31,7 @@ const STRINGS = {
     category: "Categoría",
     note: "Nota",
     amount: "Monto",
+    otherCashback: "Otro",
     nothing: "No se debe nada actualmente. 🎉",
     footer: "Solo se muestran los cargos no pagados. Cada monto es lo que aún se debe en esa tarjeta.",
   },
@@ -111,7 +113,8 @@ function colorLookup(cards) {
  * @param s       the /statement payload (profile_name, generated_on, total_owed, cards)
  * @param lang    "en" | "es"
  * @param extras  { cards: credit card rows (for per-card color),
- *                  cashback: number shown next to the total }
+ *                  cashback: number shown next to the total,
+ *                  cashbackByCard: [{ name, earned }] listed under the total }
  */
 export function writeStatement(win, s, lang = "en", extras = {}) {
   const t = STRINGS[lang] || STRINGS.en;
@@ -119,6 +122,22 @@ export function writeStatement(win, s, lang = "en", extras = {}) {
   // Cashback is optional: the line only prints when the caller passes a number.
   const cashbackNum = Number(extras.cashback);
   const cashback = extras.cashback == null || !Number.isFinite(cashbackNum) ? null : cashbackNum;
+
+  // Per-card cashback sits under the total, biggest first. Cashback earned on
+  // something other than a card (so it belongs to no row) becomes an "Other"
+  // line, so the breakdown always adds up to the total printed above it.
+  const cents = (n) => Math.round(Number(n) * 100);
+  let cashbackRows = [];
+  if (cashback !== null) {
+    cashbackRows = (extras.cashbackByCard || [])
+      .map((c) => ({ name: c.name, amount: Number(c.earned) || 0 }))
+      .filter((c) => cents(c.amount) !== 0)
+      .sort((a, b) => b.amount - a.amount);
+    const rest = cents(cashback) - cashbackRows.reduce((sum, c) => sum + cents(c.amount), 0);
+    if (cashbackRows.length && rest !== 0) {
+      cashbackRows.push({ name: t.otherCashback, amount: rest / 100 });
+    }
+  }
 
   // One small style block per card so each table carries its own colors.
   const cardStyles = [];
@@ -220,6 +239,29 @@ export function writeStatement(win, s, lang = "en", extras = {}) {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
+  /* Per-card cashback: tight indented lines that read as a breakdown of the
+     cashback figure above them, not as figures of their own. */
+  .summary .row.hasbreakdown { padding-bottom: 6px; }
+  .summary .row.cardline { border-top: none; padding: 3px 18px 3px 30px; }
+  .summary .row.cardline:last-child { padding-bottom: 14px; }
+  .summary .cardlabel {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    color: #6b7280;
+    font-size: 12.5px;
+  }
+  .summary .cardlabel .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .summary .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .summary .cardvalue {
+    color: #3f3f46;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
 
   section { margin: 26px 0 0; }
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -282,10 +324,14 @@ export function writeStatement(win, s, lang = "en", extras = {}) {
       <span class="label">${t.totalOwed}</span>
       <span class="figure">${money(s.total_owed)}</span>
     </div>
-    ${cashback === null ? "" : `<div class="row">
+    ${cashback === null ? "" : `<div class="row${cashbackRows.length ? " hasbreakdown" : ""}">
       <span class="label">${t.cashback}</span>
       <span class="value">${money(cashback)}</span>
-    </div>`}
+    </div>` + cashbackRows.map((c) => `
+    <div class="row cardline">
+      <span class="cardlabel"><span class="dot" style="background: ${colorOf({ card_name: c.name })}"></span><span class="name">${esc(c.name)}</span></span>
+      <span class="cardvalue">${money(c.amount)}</span>
+    </div>`).join("")}
   </div>
   ${s.cards.length ? cardSections : `<p class="empty">${t.nothing}</p>`}
   <footer>${t.footer}</footer>
