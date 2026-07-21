@@ -1,5 +1,6 @@
 export { default as AppShell } from "./AppShell";
 export { default as Sidebar, NAV_ITEMS } from "./Sidebar";
+export { default as AccountMenu } from "./AccountMenu";
 export { default as PageHeader } from "./PageHeader";
 export { default as Card } from "./Card";
 export { default as Button } from "./Button";

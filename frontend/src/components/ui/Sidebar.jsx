@@ -13,7 +13,6 @@ import {
   Share2,
   Moon,
   Sun,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Eye,
@@ -22,6 +21,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "./cn";
+import AccountMenu from "./AccountMenu";
 import { usePrivacy } from "../../privacy/PrivacyContext";
 import { useSettings } from "../../settings/SettingsContext";
 
@@ -183,35 +183,7 @@ export default function Sidebar({
           <span className={cn("overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-40")}>{dark ? "Light Mode" : "Dark Mode"}</span>
         </button>
 
-        <div
-          className={cn(
-            "flex items-center gap-2 px-2 py-1",
-            "justify-between"
-          )}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="grid place-items-center h-7 w-7 rounded-full bg-control text-ink text-xs font-semibold uppercase shrink-0"
-              title={user?.email}
-            >
-              {(user?.email?.[0] || "?").toUpperCase()}
-            </span>
-            <span className={cn("text-sm text-ink overflow-hidden whitespace-nowrap shrink-0 transition-[width] duration-300 ease-in-out", collapsed ? "md:w-0" : "md:w-32")} title={user?.email}>
-              {user?.email?.split("@")[0] || "Account"}
-            </span>
-          </div>
-          <button
-            onClick={onSignOut}
-            title="Log out"
-            aria-label="Log out"
-            className={cn(
-              "shrink-0 text-muted hover:text-ink transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded p-1",
-              collapsed && "md:hidden"
-            )}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
+        <AccountMenu user={user} onSignOut={onSignOut} collapsed={collapsed} />
       </div>
     </aside>
   );
