@@ -82,6 +82,26 @@ def revoke_share(share_id: str, user_id: str = Depends(get_current_user_id)):
     return None
 
 
+def _shared_transaction(t: dict) -> dict:
+    """The fields a share recipient needs, and nothing more.
+
+    The recipient is a different person than the owner, so only what the charge
+    was and whether it is settled is exposed. The owner's bookkeeping (which
+    card, cashback, bank-settlement flags) stays private.
+    """
+    return {
+        "id": t["id"],
+        "transaction_date": t["transaction_date"],
+        "merchant": t.get("merchant"),
+        "category": t.get("category"),
+        "notes": t.get("notes"),
+        "amount": float(calc._dec(t["amount"])),
+        "is_paid_back": bool(t.get("is_paid_back")),
+        # Card charges are what the owed total counts; bank/cash charges don't.
+        "on_card": bool(t.get("credit_card_id")),
+    }
+
+
 @router.get("/shared-with-me")
 def shared_with_me(user=Depends(get_current_user)):
     """Read-only summaries of profiles shared with the current user's email."""
@@ -110,9 +130,10 @@ def shared_with_me(user=Depends(get_current_user)):
         )
         summaries.append(
             {
+                "profile_id": profile_id,
                 "profile_name": profile[0]["name"],
                 "total_unpaid": float(calc.total_card_debt(txns)),
-                "transactions": txns,
+                "transactions": [_shared_transaction(t) for t in txns],
             }
         )
     return summaries
