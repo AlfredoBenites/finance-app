@@ -15,12 +15,6 @@ import IncomePage from "./pages/IncomePage";
 import PaymentsPage from "./pages/PaymentsPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
 
-// Wrap pages not yet migrated to the new design system in `.legacy` so the
-// temporary compatibility CSS keeps them looking the same. Remove the wrapper
-// (and the page from this list) as each is restyled; delete legacy.css when none
-// remain.
-const legacy = (el) => <div className="legacy">{el}</div>;
-
 export default function App() {
   const { loading, session, user, signOut } = useAuth();
 
@@ -48,7 +42,7 @@ export default function App() {
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/investments" element={<InvestmentsPage />} />
-        <Route path="/shared" element={legacy(<SharedWithMePage />)} />
+        <Route path="/shared" element={<SharedWithMePage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppShell>
