@@ -1,6 +1,7 @@
 """Endpoint tests for authentication, per-user ownership, and profile sharing."""
 from fastapi.testclient import TestClient
 
+import app.database as database
 from app.database import fetch_all, supabase
 from app.main import app
 
@@ -16,6 +17,25 @@ def test_fetch_all_pages_past_the_row_cap(api):
         api.client.post("/api/profiles", json={"name": f"P{i}"})
     rows = fetch_all(lambda: supabase.table("profiles").select("*").eq("owner_id", "user-a"), page_size=2)
     assert len(rows) == 5
+
+
+def test_listing_transactions_pages_past_the_row_cap(api, monkeypatch):
+    # The list endpoint sorts newest first, so a single capped fetch drops the
+    # OLDEST rows: a long history would quietly lose its earliest months.
+    api.login(*USER_A)
+    pid = api.client.post("/api/profiles", json={"name": "Mom"}).json()["id"]
+    for day in range(1, 6):
+        api.client.post(
+            "/api/transactions",
+            json={
+                "transaction_date": f"2026-06-0{day}",
+                "amount": -10,
+                "profile_id": pid,
+                "credit_card_id": "card-1",
+            },
+        )
+    monkeypatch.setattr(database, "PAGE_SIZE", 2)
+    assert len(api.client.get("/api/transactions").json()) == 5
 
 
 # --- authentication ----------------------------------------------------------

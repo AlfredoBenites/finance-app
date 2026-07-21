@@ -8,7 +8,7 @@ from postgrest.exceptions import APIError
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.auth import get_current_user_id
-from app.database import supabase
+from app.database import fetch_all, supabase
 from app.db_errors import is_check_violation
 from app.models.transaction import Transaction, TransactionCreate, TransactionUpdate
 from app.services.calculations import compute_cashback
@@ -66,36 +66,47 @@ def list_transactions(
     month: Optional[str] = Query(default=None, description="Filter by month, format YYYY-MM"),
     search: Optional[str] = Query(default=None, description="Merchant or notes contains"),
 ):
-    query = supabase.table(TABLE).select("*").eq("owner_id", user_id)
-
-    if profile_id is not None:
-        query = query.eq("profile_id", profile_id)
-    if credit_card_id is not None:
-        query = query.eq("credit_card_id", credit_card_id)
-    if category is not None:
-        query = query.eq("category", category)
-    if is_paid_back is not None:
-        query = query.eq("is_paid_back", is_paid_back)
-    if year is not None:
-        query = query.gte("transaction_date", f"{year}-01-01").lt(
-            "transaction_date", f"{year + 1}-01-01"
-        )
+    # Parsed up front so a bad month still 400s, rather than raising inside the
+    # query builder below.
+    month_range = None
     if month is not None:
         try:
             year_str, month_str = month.split("-")
-            year, month_num = int(year_str), int(month_str)
-            start = f"{year}-{month_num:02d}-01"
-            end = _first_of_next_month(year, month_num)
+            month_year, month_num = int(year_str), int(month_str)
+            month_range = (
+                f"{month_year}-{month_num:02d}-01",
+                _first_of_next_month(month_year, month_num),
+            )
         except (ValueError, IndexError):
             raise HTTPException(status_code=400, detail="month must be formatted YYYY-MM")
-        query = query.gte("transaction_date", start).lt("transaction_date", end)
-    if search is not None:
-        # match the term in the merchant OR the notes
-        term = search.replace(",", " ")  # commas are structural in the or() filter
-        query = query.or_(f"merchant.ilike.*{term}*,notes.ilike.*{term}*")
 
-    result = query.order("transaction_date", desc=True).execute()
-    return result.data
+    def build_query():
+        query = supabase.table(TABLE).select("*").eq("owner_id", user_id)
+        if profile_id is not None:
+            query = query.eq("profile_id", profile_id)
+        if credit_card_id is not None:
+            query = query.eq("credit_card_id", credit_card_id)
+        if category is not None:
+            query = query.eq("category", category)
+        if is_paid_back is not None:
+            query = query.eq("is_paid_back", is_paid_back)
+        if year is not None:
+            query = query.gte("transaction_date", f"{year}-01-01").lt(
+                "transaction_date", f"{year + 1}-01-01"
+            )
+        if month_range is not None:
+            query = query.gte("transaction_date", month_range[0]).lt(
+                "transaction_date", month_range[1]
+            )
+        if search is not None:
+            # match the term in the merchant OR the notes
+            term = search.replace(",", " ")  # commas are structural in the or() filter
+            query = query.or_(f"merchant.ilike.*{term}*,notes.ilike.*{term}*")
+        return query.order("transaction_date", desc=True)
+
+    # Page past the 1000-row cap. Sorted newest first, a capped fetch would drop
+    # the OLDEST rows, so a long history would quietly lose its early months.
+    return fetch_all(build_query)
 
 
 @router.post("", response_model=Transaction, status_code=201)
