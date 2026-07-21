@@ -33,7 +33,12 @@ def fetch_all(build_query, page_size: Optional[int] = None):
     rows = []
     start = 0
     while True:
-        chunk = build_query().range(start, start + page_size - 1).execute().data
+        # `id` is appended as the last sort key (the caller's own ordering still
+        # wins) to make the ordering total. Paging asks for one window at a time,
+        # and rows that tie on the caller's sort could otherwise come back in a
+        # different order per request, which would duplicate or skip a row right
+        # at a page boundary.
+        chunk = build_query().order("id").range(start, start + page_size - 1).execute().data
         rows.extend(chunk)
         if len(chunk) < page_size:
             break
