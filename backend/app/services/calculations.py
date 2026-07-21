@@ -107,30 +107,74 @@ def statement_window(statement_day: int, today: date) -> tuple:
     return on(y, m), close
 
 
+def statement_due_date(close: date, due_day: int) -> date:
+    """When a statement that closed on `close` is due: the first `due_day` strictly
+    after the close (issuers give ~3 weeks). This may be in the PAST, meaning the
+    payment is overdue."""
+    def on(y, m):
+        return date(y, m, min(due_day, calendar.monthrange(y, m)[1]))
+    d = on(close.year, close.month)
+    if d <= close:
+        y, m = (close.year + 1, 1) if close.month == 12 else (close.year, close.month + 1)
+        d = on(y, m)
+    return d
+
+
+def statement_date(t: dict, by_id: dict = None) -> date:
+    """The date a charge is billed to a statement:
+    - an explicit `posting_date` wins (set by the reconcile flow);
+    - otherwise a linked refund (`refund_for_id`) bills to the SAME statement as
+      the purchase it refunds, even if it posts in a later cycle;
+    - otherwise the transaction date."""
+    if t.get("posting_date"):
+        return date.fromisoformat(str(t["posting_date"]))
+    ref = t.get("refund_for_id")
+    if ref and by_id and ref in by_id:
+        p = by_id[ref]
+        return date.fromisoformat(str(p.get("posting_date") or p["transaction_date"]))
+    return date.fromisoformat(str(t["transaction_date"]))
+
+
 def statement_balance(transactions: list[dict], statement_day: int, today: date) -> Decimal:
     """What's on the current statement: charges in the most-recently-closed
     billing cycle (refunds in the window reduce it). Assumes prior statements
     were paid in full. `transactions` should already be one card's rows."""
     open_, close = statement_window(statement_day, today)
+    by_id = {t["id"]: t for t in transactions if t.get("id")}
     total = Decimal("0")
     for t in transactions:
         if not t.get("credit_card_id"):
             continue
-        d = date.fromisoformat(str(t["transaction_date"]))
-        if open_ < d <= close:
+        if open_ < statement_date(t, by_id) <= close:
             total += -_dec(t["amount"])
     return total
 
 
-def statement_due(transactions: list[dict], payments: list[dict], statement_day: int, today: date) -> Decimal:
+def statement_due(
+    transactions: list[dict],
+    payments: list[dict],
+    statement_day: int,
+    today: date,
+    override_amount=None,
+    override_close=None,
+) -> Decimal:
     """What's still owed on the current statement: charges in the most-recently
     closed cycle minus payments credited after it closed, clamped at zero.
 
     So it drops to $0 once the statement is paid (never negative), and rolls to
     the next cycle's charges automatically when that cycle closes. `transactions`
-    and `payments` should already be one card's rows."""
+    and `payments` should already be one card's rows.
+
+    If `override_amount` is set AND `override_close` matches this cycle's close,
+    that manual amount is used instead of the inferred charges — an escape hatch
+    for issuer quirks the date rules can't capture (e.g. a post-close refund the
+    issuer credits to this statement even though its purchase is next cycle). The
+    override auto-expires once a later cycle closes."""
     _open, close = statement_window(statement_day, today)
-    charges = statement_balance(transactions, statement_day, today)
+    if override_amount is not None and str(override_close or "") == close.isoformat():
+        charges = _dec(override_amount)
+    else:
+        charges = statement_balance(transactions, statement_day, today)
     paid_after = sum(
         (_dec(p.get("amount")) for p in payments if str(p.get("paid_on") or "") > close.isoformat()),
         Decimal("0"),

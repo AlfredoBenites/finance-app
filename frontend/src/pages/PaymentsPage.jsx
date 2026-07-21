@@ -5,6 +5,7 @@ import { money, formatDate, todayLocal } from "../format";
 import { usePrivacy } from "../privacy/PrivacyContext";
 import { useSettings } from "../settings/SettingsContext";
 import { BucketIcon } from "../components/buckets/bucketIcons";
+import StatementReconcile from "../components/payments/StatementReconcile";
 import {
   PageHeader,
   Card,
@@ -28,7 +29,8 @@ const today = todayLocal;
 
 // Match the dashboard's upcoming-payment badge (sooner = more urgent color).
 const paymentTone = (days) => (days <= 2 ? "danger" : days <= 7 ? "orange" : "info");
-const daysLabel = (days) => (days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`);
+const daysLabel = (days) =>
+  days < 0 ? "Past due" : days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`;
 
 export default function PaymentsPage() {
   const { hidden } = usePrivacy();
@@ -51,6 +53,25 @@ export default function PaymentsPage() {
   // History filters + pagination.
   const [filters, setFilters] = useState({ card: "", account: "", from: "", to: "" });
   const [page, setPage] = useState(0);
+
+  // Manual "actual statement balance" override for the selected card (escape hatch).
+  const [stmtInput, setStmtInput] = useState("");
+  const [stmtBusy, setStmtBusy] = useState(false);
+
+  async function setOverride(value) {
+    if (!cardId || stmtBusy) return;
+    setStmtBusy(true);
+    try {
+      await creditCardsApi.setStatementOverride(cardId, value);
+      setStmtInput("");
+      setError(null);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setStmtBusy(false);
+    }
+  }
 
   // Amounts inside native <option> labels can't use <Amount>, so mask by hand.
   const mask = (v) => (hidden ? "****" : money(v));
@@ -193,6 +214,34 @@ export default function PaymentsPage() {
               })}
             </tbody>
           </Table>
+        </div>
+      )}
+
+      {/* Statement fixes for the selected card (issuers bill by posting date) */}
+      {cardId && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-ink mb-1">Statement not matching?</h2>
+          <p className="text-sm text-muted mb-2">
+            The app estimates {cards.find((c) => c.id === cardId)?.name}'s statement from your transaction dates. Card issuers bill by posting date, so it can differ near the cycle's edge. Reconcile which charges belong to it (fixes this and next month), or pin the exact amount your issuer shows.
+          </p>
+          <StatementReconcile cardId={cardId} onApplied={load} onError={setError} />
+          <div className="mt-3">
+            <p className="text-xs text-muted mb-1">Or pin the exact statement your issuer shows (applies to this cycle, clears next cycle):</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <AmountInput
+                className="w-40"
+                value={stmtInput}
+                onChange={setStmtInput}
+                placeholder={statementByCard[cardId] != null ? mask(statementByCard[cardId]).replace("$", "") : "0.00"}
+              />
+              <Button size="sm" variant="primary" onClick={() => setOverride(Number(stmtInput))} disabled={stmtBusy || stmtInput === ""}>
+                Set statement
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setOverride(null)} disabled={stmtBusy}>
+                Use estimate
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

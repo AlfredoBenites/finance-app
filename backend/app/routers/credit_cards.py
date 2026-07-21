@@ -1,5 +1,5 @@
 """CRUD endpoints for credit cards. Scoped to the logged-in user."""
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -13,6 +13,7 @@ from app.auth import get_current_user_id
 from app.database import supabase, fetch_all
 from app.db_errors import is_foreign_key_violation
 from app.models.credit_card import CreditCard, CreditCardCreate, CreditCardUpdate
+from app.services import calculations as calc
 
 router = APIRouter(prefix="/api/credit-cards", tags=["credit_cards"])
 
@@ -22,6 +23,19 @@ TABLE = "credit_cards"
 class UpgradeRequest(BaseModel):
     new_card_id: str
     upgraded_on: Optional[date] = None
+
+
+class StatementOverrideRequest(BaseModel):
+    amount: Optional[Decimal] = None  # null clears the override
+
+
+class ReconcileMove(BaseModel):
+    transaction_id: str
+    in_statement: bool  # True = keep on this statement; False = push to next cycle
+
+
+class ReconcileRequest(BaseModel):
+    moves: list[ReconcileMove]
 
 
 class PaymentRequest(BaseModel):
@@ -121,6 +135,104 @@ def pay_card(card_id: str, payload: PaymentRequest, user_id: str = Depends(get_c
         "paid_on": paid_on,
     }).execute()
     return {"ok": True, "paid": float(amount), "charges_settled": len(to_settle)}
+
+
+@router.post("/{card_id}/statement-override", response_model=CreditCard)
+def set_statement_override(
+    card_id: str, payload: StatementOverrideRequest, user_id: str = Depends(get_current_user_id)
+):
+    """Pin the ACTUAL statement balance for this card's current cycle (or clear it
+    with a null amount). Stored with the current close date so it auto-expires once
+    the next cycle closes. Escape hatch for issuer quirks the date rules can't model."""
+    card = supabase.table(TABLE).select("statement_day").eq("id", card_id).eq("owner_id", user_id).execute()
+    if not card.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    sd = card.data[0].get("statement_day")
+    if not sd:
+        raise HTTPException(status_code=400, detail="Set a statement day on this card first.")
+    if payload.amount is None:
+        changes = {"statement_override": None, "statement_override_close": None}
+    else:
+        if payload.amount < 0:
+            raise HTTPException(status_code=400, detail="Amount can't be negative.")
+        _open, close = calc.statement_window(int(sd), date.today())
+        changes = {"statement_override": str(payload.amount), "statement_override_close": close.isoformat()}
+    result = supabase.table(TABLE).update(changes).eq("id", card_id).eq("owner_id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    return result.data[0]
+
+
+@router.get("/{card_id}/reconcile")
+def get_reconcile(card_id: str, user_id: str = Depends(get_current_user_id)):
+    """Charges near this card's current statement close, so the user can fix which
+    ones actually landed on this statement (issuers bill by posting date)."""
+    card = supabase.table(TABLE).select("statement_day").eq("id", card_id).eq("owner_id", user_id).execute()
+    if not card.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    sd = card.data[0].get("statement_day")
+    if not sd:
+        raise HTTPException(status_code=400, detail="Set a statement day on this card first.")
+    today = date.today()
+    open_, close = calc.statement_window(int(sd), today)
+    txns = fetch_all(
+        lambda: supabase.table("transactions")
+        .select("id, transaction_date, posting_date, refund_for_id, merchant, amount, credit_card_id")
+        .eq("owner_id", user_id)
+        .eq("credit_card_id", card_id)
+    )
+    by_id = {t["id"]: t for t in txns}
+    eff = lambda t: calc.statement_date(t, by_id)
+    lo, hi = close - timedelta(days=7), close + timedelta(days=7)
+    boundary = sorted([t for t in txns if lo <= eff(t) <= hi], key=eff)
+    charges = [
+        {
+            "id": t["id"],
+            "transaction_date": t["transaction_date"],
+            "posting_date": t.get("posting_date"),
+            "effective_date": eff(t).isoformat(),
+            "merchant": t.get("merchant"),
+            # Positive contribution to the statement (a purchase adds; a refund subtracts).
+            "statement_amount": float(-Decimal(str(t["amount"]))),
+            "in_statement": open_ < eff(t) <= close,
+        }
+        for t in boundary
+    ]
+    return {
+        "open": open_.isoformat(),
+        "close": close.isoformat(),
+        "estimate": float(calc.statement_balance(txns, int(sd), today)),
+        "charges": charges,
+    }
+
+
+@router.post("/{card_id}/reconcile")
+def apply_reconcile(card_id: str, payload: ReconcileRequest, user_id: str = Depends(get_current_user_id)):
+    """Set each moved charge's posting date so it lands on the statement the user
+    says (this cycle = the close date; next cycle = the day after close)."""
+    card = supabase.table(TABLE).select("statement_day").eq("id", card_id).eq("owner_id", user_id).execute()
+    if not card.data:
+        raise HTTPException(status_code=404, detail="Credit card not found")
+    sd = card.data[0].get("statement_day")
+    if not sd:
+        raise HTTPException(status_code=400, detail="Set a statement day on this card first.")
+    _open, close = calc.statement_window(int(sd), date.today())
+    in_date = close.isoformat()
+    out_date = (close + timedelta(days=1)).isoformat()
+    updated = 0
+    for m in payload.moves:
+        pd = in_date if m.in_statement else out_date
+        res = (
+            supabase.table("transactions")
+            .update({"posting_date": pd})
+            .eq("id", m.transaction_id)
+            .eq("owner_id", user_id)
+            .eq("credit_card_id", card_id)
+            .execute()
+        )
+        if res.data:
+            updated += 1
+    return {"ok": True, "updated": updated}
 
 
 @router.get("/upgrades")
