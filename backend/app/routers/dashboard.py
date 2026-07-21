@@ -46,7 +46,7 @@ def get_dashboard(
         for a in accounts
     ]
     profiles = owned("profiles", "id, name, is_primary")
-    cards = owned("credit_cards", "id, name, due_day, statement_day, is_active, statement_override, statement_override_close")
+    cards = owned("credit_cards", "id, name, due_day, statement_day, is_active")
     card_payments = owned("card_payments", "credit_card_id, amount, paid_on")
     income_rows = owned("income", "amount, income_date, category")
 
@@ -101,10 +101,7 @@ def get_dashboard(
         if sd:
             card_txns = [t for t in all_transactions if t.get("credit_card_id") == c["id"]]
             card_pays = [p for p in card_payments if p.get("credit_card_id") == c["id"]]
-            statement_by_card[c["id"]] = calc.statement_due(
-                card_txns, card_pays, int(sd), today,
-                c.get("statement_override"), c.get("statement_override_close"),
-            )
+            statement_by_card[c["id"]] = calc.statement_due(card_txns, card_pays, int(sd), today)
 
     # "Unallocated" = charges a person hasn't reimbursed yet (is_paid_back based).
     # That's the red figure on the dashboard's "Unallocated Balance by Card".

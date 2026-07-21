@@ -1,5 +1,5 @@
 """Tests for the statement 'reconcile charges' flow (posting-date fix)."""
-from datetime import date
+from datetime import date, timedelta
 
 from app.services import calculations as calc
 
@@ -47,3 +47,26 @@ def test_reconcile_requires_a_statement_day(api):
     api.login("user-a", "a@example.com")
     cid = api.client.post("/api/credit-cards", json={"name": "No Day"}).json()["id"]
     assert api.client.get(f"/api/credit-cards/{cid}/reconcile").status_code == 400
+
+
+def test_linked_refund_bills_to_its_purchases_statement(api):
+    api.login("user-a", "a@example.com")
+    pid = api.client.post("/api/profiles", json={"name": "Me"}).json()["id"]
+    cid = api.client.post("/api/credit-cards", json={"name": "RH Gold", "statement_day": 15}).json()["id"]
+    open_, close = calc.statement_window(15, date.today())
+
+    # A purchase ON this statement (close day) for $50.
+    purchase = _charge(api, pid, cid, close.isoformat(), -50)
+    # A refund posted AFTER the close (next cycle) but linked to that purchase.
+    after = (close + timedelta(days=2)).isoformat()
+    api.client.post(
+        "/api/transactions",
+        json={"transaction_date": after, "amount": 8, "profile_id": pid,
+              "credit_card_id": cid, "refund_for_id": purchase["id"]},
+    )
+
+    # The refund nets against THIS statement (its purchase's), so due = 50 - 8 = 42,
+    # even though the refund is dated in the next cycle.
+    dash = api.client.get("/api/dashboard").json()
+    row = next(d for d in dash["debt_by_card"] if d["credit_card_id"] == cid)
+    assert row["statement"] == 42.0
