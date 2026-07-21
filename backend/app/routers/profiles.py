@@ -294,7 +294,15 @@ def profile_statement(profile_id: str, user_id: str = Depends(get_current_user_i
         if not cid or t.get("is_paid_back"):
             continue  # only unpaid card charges count toward what's still owed
         entry = by_card.setdefault(
-            cid, {"card_name": card_names.get(cid, "Unknown"), "owed": Decimal("0"), "transactions": []}
+            cid,
+            {
+                # Include the id so the printable statement can look up this card's
+                # chosen color reliably, even if two cards share a name.
+                "credit_card_id": cid,
+                "card_name": card_names.get(cid, "Unknown"),
+                "owed": Decimal("0"),
+                "transactions": [],
+            },
         )
         amt = calc._dec(t["amount"])
         entry["owed"] += -amt  # purchases are negative; owed is positive
