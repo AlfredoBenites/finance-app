@@ -22,6 +22,23 @@ router = APIRouter(prefix="/api/holdings", tags=["holdings"])
 TABLE = "holdings"
 
 
+def _bucket_in_account(user_id: str, bucket_id: str, account_id: str):
+    """Fetch a bucket and confirm it belongs to the account. Returns the row."""
+    b = (
+        supabase.table("buckets")
+        .select("id, name, current_amount, account_id")
+        .eq("id", bucket_id)
+        .eq("owner_id", user_id)
+        .execute()
+        .data
+    )
+    if not b:
+        raise HTTPException(status_code=404, detail="Bucket not found")
+    if b[0]["account_id"] != account_id:
+        raise HTTPException(status_code=400, detail="That bucket isn't in the chosen account")
+    return b[0]
+
+
 @router.get("", response_model=list[Holding])
 def list_holdings(user_id: str = Depends(get_current_user_id)):
     return (
@@ -72,7 +89,11 @@ def list_investment_transactions(user_id: str = Depends(get_current_user_id)):
 def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)):
     """Buy shares with an account's buying power: add the shares to a holding
     (creating it if new), subtract the cost from the account's cash, and log the
-    purchase. You can only buy with money already sitting in the account."""
+    purchase. You can only buy with money already sitting in the account.
+
+    Pass a `bucket_id` when the cash is set aside in a bucket (e.g. "Buying
+    power") so the envelope shrinks with the balance instead of leaving the
+    account over-allocated."""
     if payload.shares <= 0:
         raise HTTPException(status_code=400, detail="Shares must be positive.")
     if payload.amount is None and payload.price is None:
@@ -104,6 +125,8 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
             status_code=400,
             detail=f"Not enough buying power (${balance}) in {acc[0]['name']}. Transfer cash into it first.",
         )
+    # Check the bucket before anything moves, so a bad one can't half-apply a buy.
+    bucket = _bucket_in_account(user_id, payload.bucket_id, payload.account_id) if payload.bucket_id else None
 
     symbol = payload.symbol.strip().upper()
     existing = (
@@ -149,6 +172,14 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
     supabase.table("accounts").update({"balance": str(balance - amount)}).eq(
         "id", payload.account_id
     ).eq("owner_id", user_id).execute()
+    # Spend the bucket down too (never below 0), so the cash and the envelope
+    # that held it stay in step.
+    if bucket:
+        cur = Decimal(str(bucket["current_amount"]))
+        new_bucket = cur - amount if cur - amount > 0 else Decimal("0")
+        supabase.table("buckets").update({"current_amount": str(new_bucket)}).eq(
+            "id", bucket["id"]
+        ).eq("owner_id", user_id).execute()
 
     traded_on = payload.traded_on or date.today().isoformat()
     supabase.table("investment_transactions").insert(
@@ -176,7 +207,10 @@ def buy_holding(payload: HoldingBuy, user_id: str = Depends(get_current_user_id)
 @router.post("/sell")
 def sell_holding(payload: HoldingSell, user_id: str = Depends(get_current_user_id)):
     """Sell shares of a holding: reduce its shares (deleting it if it hits zero),
-    return the proceeds to the holding's account cash, and log the sale."""
+    return the proceeds to the holding's account cash, and log the sale.
+
+    Pass a `bucket_id` to put the proceeds back into a bucket of that account
+    (e.g. "Buying power") instead of leaving them unallocated."""
     if payload.shares <= 0:
         raise HTTPException(status_code=400, detail="Shares must be positive.")
     if payload.amount is None and payload.price is None:
@@ -191,6 +225,8 @@ def sell_holding(payload: HoldingSell, user_id: str = Depends(get_current_user_i
     owned = Decimal(str(holding["shares"]))
     if payload.shares > owned:
         raise HTTPException(status_code=400, detail=f"You only have {owned} shares to sell.")
+    # Check the bucket before anything moves, so a bad one can't half-apply a sale.
+    bucket = _bucket_in_account(user_id, payload.bucket_id, holding["account_id"]) if payload.bucket_id else None
 
     if payload.amount is not None:
         amount = payload.amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -239,6 +275,12 @@ def sell_holding(payload: HoldingSell, user_id: str = Depends(get_current_user_i
         supabase.table("accounts").update({"balance": str(Decimal(str(acc[0]["balance"])) + amount)}).eq(
             "id", acc[0]["id"]
         ).eq("owner_id", user_id).execute()
+        # Put the proceeds back in the bucket they were bought out of, if asked.
+        if bucket:
+            cur = Decimal(str(bucket["current_amount"]))
+            supabase.table("buckets").update({"current_amount": str(cur + amount)}).eq(
+                "id", bucket["id"]
+            ).eq("owner_id", user_id).execute()
         log_move(user_id, "account", amount, f"Sold {payload.shares} {holding['symbol']} · {acc[0]['name']}")
 
     return {"ok": True, "shares_left": float(new_shares)}

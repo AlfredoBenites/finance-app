@@ -16,7 +16,7 @@ import {
 import { Modal, Button, Input, Select, Toggle, ReorderList, cn } from "./ui";
 import { KindBadge, TAG_COLORS } from "./buckets/tagColors";
 import { BucketIcon, BUCKET_COLORS } from "./buckets/bucketIcons";
-import { useSettings } from "../settings/SettingsContext";
+import { useSettings, REFUNDS } from "../settings/SettingsContext";
 import { YEARS } from "../components/YearSelect";
 import { profilesApi, creditCardsApi, accountsApi, bucketsApi } from "../api/client";
 
@@ -438,6 +438,7 @@ export default function SettingsModal() {
                       <option value="">Paid + unpaid</option>
                       <option value="false">Unpaid only</option>
                       <option value="true">Paid only</option>
+                      <option value={REFUNDS}>Refunds only</option>
                     </Select>
                   </label>
                   <label className="flex flex-col gap-1">

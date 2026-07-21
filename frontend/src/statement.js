@@ -11,6 +11,7 @@ const STRINGS = {
     title: "Amount owed",
     generated: "Generated",
     totalOwed: "Total still owed",
+    cashback: "Cashback earned",
     date: "Date",
     merchant: "Merchant",
     category: "Category",
@@ -23,6 +24,7 @@ const STRINGS = {
     title: "Cantidad adeudada",
     generated: "Generado",
     totalOwed: "Total pendiente",
+    cashback: "Cashback ganado",
     date: "Fecha",
     merchant: "Comercio",
     category: "Categoría",
@@ -51,10 +53,84 @@ function fmtDate(v) {
   return String(v);
 }
 
-export function writeStatement(win, s, lang = "en") {
+// --- card colors -------------------------------------------------------------
+// Each card section is tinted with the color picked for that card on the Credit
+// Cards page: a filled header row plus faint alternating body rows, like a bank
+// statement. Cards with no color use this neutral gray, which runs through the
+// same helpers (so it gets white header text and a light-gray zebra).
+const NEUTRAL_COLOR = "#52525b";
+
+// "#abc" / "abcdef" -> "#aabbcc". Returns null for anything we can't read.
+function toHex(v) {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(v ?? "").trim());
+  if (!m) return null;
+  const h = m[1].toLowerCase();
+  return h.length === 3 ? `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}` : `#${h}`;
+}
+
+function rgbOf(hex) {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+}
+
+// Dark ink on light colors, white on dark ones. Uses WCAG relative luminance;
+// 0.18 is where contrast against white and against black cross over.
+function readableInk(hex) {
+  const [r, g, b] = rgbOf(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.18 ? "#0d0b09" : "#ffffff";
+}
+
+// Blend a color toward white. `white` is how much white to mix in, so 0.92
+// keeps 8% of the color — enough to read on paper without muddying the text.
+function tint(hex, white) {
+  const parts = rgbOf(hex).map((v) => Math.round(v + (255 - v) * white));
+  return `#${parts.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+// The statement's card entries only carry the card NAME, so match the credit
+// card rows on name (and on id when a card id is present).
+function colorLookup(cards) {
+  const byId = {};
+  const byName = {};
+  for (const c of cards || []) {
+    if (!c || !c.color) continue;
+    if (c.id) byId[c.id] = c.color;
+    if (c.name) byName[String(c.name).trim().toLowerCase()] = c.color;
+  }
+  return (entry) => {
+    const id = entry.credit_card_id || entry.card_id;
+    const byName_ = byName[String(entry.card_name ?? "").trim().toLowerCase()];
+    return toHex((id && byId[id]) || byName_) || NEUTRAL_COLOR;
+  };
+}
+
+/**
+ * @param win     the already-opened print window
+ * @param s       the /statement payload (profile_name, generated_on, total_owed, cards)
+ * @param lang    "en" | "es"
+ * @param extras  { cards: credit card rows (for per-card color),
+ *                  cashback: number shown next to the total }
+ */
+export function writeStatement(win, s, lang = "en", extras = {}) {
   const t = STRINGS[lang] || STRINGS.en;
+  const colorOf = colorLookup(extras.cards);
+  // Cashback is optional: the line only prints when the caller passes a number.
+  const cashbackNum = Number(extras.cashback);
+  const cashback = extras.cashback == null || !Number.isFinite(cashbackNum) ? null : cashbackNum;
+
+  // One small style block per card so each table carries its own colors.
+  const cardStyles = [];
   const cardSections = s.cards
-    .map((c) => {
+    .map((c, i) => {
+      const color = colorOf(c);
+      const cls = `card${i}`;
+      cardStyles.push(`
+  .${cls} tr.cardhead th { background: ${color}; color: ${readableInk(color)}; }
+  .${cls} tr.colhead th { background: ${tint(color, 0.84)}; color: #3f3f46; border-bottom-color: ${tint(color, 0.66)}; }
+  .${cls} tbody tr:nth-child(even) td { background: ${tint(color, 0.92)}; }`);
+
       const rows = c.transactions
         .map(
           (tx) => `
@@ -68,7 +144,7 @@ export function writeStatement(win, s, lang = "en") {
         )
         .join("");
       return `
-      <section>
+      <section class="${cls}">
         <table>
           <thead>
             <tr class="cardhead">
@@ -110,26 +186,37 @@ export function writeStatement(win, s, lang = "en") {
   h1 .who { color: #6b7280; font-weight: 500; }
   .meta { color: #6b7280; font-size: 12.5px; margin: 0; }
 
-  /* Summary: label on the left, total figure highlighted with the brand accent. */
-  .total {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
+  /* Summary: labels on the left, figures on the right. The total gets the brand
+     accent; cashback sits under it on its own line. */
+  .summary {
     margin: 22px 0 8px;
-    padding: 16px 18px;
     border: 1px solid #ececec;
     border-radius: 10px;
     background: #fafafa;
   }
-  .total .label { color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-  .total .figure {
+  .summary .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 18px;
+  }
+  .summary .row + .row { border-top: 1px solid #ececec; padding: 11px 18px; }
+  .summary .label { color: #6b7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .summary .figure {
     font-size: 24px;
     font-weight: 800;
     color: #0d0b09;
     padding: 2px 10px;
     border-radius: 4px;
     background: #e4f222;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .summary .value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #26753b;
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
   }
@@ -141,13 +228,16 @@ export function writeStatement(win, s, lang = "en") {
      card never leaves its heading stranded at the bottom of a page. */
   thead { display: table-header-group; }
   tr.cardhead th {
-    padding: 0 0 6px;
-    border-bottom: 2px solid #0d0b09;
+    padding: 9px 10px;
+    background: ${NEUTRAL_COLOR};
+    color: #ffffff;
+    /* Keeps a hairline under the bar even when a card's color is very pale. */
+    border-bottom: 1px solid rgba(0, 0, 0, 0.10);
     text-align: left;
     vertical-align: baseline;
   }
-  .cardname { font-size: 16px; font-weight: 700; color: #0d0b09; }
-  .cardowed { font-size: 14px; font-weight: 700; color: #26753b; white-space: nowrap; }
+  .cardname { font-size: 15px; font-weight: 700; }
+  .cardowed { font-size: 14px; font-weight: 700; white-space: nowrap; }
 
   tr.colhead th {
     padding: 8px;
@@ -156,7 +246,8 @@ export function writeStatement(win, s, lang = "en") {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #6b7280;
+    color: #3f3f46;
+    background: #f4f4f5;
     border-bottom: 1px solid #ececec;
   }
   tbody td { padding: 7px 8px; border-bottom: 1px solid #ececec; vertical-align: top; }
@@ -174,6 +265,8 @@ export function writeStatement(win, s, lang = "en") {
   }
   tbody .amt { font-weight: 600; color: #0d0b09; }
 
+  /* Per-card colors (header fill + zebra tint), one rule set per card. */${cardStyles.join("")}
+
   .empty { margin: 28px 0; color: #6b7280; font-size: 14px; }
   footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #ececec; color: #9ca3af; font-size: 11.5px; }
 
@@ -182,11 +275,17 @@ export function writeStatement(win, s, lang = "en") {
 <body onload="window.print()">
   <header>
     <h1>${t.title} <span class="who">— ${esc(s.profile_name)}</span></h1>
-    <p class="meta">${t.generated} ${esc(s.generated_on)}</p>
+    <p class="meta">${t.generated} ${esc(fmtDate(s.generated_on))}</p>
   </header>
-  <div class="total">
-    <span class="label">${t.totalOwed}</span>
-    <span class="figure">${money(s.total_owed)}</span>
+  <div class="summary">
+    <div class="row">
+      <span class="label">${t.totalOwed}</span>
+      <span class="figure">${money(s.total_owed)}</span>
+    </div>
+    ${cashback === null ? "" : `<div class="row">
+      <span class="label">${t.cashback}</span>
+      <span class="value">${money(cashback)}</span>
+    </div>`}
   </div>
   ${s.cards.length ? cardSections : `<p class="empty">${t.nothing}</p>`}
   <footer>${t.footer}</footer>

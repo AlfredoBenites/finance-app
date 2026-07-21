@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { profilesApi, sharesApi, bucketsApi } from "../api/client";
+import { profilesApi, sharesApi, bucketsApi, creditCardsApi } from "../api/client";
 import { writeStatement } from "../statement";
 import { useSettings } from "../settings/SettingsContext";
 import {
@@ -139,8 +139,16 @@ export default function ProfilesPage() {
     }
     try {
       setError(null);
-      const s = await profilesApi.statement(detailId);
-      writeStatement(win, s, statementLangByProfile[detailId] || "en");
+      // The statement itself, plus the cards (for each card's color). Cashback
+      // comes from the summary already loaded for the open panel.
+      const [s, cards] = await Promise.all([
+        profilesApi.statement(detailId),
+        creditCardsApi.list().catch(() => []), // colors are decoration; don't fail the print
+      ]);
+      writeStatement(win, s, statementLangByProfile[detailId] || "en", {
+        cards,
+        cashback: summary?.cashback_earned ?? null,
+      });
     } catch (e) {
       win.close();
       setError(e.message);

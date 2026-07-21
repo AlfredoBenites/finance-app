@@ -8,6 +8,11 @@ import usePersistedState from "../hooks/usePersistedState";
 // - cardOrder: array of card ids = display order on the Credit Cards page
 const SettingsContext = createContext(null);
 
+// Extra value for the Expenses status filter, alongside "" / "true" / "false".
+// It means "only refunds" (a positive amount) and is applied client-side, since
+// the API's is_paid_back param only accepts true/false.
+export const REFUNDS = "refunds";
+
 export function SettingsProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [profileSort, setProfileSort] = usePersistedState("settings.profileSort", {
@@ -33,7 +38,7 @@ export function SettingsProvider({ children }) {
   const [expensesPerPage, setExpensesPerPage] = usePersistedState("settings.expensesPerPage", 15);
   const [expensesFilters, setExpensesFilters] = usePersistedState("settings.expensesFilters", {
     profile_id: "",
-    is_paid_back: "",
+    is_paid_back: "", // "" (all) | "true" | "false" | REFUNDS
     source: "",
     year: "current", // "current" | "all" | a specific year string
   });

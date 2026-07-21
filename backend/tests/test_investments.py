@@ -8,6 +8,18 @@ def _account(api, balance):
     ).json()["id"]
 
 
+def _bucket(api, account_id, amount, name="Buying power"):
+    return api.client.post(
+        "/api/buckets",
+        json={"name": name, "account_id": account_id, "current_amount": amount},
+    ).json()["id"]
+
+
+def _bucket_amount(api, bucket_id):
+    row = next(b for b in api.client.get("/api/buckets").json() if b["id"] == bucket_id)
+    return float(row["current_amount"])
+
+
 def test_buy_creates_holding_debits_cash_and_logs(api):
     api.login("user-a", "a@example.com")
     acc = _account(api, 1000)
@@ -117,3 +129,94 @@ def test_sell_more_than_owned_is_rejected(api):
     r = api.client.post("/api/holdings/sell", json={"holding_id": hid, "shares": 3, "price": 100})
     assert r.status_code == 400
     assert "only have" in r.json()["detail"].lower()
+
+
+def test_buy_from_a_bucket_draws_the_bucket_down(api):
+    """Cash allocated to a bucket has to leave the bucket too, or the account is
+    left over-allocated (balance minus its buckets goes negative)."""
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1065.49)
+    bucket = _bucket(api, acc, 1065.49)
+
+    r = api.client.post(
+        "/api/holdings/buy",
+        json={"account_id": acc, "bucket_id": bucket, "symbol": "NVDA",
+              "shares": 2.289841, "price": 202.42, "amount": 463.50},
+    )
+    assert r.status_code == 200, r.text
+    acc_row = next(a for a in api.client.get("/api/accounts").json() if a["id"] == acc)
+    assert float(acc_row["balance"]) == 601.99
+    # Bucket followed the cash down, so unallocated stays at 0 (not -463.50).
+    assert _bucket_amount(api, bucket) == 601.99
+
+
+def test_buy_never_pushes_a_bucket_negative(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    bucket = _bucket(api, acc, 100)
+    r = api.client.post(
+        "/api/holdings/buy",
+        json={"account_id": acc, "bucket_id": bucket, "symbol": "AAPL", "shares": 3, "price": 100},
+    )
+    assert r.status_code == 200, r.text
+    assert _bucket_amount(api, bucket) == 0.0
+
+
+def test_sell_into_a_bucket_returns_the_proceeds(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    bucket = _bucket(api, acc, 1000)
+    api.client.post(
+        "/api/holdings/buy",
+        json={"account_id": acc, "bucket_id": bucket, "symbol": "AAPL", "shares": 5, "price": 100},
+    )
+    hid = api.client.get("/api/holdings").json()[0]["id"]
+    assert _bucket_amount(api, bucket) == 500.0
+
+    r = api.client.post(
+        "/api/holdings/sell",
+        json={"holding_id": hid, "bucket_id": bucket, "shares": 2, "price": 120},
+    )
+    assert r.status_code == 200, r.text
+    # Cash and bucket both back up by 240.
+    acc_row = next(a for a in api.client.get("/api/accounts").json() if a["id"] == acc)
+    assert float(acc_row["balance"]) == 740.0
+    assert _bucket_amount(api, bucket) == 740.0
+
+
+def test_buy_rejects_a_bucket_from_another_account(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    other = api.client.post("/api/accounts", json={"name": "Ally", "balance": 500}).json()["id"]
+    bucket = _bucket(api, other, 500, name="Rent")
+
+    r = api.client.post(
+        "/api/holdings/buy",
+        json={"account_id": acc, "bucket_id": bucket, "symbol": "AAPL", "shares": 1, "price": 100},
+    )
+    assert r.status_code == 400
+    assert "bucket" in r.json()["detail"].lower()
+    # Nothing moved: no holding, no cash spent, bucket untouched.
+    assert api.client.get("/api/holdings").json() == []
+    acc_row = next(a for a in api.client.get("/api/accounts").json() if a["id"] == acc)
+    assert float(acc_row["balance"]) == 1000
+    assert _bucket_amount(api, bucket) == 500.0
+
+
+def test_sell_rejects_a_bucket_from_another_account(api):
+    api.login("user-a", "a@example.com")
+    acc = _account(api, 1000)
+    other = api.client.post("/api/accounts", json={"name": "Ally", "balance": 500}).json()["id"]
+    bucket = _bucket(api, other, 500, name="Rent")
+    api.client.post("/api/holdings/buy", json={"account_id": acc, "symbol": "AAPL", "shares": 2, "price": 100})
+    hid = api.client.get("/api/holdings").json()[0]["id"]
+
+    r = api.client.post(
+        "/api/holdings/sell",
+        json={"holding_id": hid, "bucket_id": bucket, "shares": 1, "price": 100},
+    )
+    assert r.status_code == 400
+    assert "bucket" in r.json()["detail"].lower()
+    # The sale didn't happen.
+    assert float(api.client.get("/api/holdings").json()[0]["shares"]) == 2
+    assert _bucket_amount(api, bucket) == 500.0

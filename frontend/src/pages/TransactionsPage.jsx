@@ -31,7 +31,7 @@ import { useExpenseForm, ExpenseFields, today } from "../components/expenses/Exp
 import GroupPurchaseForm from "../components/expenses/GroupPurchaseForm";
 import TransactionDetailPanel from "../components/expenses/TransactionDetailPanel";
 import { Modal } from "../components/ui";
-import { useSettings } from "../settings/SettingsContext";
+import { useSettings, REFUNDS } from "../settings/SettingsContext";
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
@@ -140,7 +140,10 @@ export default function TransactionsPage() {
 
   async function loadTransactions() {
     try {
-      setTransactions(await transactionsApi.list(filters));
+      // "Refunds" lives in the status filter but the API only knows
+      // is_paid_back true/false, so we drop it here and filter client-side.
+      const { is_paid_back, ...rest } = filters;
+      setTransactions(await transactionsApi.list(is_paid_back === REFUNDS ? rest : filters));
     } catch (e) {
       setError(e.message);
     }
@@ -240,13 +243,16 @@ export default function TransactionsPage() {
     }
   }
 
-  const visibleTransactions = sourceFilter
-    ? transactions.filter((t) =>
-        sourceFilter.startsWith("card:")
-          ? t.credit_card_id === sourceFilter.slice(5)
-          : t.account_id === sourceFilter.slice(8)
-      )
-    : transactions;
+  // Client-side filters on top of what the API already narrowed (year,
+  // profile, status, search): the source picker and the "Refunds" status,
+  // which is just a positive amount.
+  const visibleTransactions = transactions.filter((t) => {
+    if (filters.is_paid_back === REFUNDS && Number(t.amount) <= 0) return false;
+    if (!sourceFilter) return true;
+    return sourceFilter.startsWith("card:")
+      ? t.credit_card_id === sourceFilter.slice(5)
+      : t.account_id === sourceFilter.slice(8);
+  });
 
   // Paginate the filtered list (rows-per-page from Settings).
   useEffect(() => {
@@ -348,6 +354,7 @@ export default function TransactionsPage() {
           <option value="">Paid + unpaid</option>
           <option value="false">Unpaid only</option>
           <option value="true">Paid only</option>
+          <option value={REFUNDS}>Refunds only</option>
         </Select>
         <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
           <option value="">All sources</option>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { holdingsApi, accountsApi } from "../api/client";
+import { holdingsApi, accountsApi, bucketsApi } from "../api/client";
 import { formatDate, todayLocal } from "../format";
 import { useSettings } from "../settings/SettingsContext";
 import {
@@ -24,7 +24,7 @@ import {
 import HoldingDetailPanel from "../components/investments/HoldingDetailPanel";
 
 const EMPTY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", manual_price: "" };
-const EMPTY_BUY = { account_id: "", symbol: "", kind: "stock", category: "", shares: "", price: "", total: "" };
+const EMPTY_BUY = { account_id: "", bucket_id: "", symbol: "", kind: "stock", category: "", shares: "", price: "", total: "" };
 
 const KINDS = [
   ["stock", "Stock / ETF"],
@@ -41,6 +41,7 @@ const holdingValue = (h) => (effPrice(h) == null ? null : Number(h.shares) * Num
 export default function InvestmentsPage() {
   const [holdings, setHoldings] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [buckets, setBuckets] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [buy, setBuy] = useState({ ...EMPTY_BUY, traded_on: todayLocal() });
@@ -57,9 +58,15 @@ export default function InvestmentsPage() {
 
   async function load() {
     try {
-      const [h, a, t] = await Promise.all([holdingsApi.list(), accountsApi.list(), holdingsApi.transactions()]);
+      const [h, a, b, t] = await Promise.all([
+        holdingsApi.list(),
+        accountsApi.list(),
+        bucketsApi.list(),
+        holdingsApi.transactions(),
+      ]);
       setHoldings(h);
       setAccounts(a);
+      setBuckets(b);
       setTransactions(t);
     } catch (e) {
       setError(e.message);
@@ -86,6 +93,7 @@ export default function InvestmentsPage() {
     try {
       await holdingsApi.buy({
         account_id: buy.account_id,
+        bucket_id: buy.bucket_id || null,
         symbol: buy.symbol.trim().toUpperCase(),
         kind: buy.kind,
         category: buy.category.trim() || null,
@@ -154,6 +162,7 @@ export default function InvestmentsPage() {
   const activeAccounts = accounts.filter((a) => a.is_active !== false);
 
   const buyingPower = buy.account_id ? Number(accounts.find((a) => a.id === buy.account_id)?.balance ?? 0) : null;
+  const buyBuckets = buckets.filter((b) => b.account_id === buy.account_id);
   const buyCost =
     buy.total !== ""
       ? Number(buy.total)
@@ -204,9 +213,18 @@ export default function InvestmentsPage() {
       <Card className="mb-6">
         <form onSubmit={handleBuy} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <Field label="Account (buying power)">
-            <Select value={buy.account_id} onChange={(e) => setBuyField("account_id", e.target.value)}>
+            <Select
+              value={buy.account_id}
+              onChange={(e) => setBuy((b) => ({ ...b, account_id: e.target.value, bucket_id: "" }))}
+            >
               <option value="">Account…</option>
               {activeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="From bucket" hint="Optional. Spends the bucket down too, so the account stays in balance.">
+            <Select value={buy.bucket_id} onChange={(e) => setBuyField("bucket_id", e.target.value)} disabled={!buy.account_id}>
+              <option value="">Unallocated</option>
+              {buyBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
           </Field>
           <Field label="Type">
@@ -372,6 +390,7 @@ export default function InvestmentsPage() {
       <HoldingDetailPanel
         holding={panelHolding}
         accounts={accounts}
+        buckets={buckets}
         categories={categories}
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
