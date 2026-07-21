@@ -432,14 +432,16 @@ export default function BucketsPage() {
                               />
                             </td>
                             <td className="align-middle whitespace-nowrap tabular-nums text-muted">{formatDate(t.transaction_date)}</td>
-                            <td className="w-full align-middle text-ink">{t.merchant || "—"}</td>
-                            <td className="align-middle whitespace-nowrap text-right tabular-nums text-ink">
-                              <strong><Amount value={-t.amount} /></strong>
-                            </td>
-                            <td className="align-middle text-muted">
+                            <td className="align-middle whitespace-nowrap text-ink">{t.merchant || "Unknown"}</td>
+                            {/* The note takes the leftover width so it never gets
+                                squeezed into a sliver; the amount stays last. */}
+                            <td className="w-full align-middle text-muted">
                               {t.refunded > 0 ? <span>(net of <Amount value={t.refunded} /> refund)</span> : null}
                               {t.refunded > 0 && t.notes ? " " : null}
                               {t.notes || null}
+                            </td>
+                            <td className="align-middle whitespace-nowrap text-right tabular-nums text-ink">
+                              <strong><Amount value={-t.amount} /></strong>
                             </td>
                           </tr>
                         ))}
