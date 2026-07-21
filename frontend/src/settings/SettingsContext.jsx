@@ -46,6 +46,8 @@ export function SettingsProvider({ children }) {
   const [incomePerPage, setIncomePerPage] = usePersistedState("settings.incomePerPage", 15);
   // Pay a card: how many payment-history rows show per page (max 100).
   const [paymentsPerPage, setPaymentsPerPage] = usePersistedState("settings.paymentsPerPage", 25);
+  // Shared with me: how many charge rows show per page (max 100).
+  const [sharedPerPage, setSharedPerPage] = usePersistedState("settings.sharedPerPage", 15);
   // Accounts: how many transfer-history rows show per page (max 100).
   const [transferHistoryPerPage, setTransferHistoryPerPage] = usePersistedState("settings.transferHistoryPerPage", 25);
   // Accounts: chosen icon color per account — { [accountId]: colorKey } (bucket palette).
@@ -91,6 +93,8 @@ export function SettingsProvider({ children }) {
     setIncomePerPage,
     paymentsPerPage,
     setPaymentsPerPage,
+    sharedPerPage,
+    setSharedPerPage,
     transferHistoryPerPage,
     setTransferHistoryPerPage,
     accountIconColors,

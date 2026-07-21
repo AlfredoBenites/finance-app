@@ -7,7 +7,6 @@ import { PrivacyProvider } from "./privacy/PrivacyContext.jsx";
 import { SettingsProvider } from "./settings/SettingsContext.jsx";
 import "@fontsource-variable/inter";
 import "./index.css";
-import "./legacy.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

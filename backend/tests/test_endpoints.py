@@ -320,6 +320,27 @@ def test_shared_with_me_shows_only_the_shared_profile(api):
     assert shared[0]["total_unpaid"] == 100.0
 
 
+def test_shared_transactions_only_expose_recipient_facing_fields(api):
+    profile_id = _setup_shared_profile(api)
+
+    api.login(*USER_B)
+    shared = api.client.get("/api/shared-with-me").json()
+    assert shared[0]["profile_id"] == profile_id
+    txn = shared[0]["transactions"][0]
+    assert set(txn) == {
+        "id",
+        "transaction_date",
+        "merchant",
+        "category",
+        "notes",
+        "amount",
+        "is_paid_back",
+        "on_card",
+    }
+    assert txn["amount"] == -100.0
+    assert txn["on_card"] is True
+
+
 def test_shared_user_still_cannot_open_the_profile_directly(api):
     profile_id = _setup_shared_profile(api)
     api.login(*USER_B)
