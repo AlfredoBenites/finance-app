@@ -107,6 +107,19 @@ def statement_window(statement_day: int, today: date) -> tuple:
     return on(y, m), close
 
 
+def statement_due_date(close: date, due_day: int) -> date:
+    """When a statement that closed on `close` is due: the first `due_day` strictly
+    after the close (issuers give ~3 weeks). This may be in the PAST, meaning the
+    payment is overdue."""
+    def on(y, m):
+        return date(y, m, min(due_day, calendar.monthrange(y, m)[1]))
+    d = on(close.year, close.month)
+    if d <= close:
+        y, m = (close.year + 1, 1) if close.month == 12 else (close.year, close.month + 1)
+        d = on(y, m)
+    return d
+
+
 def statement_date(t: dict, by_id: dict = None) -> date:
     """The date a charge is billed to a statement:
     - an explicit `posting_date` wins (set by the reconcile flow);

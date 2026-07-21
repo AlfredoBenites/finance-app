@@ -29,7 +29,8 @@ const today = todayLocal;
 
 // Match the dashboard's upcoming-payment badge (sooner = more urgent color).
 const paymentTone = (days) => (days <= 2 ? "danger" : days <= 7 ? "orange" : "info");
-const daysLabel = (days) => (days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`);
+const daysLabel = (days) =>
+  days < 0 ? "Past due" : days === 0 ? "Today" : `${days} day${days === 1 ? "" : "s"}`;
 
 export default function PaymentsPage() {
   const { hidden } = usePrivacy();
