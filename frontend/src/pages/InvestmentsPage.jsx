@@ -278,13 +278,13 @@ export default function InvestmentsPage() {
                 <strong className="text-ink"><Amount value={sum(accHoldings)} /></strong>
               </div>
               <div className="overflow-x-auto">
-                <Table className="table-fixed min-w-[36rem]">
+                <Table className="table-fixed sm:min-w-[36rem]">
                   <THead>
                     <tr>
                       <TH className="w-[24%]">Holding</TH>
-                      <TH className="w-[16%]">Type</TH>
+                      <TH className="hidden sm:table-cell w-[16%]">Type</TH>
                       <TH className="w-[18%]">Shares</TH>
-                      <TH align="right" className="w-[21%]">Price</TH>
+                      <TH align="right" className="hidden sm:table-cell w-[21%]">Price</TH>
                       <TH align="right" className="w-[21%]">Value</TH>
                     </tr>
                   </THead>
@@ -343,15 +343,15 @@ export default function InvestmentsPage() {
         <section className="mb-6">
           <h2 className="text-lg font-semibold text-ink mb-2">Trade history</h2>
           <div className="overflow-x-auto">
-            <Table className="table-fixed min-w-[46rem]">
+            <Table className="table-fixed sm:min-w-[46rem]">
               <THead>
                 <tr>
                   <TH className="w-[15%]">Date</TH>
                   <TH className="w-[12%]">Type</TH>
                   <TH className="w-[15%]">Holding</TH>
-                  <TH className="w-[20%]">Account</TH>
-                  <TH className="w-[12%]">Shares</TH>
-                  <TH align="right" className="w-[13%]">Price</TH>
+                  <TH className="hidden sm:table-cell w-[20%]">Account</TH>
+                  <TH className="hidden sm:table-cell w-[12%]">Shares</TH>
+                  <TH align="right" className="hidden sm:table-cell w-[13%]">Price</TH>
                   <TH align="right" className="w-[13%]">Amount</TH>
                 </tr>
               </THead>
@@ -363,9 +363,9 @@ export default function InvestmentsPage() {
                       <Badge tone={t.type === "sell" ? "success" : "info"}>{t.type === "sell" ? "Sell" : "Buy"}</Badge>
                     </TD>
                     <TD className="text-ink"><span className="block truncate">{t.symbol}</span></TD>
-                    <TD className="text-muted"><span className="block truncate">{accountName(t.account_id)}</span></TD>
-                    <TD className="text-muted tabular-nums">{Number(t.shares)}</TD>
-                    <TD align="right" className="text-muted tabular-nums">{priceStr(t.price)}</TD>
+                    <TD className="hidden sm:table-cell text-muted"><span className="block truncate">{accountName(t.account_id)}</span></TD>
+                    <TD className="hidden sm:table-cell text-muted tabular-nums">{Number(t.shares)}</TD>
+                    <TD align="right" className="hidden sm:table-cell text-muted tabular-nums">{priceStr(t.price)}</TD>
                     <TD align="right"><strong className="text-ink"><Amount value={t.amount} /></strong></TD>
                   </TR>
                 ))}
@@ -406,7 +406,8 @@ function CategoryGroup({ cat, list, onRowClick }) {
   return (
     <>
       <tr className="bg-surface-muted">
-        <TD colSpan={4} className="text-xs font-medium uppercase tracking-wide text-muted">{cat}</TD>
+        <TD colSpan={2} className="sm:hidden text-xs font-medium uppercase tracking-wide text-muted">{cat}</TD>
+        <TD colSpan={4} className="hidden sm:table-cell text-xs font-medium uppercase tracking-wide text-muted">{cat}</TD>
         <TD align="right" className="text-xs text-muted"><Amount value={catTotal} /></TD>
       </tr>
       {list.map((h) => {
@@ -416,11 +417,11 @@ function CategoryGroup({ cat, list, onRowClick }) {
             <TD className="text-ink">
               <span className="font-medium block truncate">{h.symbol}</span>
             </TD>
-            <TD>
+            <TD className="hidden sm:table-cell">
               <Badge tone={h.kind === "crypto" ? "orange" : "info"}>{h.kind === "crypto" ? "Crypto" : "Stock"}</Badge>
             </TD>
             <TD className="text-muted tabular-nums">{Number(h.shares)}</TD>
-            <TD align="right" className="text-muted tabular-nums">
+            <TD align="right" className="hidden sm:table-cell text-muted tabular-nums">
               {h.manual_price != null ? "manual " : ""}{priceStr(effPrice(h))}
             </TD>
             <TD align="right"><strong className="text-ink">{val == null ? <span className="text-muted">—</span> : <Amount value={val} />}</strong></TD>

@@ -212,7 +212,7 @@ export default function ProfilesPage() {
       {profiles.length === 0 ? (
         <p className="text-muted text-sm">No profiles yet.</p>
       ) : (
-        <Table className="table-fixed min-w-[32rem]">
+        <Table className="table-fixed sm:min-w-[32rem]">
           <THead>
             <tr>
               <TH className="w-[55%]">Profile</TH>
