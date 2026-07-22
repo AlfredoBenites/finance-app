@@ -132,13 +132,13 @@ export default function AccountsPage() {
 
   const AccountsTable = ({ rows }) => (
     <div className="overflow-x-auto">
-      <Table className="table-fixed min-w-[38rem]">
+      <Table className="table-fixed sm:min-w-[38rem]">
         <THead>
           <tr>
             <TH className="w-[34%]">Account</TH>
-            <TH className="w-[18%]">Type</TH>
-            <TH className="w-[14%]">Kind</TH>
-            <TH className="w-[16%]">Buckets</TH>
+            <TH className="hidden sm:table-cell w-[18%]">Type</TH>
+            <TH className="hidden sm:table-cell w-[14%]">Kind</TH>
+            <TH className="hidden sm:table-cell w-[16%]">Buckets</TH>
             <TH align="right" className="w-[18%]">Balance</TH>
           </tr>
         </THead>
@@ -151,11 +151,11 @@ export default function AccountsPage() {
                   <span className="truncate">{a.name}</span>
                 </span>
               </TD>
-              <TD className="text-muted">{typeLabel(a.account_type)}</TD>
-              <TD>
+              <TD className="hidden sm:table-cell text-muted">{typeLabel(a.account_type)}</TD>
+              <TD className="hidden sm:table-cell">
                 <Badge tone={a.is_asset ? "success" : "danger"}>{a.is_asset ? "Asset" : "Liability"}</Badge>
               </TD>
-              <TD>
+              <TD className="hidden sm:table-cell">
                 {a.show_in_buckets ? <Badge tone="neutral">In Buckets</Badge> : null}
               </TD>
               <TD align="right">
@@ -267,19 +267,22 @@ export default function AccountsPage() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <Table className="table-fixed min-w-[32rem]">
+                <Table className="table-fixed sm:min-w-[32rem]">
                   <THead>
                     <tr>
-                      <TH className="w-[22%]">Date</TH>
-                      <TH className="w-[58%]">Summary</TH>
-                      <TH align="right" className="w-[20%]">Amount</TH>
+                      <TH className="hidden sm:table-cell w-[22%]">Date</TH>
+                      <TH className="w-[62%] sm:w-[58%]">Summary</TH>
+                      <TH align="right" className="w-[38%] sm:w-[20%]">Amount</TH>
                     </tr>
                   </THead>
                   <tbody>
                     {histPageItems.map((t) => (
                       <TR key={t.id}>
-                        <TD className="text-ink whitespace-nowrap tabular-nums">{formatDate(t.created_at)}</TD>
-                        <TD className="text-muted"><span className="block truncate" title={t.summary}>{t.summary}</span></TD>
+                        <TD className="hidden sm:table-cell text-ink whitespace-nowrap tabular-nums">{formatDate(t.created_at)}</TD>
+                        <TD className="text-muted">
+                          <span className="block truncate" title={t.summary}>{t.summary}</span>
+                          <span className="sm:hidden block text-xs tabular-nums">{formatDate(t.created_at)}</span>
+                        </TD>
                         <TD align="right"><strong className="text-ink"><Amount value={t.amount} /></strong></TD>
                       </TR>
                     ))}

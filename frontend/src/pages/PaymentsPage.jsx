@@ -177,13 +177,13 @@ export default function PaymentsPage() {
       {cards.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-ink mb-2">Cards</h2>
-          <Table className="table-fixed min-w-[34rem]">
+          <Table className="table-fixed sm:min-w-[34rem]">
             <THead>
               <tr>
                 <TH className="w-[34%]">Card</TH>
-                <TH className="w-[20%]">Due in</TH>
+                <TH className="hidden sm:table-cell w-[20%]">Due in</TH>
                 <TH align="right" className="w-[23%]">Statement Due</TH>
-                <TH align="right" className="w-[23%]">Total Balance</TH>
+                <TH align="right" className="hidden sm:table-cell w-[23%]">Total Balance</TH>
               </tr>
             </THead>
             <tbody>
@@ -201,14 +201,19 @@ export default function PaymentsPage() {
                         <span className="truncate">{c.name}</span>
                         {cardId === c.id && <Badge tone="teal">Selected</Badge>}
                       </span>
+                      {due && (
+                        <span className="sm:hidden block mt-0.5">
+                          <Badge tone={paymentTone(due.days_until)}>{daysLabel(due.days_until)}</Badge>
+                        </span>
+                      )}
                     </TD>
-                    <TD>
+                    <TD className="hidden sm:table-cell">
                       {due ? <Badge tone={paymentTone(due.days_until)}>{daysLabel(due.days_until)}</Badge> : <span className="text-muted">—</span>}
                     </TD>
                     <TD align="right">
                       {statementByCard[c.id] != null ? <Amount value={statementByCard[c.id]} /> : <span className="text-muted">—</span>}
                     </TD>
-                    <TD align="right"><Amount value={owedByCard[c.id] || 0} /></TD>
+                    <TD align="right" className="hidden sm:table-cell"><Amount value={owedByCard[c.id] || 0} /></TD>
                   </TR>
                 );
               })}
@@ -328,12 +333,12 @@ export default function PaymentsPage() {
         <p className="text-muted text-sm">No payments match.</p>
       ) : (
         <>
-          <Table className="table-fixed min-w-[40rem]">
+          <Table className="table-fixed sm:min-w-[40rem]">
             <THead>
               <tr>
                 <TH className="w-[16%]">Date</TH>
                 <TH className="w-[28%]">Card</TH>
-                <TH className="w-[38%]">From</TH>
+                <TH className="hidden sm:table-cell w-[38%]">From</TH>
                 <TH align="right" className="w-[18%]">Amount</TH>
               </tr>
             </THead>
@@ -342,7 +347,7 @@ export default function PaymentsPage() {
                 <TR key={p.id}>
                   <TD className="text-ink whitespace-nowrap">{p.paid_on ? formatDate(p.paid_on) : "—"}</TD>
                   <TD className="text-ink truncate">{p.card}</TD>
-                  <TD className="text-muted truncate">
+                  <TD className="hidden sm:table-cell text-muted truncate">
                     from {p.account}{p.bucket && p.bucket !== "—" ? ` / ${p.bucket}` : ""}
                   </TD>
                   <TD align="right"><strong className="text-ink"><Amount value={p.amount} /></strong></TD>
