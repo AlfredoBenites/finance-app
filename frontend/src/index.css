@@ -133,6 +133,23 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Spending charts: brighten the bar under the pointer, so the thing that
+     reacts is the same thing you click. Mixing toward the ink color reads as
+     "brighter" in both themes, since ink is near-black on the light canvas and
+     white on the dark one.
+     Done in CSS rather than with recharts' own `activeBar`, which re-renders the
+     hovered bar into a separate layer that no longer carries the click handler,
+     leaving the bar looking interactive but doing nothing when clicked. CSS also
+     costs no re-render, so the tooltip keeps up with the pointer. */
+  .chart-clickable .recharts-bar-rectangle:hover path,
+  .chart-clickable .recharts-bar-rectangle:hover rect {
+    fill: color-mix(in srgb, var(--info) 78%, var(--ink));
+  }
+  .chart-clickable .recharts-bar-rectangle,
+  .chart-clickable .recharts-bar-background-rectangle {
+    cursor: pointer;
+  }
+
   /* Thin, rounded scrollbar for scroll areas inside panels/modals. */
   .scroll-thin {
     scrollbar-width: thin;

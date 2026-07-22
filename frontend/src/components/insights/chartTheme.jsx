@@ -21,6 +21,23 @@ export const GRID = { stroke: "var(--border)", vertical: false };
 // on each filter click and reads heavy next to the app's 200ms transitions.
 export const NO_ANIM = { isAnimationActive: false };
 
+// Tooltip settings shared by the charts.
+// - The tooltip box is animated by default, so it glides after the pointer a
+//   frame or two behind. Turning that off makes it track the pointer exactly.
+// - No cursor highlight: the band behind a bar lighting up suggests the band is
+//   what you click. The hovered BAR brightens instead (see CLICKABLE_CHART), which
+//   points at the thing the eye should follow.
+export const TOOLTIP = {
+  isAnimationActive: false,
+  animationDuration: 0,
+  cursor: false,
+  wrapperStyle: { zIndex: 10 },
+};
+
+// Put this on the element wrapping a chart whose bars are clickable: it carries
+// the hover styling for the bars (see `.chart-clickable` in index.css).
+export const CLICKABLE_CHART = "chart-clickable";
+
 export function ChartTooltip({ title, children }) {
   return (
     <div className="bg-surface border border-border rounded-lg shadow-sm px-3 py-2 text-sm max-w-[16rem]">

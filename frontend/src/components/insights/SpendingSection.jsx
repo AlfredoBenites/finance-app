@@ -7,7 +7,17 @@ import { Card, Banner, Select, cn } from "../ui";
 import SpendingByMonthChart from "./SpendingByMonthChart";
 import SpendingByCategoryChart from "./SpendingByCategoryChart";
 import SpendingBySourceChart from "./SpendingBySourceChart";
-import { byCategory, byMonth, bySource, monthLabel, monthlyAverage, normalize } from "./spending";
+import CategoryTransactionsPanel from "./CategoryTransactionsPanel";
+import {
+  byCategory,
+  byMonth,
+  bySource,
+  monthLabel,
+  monthlyAverage,
+  normalize,
+  sourceNames,
+  transactionsFor,
+} from "./spending";
 
 // The spending charts: one fetch of a year's transactions, then everything is
 // derived from it in the browser. Picking a month in the first chart scopes the
@@ -23,6 +33,10 @@ export default function SpendingSection() {
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // The category row whose transactions are open in the panel.
+  const [detailRow, setDetailRow] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // The month axis covers one year, so "All time" shows the current one.
   const fetchYear = year === "all" ? CURRENT_YEAR : year;
@@ -78,8 +92,21 @@ export default function SpendingSection() {
   const categories = useMemo(() => byCategory(txns, month), [txns, month]);
   const sources = useMemo(() => bySource(txns, month, cards, accounts), [txns, month, cards, accounts]);
   const yearTotal = useMemo(() => months.reduce((sum, m) => sum + m.total, 0), [months]);
+  const nameOfSource = useMemo(() => sourceNames(cards, accounts), [cards, accounts]);
 
   const periodLabel = month ? monthLabel(month) : `All of ${fetchYear}`;
+
+  // Drilling into a category is a per-month thing: a whole year of one category
+  // would be hundreds of rows, and the Expenses page already does that job.
+  const openCategory = (row) => {
+    if (!month) return;
+    setDetailRow(row);
+    setDetailOpen(true);
+  };
+  const detailTransactions = useMemo(
+    () => transactionsFor(txns, month, detailRow),
+    [txns, month, detailRow]
+  );
 
   const filters = (
     <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -159,8 +186,18 @@ export default function SpendingSection() {
         grand={categories.grand}
         netZeroOrLess={categories.netZeroOrLess}
         periodLabel={periodLabel}
+        onSelectRow={month ? openCategory : undefined}
       />
       <SpendingBySourceChart list={sources.list} grand={sources.grand} periodLabel={periodLabel} />
+
+      <CategoryTransactionsPanel
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        row={detailRow}
+        monthLabel={detailRow && month ? monthLabel(month) : ""}
+        transactions={detailTransactions}
+        sourceName={nameOfSource}
+      />
     </section>
   );
 }

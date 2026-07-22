@@ -1,6 +1,7 @@
 import {
   Bar,
   BarChart,
+  Cell,
   LabelList,
   ResponsiveContainer,
   Tooltip,
@@ -8,27 +9,38 @@ import {
   YAxis,
 } from "recharts";
 import { Card, Amount } from "../ui";
-import { AXIS, NO_ANIM, ChartTooltip, useMask } from "./chartTheme";
+import useMediaQuery from "../../hooks/useMediaQuery";
+import { AXIS, CLICKABLE_CHART, NO_ANIM, TOOLTIP, ChartTooltip, useMask } from "./chartTheme";
 
 // Where the money went, ranked. Every bar is the same color on purpose: the
 // categories have no order of their own, and bar length already says which is
 // biggest, so spending a second color channel on it would say nothing new.
-const MAX_LABEL = 18;
-const truncate = (s) => (s.length > MAX_LABEL ? `${s.slice(0, MAX_LABEL - 1)}…` : s);
-
-// Recharts' own tick wraps a long name onto a second line, which then gets
-// clipped by the row height. Draw the tick so a name can only ever be one line.
-function CategoryTick({ x, y, payload }) {
-  return (
-    <text x={x} y={y} dy={4} textAnchor="end" fill="var(--muted)" fontSize={12}>
-      <title>{payload.value}</title>
-      {truncate(payload.value)}
-    </text>
-  );
-}
-
-export default function SpendingByCategoryChart({ rows, grand, netZeroOrLess, periodLabel }) {
+// With a month picked, a row opens the transactions behind it.
+export default function SpendingByCategoryChart({
+  rows,
+  grand,
+  netZeroOrLess,
+  periodLabel,
+  onSelectRow,
+}) {
   const { mask } = useMask();
+  const narrow = useMediaQuery("(max-width: 640px)");
+  // The label column is a fixed pixel width, so on a phone it has to give back
+  // the room the bars need.
+  const labelWidth = narrow ? 84 : 124;
+  const maxLabel = narrow ? 11 : 18;
+  const truncate = (s) => (s.length > maxLabel ? `${s.slice(0, maxLabel - 1)}…` : s);
+
+  // Recharts' own tick wraps a long name onto a second line, which then gets
+  // clipped by the row height. Draw the tick so a name can only ever be one line.
+  function CategoryTick({ x, y, payload }) {
+    return (
+      <text x={x} y={y} dy={4} textAnchor="end" fill="var(--muted)" fontSize={12}>
+        <title>{payload.value}</title>
+        {truncate(payload.value)}
+      </text>
+    );
+  }
 
   function CategoryTooltip({ active, payload }) {
     if (!active || !payload?.length) return null;
@@ -60,7 +72,10 @@ export default function SpendingByCategoryChart({ rows, grand, netZeroOrLess, pe
       ) : (
         // Grow with the rows instead of scaling to a fixed box, so the labels
         // keep the same size whether there are three categories or nine.
-        <div style={{ height: `${rows.length * 2.25 + 0.5}rem` }}>
+        <div
+          className={onSelectRow ? CLICKABLE_CHART : undefined}
+          style={{ height: `${rows.length * 2.25 + 0.5}rem` }}
+        >
           <ResponsiveContainer>
             <BarChart
               data={rows}
@@ -68,15 +83,32 @@ export default function SpendingByCategoryChart({ rows, grand, netZeroOrLess, pe
               margin={{ top: 0, right: 8, bottom: 0, left: 0 }}
               accessibilityLayer
             >
-              {/* Leaves room on the right for each bar's own amount label. */}
-              <XAxis type="number" hide domain={[0, (max) => max * 1.25]} />
-              <YAxis type="category" dataKey="name" width={124} tick={<CategoryTick />} {...AXIS} />
-              <Tooltip
-                content={<CategoryTooltip />}
-                cursor={{ fill: "var(--surface-muted)" }}
-                wrapperStyle={{ zIndex: 10 }}
-              />
-              <Bar dataKey="total" fill="var(--info)" radius={[0, 4, 4, 0]} barSize={14} {...NO_ANIM}>
+              {/* Headroom past the longest bar is where its amount label goes.
+                  A phone needs proportionally more of it, since the label is a
+                  fixed number of pixels in a much narrower chart. */}
+              <XAxis type="number" hide domain={[0, (max) => max * (narrow ? 1.5 : 1.25)]} />
+              {/* tick comes AFTER the spread: AXIS carries a default `tick` and
+                  would otherwise overwrite the custom one. */}
+              <YAxis type="category" dataKey="name" width={labelWidth} {...AXIS} tick={<CategoryTick />} />
+              <Tooltip content={<CategoryTooltip />} {...TOOLTIP} />
+              {/* The invisible `background` rectangle makes the whole row the
+                  tap target rather than a 14px-tall bar. See the same note in
+                  SpendingByMonthChart for why it can't be a hover-based handler. */}
+              <Bar
+                dataKey="total"
+                fill="var(--info)"
+                radius={[0, 4, 4, 0]}
+                barSize={14}
+                background={onSelectRow ? { fill: "transparent" } : false}
+                onClick={(entry) => {
+                  const row = entry?.payload ?? entry;
+                  if (onSelectRow && row?.name) onSelectRow(row);
+                }}
+                {...NO_ANIM}
+              >
+                {rows.map((r) => (
+                  <Cell key={r.name} cursor={onSelectRow ? "pointer" : "default"} />
+                ))}
                 <LabelList
                   dataKey="total"
                   position="right"
@@ -87,6 +119,14 @@ export default function SpendingByCategoryChart({ rows, grand, netZeroOrLess, pe
             </BarChart>
           </ResponsiveContainer>
         </div>
+      )}
+
+      {rows.length > 0 && (
+        <p className="text-xs text-muted mt-2">
+          {onSelectRow
+            ? "Tap a category to see the transactions behind it."
+            : "Pick a month above to see the transactions behind a category."}
+        </p>
       )}
 
       {netZeroOrLess.length > 0 && (
