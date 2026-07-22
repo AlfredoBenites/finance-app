@@ -24,7 +24,7 @@ export function TH({ className, align = "left", ...props }) {
   return (
     <th
       className={cn(
-        "font-medium px-4 py-2.5 border-b border-border",
+        "font-medium px-3 sm:px-4 py-2.5 border-b border-border",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className
@@ -47,7 +47,7 @@ export function TD({ className, align = "left", ...props }) {
   return (
     <td
       className={cn(
-        "px-4 py-2.5 align-middle",
+        "px-3 sm:px-4 py-2.5 align-middle",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className
