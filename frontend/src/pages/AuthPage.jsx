@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { supabase } from "../auth/supabaseClient";
-import { Card, Button, Banner, Input } from "../components/ui";
+import { useAuth } from "../auth/AuthContext";
+import { setRemembered, syncCurrent } from "../auth/accounts";
+import { Card, Button, Banner, Input, Toggle } from "../components/ui";
 
 export default function AuthPage() {
+  const { session, loginIntent, cancelLogin } = useAuth();
   const [mode, setMode] = useState("login"); // "login" | "signup"
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(loginIntent?.email || "");
   const [password, setPassword] = useState("");
+  // Off by default: only store an account's token when the user opts in.
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
+
+  // This form is over a live session when it was opened to add or switch
+  // accounts, so it needs a way back to the app.
+  const addingWhileSignedIn = !!session && !!loginIntent;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -26,8 +35,16 @@ export default function AuthPage() {
       // If email confirmation is on, signUp returns a user with no session.
       if (mode === "signup" && !data.session) {
         setInfo("Check your email to confirm your account, then log in.");
+        return;
       }
-      // On success with a session, AuthContext picks it up automatically.
+      // On success with a session, AuthContext picks it up automatically. Record
+      // the remember choice against the session we just got, since the token is
+      // needed to store it.
+      if (data.session) {
+        syncCurrent(data.session, { lastUsed: true });
+        if (remember) setRemembered(data.session.user.id, true, data.session);
+        cancelLogin();
+      }
     } catch (err) {
       setError(err.message || "Something went wrong. Try again.");
     }
@@ -45,7 +62,11 @@ export default function AuthPage() {
 
         <Card className="space-y-4">
           <h1 className="text-2xl font-bold text-ink">
-            {mode === "login" ? "Log in" : "Sign up"}
+            {addingWhileSignedIn
+              ? "Add an account"
+              : mode === "login"
+                ? "Log in"
+                : "Sign up"}
           </h1>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -63,10 +84,23 @@ export default function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <Toggle
+              on={remember}
+              onClick={() => setRemember((v) => !v)}
+              label="Stay signed in on this device"
+              className="justify-between"
+            />
             <Button type="submit" variant="primary" className="w-full">
               {mode === "login" ? "Log in" : "Sign up"}
             </Button>
           </form>
+
+          {remember && (
+            <p className="text-xs text-muted">
+              Keeps this account signed in here so you can switch to it without a
+              password. Only do this on a device you trust.
+            </p>
+          )}
 
           {error && <Banner tone="danger">{error}</Banner>}
           {info && <Banner tone="info">{info}</Banner>}
@@ -85,6 +119,16 @@ export default function AuthPage() {
               {mode === "login" ? "Sign up" : "Log in"}
             </button>
           </p>
+
+          {addingWhileSignedIn && (
+            <button
+              type="button"
+              className="text-sm text-muted hover:text-ink"
+              onClick={cancelLogin}
+            >
+              ← Back to your account
+            </button>
+          )}
         </Card>
       </div>
     </div>

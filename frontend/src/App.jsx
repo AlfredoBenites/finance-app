@@ -16,16 +16,18 @@ import PaymentsPage from "./pages/PaymentsPage";
 import InvestmentsPage from "./pages/InvestmentsPage";
 
 export default function App() {
-  const { loading, session, user, signOut } = useAuth();
+  const { loading, session, user, signOut, loginIntent, switching } = useAuth();
 
-  if (loading) {
+  if (loading || switching) {
     return (
       <div className="min-h-screen grid place-items-center bg-canvas text-muted">
-        Loading…
+        {switching ? `Switching to ${switching.email}…` : "Loading…"}
       </div>
     );
   }
-  if (!session) return <AuthPage />;
+  // The login form also shows over a live session while adding or switching to
+  // an account that needs a password.
+  if (!session || loginIntent) return <AuthPage />;
 
   return (
     <>
