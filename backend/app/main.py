@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import get_current_user
+from app.config import settings
 from app.routers import (
     accounts,
     buckets,
@@ -22,13 +23,25 @@ from app.routers import (
     transactions,
 )
 
-app = FastAPI(title="Finance Tracker API")
+app = FastAPI(
+    title="Finance Tracker API",
+    # Hidden in production via ENABLE_DOCS=false; see config.py.
+    docs_url="/docs" if settings.enable_docs else None,
+    redoc_url="/redoc" if settings.enable_docs else None,
+    openapi_url="/openapi.json" if settings.enable_docs else None,
+)
 
-# Allow the local Vite dev server to call the API during development.
-# Regex covers localhost/127.0.0.1 on ANY port, so a Vite port other than 5173
-# (e.g. 5174 when 5173 is taken) won't be blocked by CORS.
+# Who may call this API from a browser.
+# - allow_origins: the deployed frontend(s), from the FRONTEND_ORIGINS env var.
+#   Empty locally, so nothing changes in development.
+# - allow_origin_regex: the local Vite dev server on ANY port, so a port other
+#   than 5173 (e.g. 5174 when 5173 is taken) still works.
+# Both apply at once: a request is allowed if it matches either.
+# No allow_credentials: auth is a Bearer token, not a cookie, so the browser
+# never needs to send credentials cross-origin.
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=settings.allowed_origins,
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_methods=["*"],
     allow_headers=["*"],

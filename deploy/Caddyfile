@@ -1,0 +1,33 @@
+# Caddy reverse proxy for the API.
+#
+# What this does and why it exists:
+#   Browsers refuse to let an https:// page call a plain http:// server, so the
+#   backend needs HTTPS. Caddy fetches and renews a free Let's Encrypt
+#   certificate automatically, with no certbot steps and no cron job to forget.
+#   It listens on 443 and forwards to uvicorn on localhost:8000.
+#
+# Install (see DEPLOY.md):
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   # then replace api.example.com with your real hostname
+#   sudo systemctl reload caddy
+#
+# Logs:  sudo journalctl -u caddy -f
+
+# REPLACE api.example.com with your API hostname. Its DNS A record must already
+# point at this server, or the certificate request will fail.
+api.example.com {
+	reverse_proxy 127.0.0.1:8000
+
+	# Ask browsers to stick to HTTPS for this host from now on.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Don't advertise the server software.
+	header -Server
+
+	log {
+		output file /var/log/caddy/api.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+}

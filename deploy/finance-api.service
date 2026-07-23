@@ -1,0 +1,47 @@
+# systemd unit for the FastAPI backend.
+#
+# systemd is what keeps the API running: it starts on boot, restarts on crash,
+# and collects logs. Without it, closing your SSH session would kill the server.
+#
+# Install (see DEPLOY.md for the full walkthrough):
+#   sudo cp deploy/finance-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now finance-api
+#
+# Logs:  sudo journalctl -u finance-api -f
+
+[Unit]
+Description=Finance Tracker API (FastAPI/uvicorn)
+# Don't start until the network is up, or the first Supabase call fails on boot.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=ubuntu
+WorkingDirectory=/home/ubuntu/finance-app/backend
+
+# Secrets live here, NOT in this file (this file is committed to git).
+# Create it with mode 600 owned by root: SUPABASE_URL, SUPABASE_KEY,
+# FRONTEND_ORIGINS, FINNHUB_API_KEY, ENABLE_DOCS.
+EnvironmentFile=/etc/finance-app.env
+
+# Bind to localhost ONLY. Caddy is the only thing that talks to this port, so
+# the API is never exposed to the internet directly — that's what gives us
+# HTTPS and keeps the raw port unreachable.
+ExecStart=/home/ubuntu/finance-app/backend/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 --port 8000 --workers 2
+
+Restart=always
+RestartSec=3
+
+# Basic hardening: the service gets a private /tmp, cannot write outside its
+# own directories, and cannot gain new privileges.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/finance-app
+
+[Install]
+WantedBy=multi-user.target

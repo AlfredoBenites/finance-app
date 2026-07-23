@@ -1,0 +1,7 @@
+# Files that run on the Linux server must keep LF line endings, whatever the
+# machine that edited them uses. A shell script committed with Windows CRLF
+# fails on Linux with a confusing "bad interpreter: /usr/bin/env bash^M", and
+# systemd/Caddy config is just as picky.
+*.sh text eol=lf
+deploy/Caddyfile text eol=lf
+deploy/*.service text eol=lf
