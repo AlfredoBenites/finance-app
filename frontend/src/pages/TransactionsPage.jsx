@@ -382,15 +382,17 @@ export default function TransactionsPage() {
         <p className="text-muted text-sm">No transactions match.</p>
       ) : (
         <>
-          <Table className="table-fixed min-w-[48rem]">
+          {/* On a phone only Merchant/Status/Amount show; the rest lives in the
+              row's detail panel. Wider screens get every column back. */}
+          <Table className="table-fixed sm:min-w-[48rem]">
             <THead>
               <tr>
                 <TH className="w-[19%]">Merchant</TH>
-                <TH className="w-[20%]">Status</TH>
-                <TH className="w-[12%]">Date</TH>
-                <TH className="w-[15%]">Card</TH>
+                <TH className="hidden sm:table-cell w-[20%]">Status</TH>
+                <TH className="hidden sm:table-cell w-[12%]">Date</TH>
+                <TH className="hidden sm:table-cell w-[15%]">Card</TH>
                 <TH align="right" className="w-[12%]">Amount</TH>
-                <TH className="w-[22%]">Notes</TH>
+                <TH className="hidden sm:table-cell w-[22%]">Notes</TH>
               </tr>
             </THead>
             <tbody>
@@ -411,19 +413,24 @@ export default function TransactionsPage() {
                   <TR key={t.id} onClick={() => openDetail(t)} className="cursor-pointer">
                     <TD>
                       <span className="block truncate text-ink font-medium">{t.merchant || "—"}</span>
+                      {/* On a phone the status rides under the merchant. */}
+                      <span className="sm:hidden inline-flex items-center gap-1 flex-wrap mt-0.5">
+                        <Badge tone={statusTone}>{statusText}</Badge>
+                        {t.group_id && <Badge tone="neutral">Group</Badge>}
+                      </span>
                     </TD>
-                    <TD>
+                    <TD className="hidden sm:table-cell">
                       <span className="inline-flex items-center gap-1 flex-wrap">
                         <Badge tone={statusTone}>{statusText}</Badge>
                         {t.group_id && <Badge tone="neutral">Group</Badge>}
                       </span>
                     </TD>
-                    <TD className="text-ink whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
-                    <TD className="text-ink truncate">{sourceName(t)}</TD>
+                    <TD className="hidden sm:table-cell text-ink whitespace-nowrap">{shortDate(t.transaction_date)}</TD>
+                    <TD className="hidden sm:table-cell text-ink truncate">{sourceName(t)}</TD>
                     <TD align="right">
                       <strong className="text-ink"><Amount value={t.amount} /></strong>
                     </TD>
-                    <TD className="text-muted">
+                    <TD className="hidden sm:table-cell text-muted">
                       <span className="block truncate" title={t.notes || ""}>{t.notes || ""}</span>
                     </TD>
                   </TR>

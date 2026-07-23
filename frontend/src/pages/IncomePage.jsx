@@ -237,15 +237,15 @@ export default function IncomePage() {
         <p className="text-muted text-sm">No income matches.</p>
       ) : (
         <>
-        <Table className="table-fixed min-w-[46rem]">
+        <Table className="table-fixed sm:min-w-[46rem]">
           <THead>
             <tr>
               <TH className="w-[20%]">Source</TH>
-              <TH className="w-[15%]">Status</TH>
-              <TH className="w-[12%]">Date</TH>
-              <TH className="w-[16%]">Account</TH>
+              <TH className="hidden sm:table-cell w-[15%]">Status</TH>
+              <TH className="hidden sm:table-cell w-[12%]">Date</TH>
+              <TH className="hidden sm:table-cell w-[16%]">Account</TH>
               <TH align="right" className="w-[13%]">Amount</TH>
-              <TH className="w-[24%]">Notes</TH>
+              <TH className="hidden sm:table-cell w-[24%]">Notes</TH>
             </tr>
           </THead>
           <tbody>
@@ -255,14 +255,19 @@ export default function IncomePage() {
                 <TR key={i.id} onClick={() => openDetail(i)} className="cursor-pointer">
                   <TD>
                     <span className="block truncate text-ink font-medium">{i.source}</span>
+                    {status && (
+                      <span className="sm:hidden inline-flex mt-0.5">
+                        <Badge tone={status[0]}>{status[1]}</Badge>
+                      </span>
+                    )}
                   </TD>
-                  <TD>{status && <Badge tone={status[0]}>{status[1]}</Badge>}</TD>
-                  <TD className="text-ink whitespace-nowrap">{shortDate(i.income_date)}</TD>
-                  <TD className="text-ink truncate">{accountName(i.account_id)}</TD>
+                  <TD className="hidden sm:table-cell">{status && <Badge tone={status[0]}>{status[1]}</Badge>}</TD>
+                  <TD className="hidden sm:table-cell text-ink whitespace-nowrap">{shortDate(i.income_date)}</TD>
+                  <TD className="hidden sm:table-cell text-ink truncate">{accountName(i.account_id)}</TD>
                   <TD align="right">
                     <strong><Amount value={i.amount} tone="green" /></strong>
                   </TD>
-                  <TD className="text-muted">
+                  <TD className="hidden sm:table-cell text-muted">
                     <span className="block truncate" title={i.notes || ""}>{i.notes || ""}</span>
                   </TD>
                 </TR>

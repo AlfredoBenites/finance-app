@@ -485,14 +485,17 @@ export default function BucketsPage() {
                 <tr>
                   <TH className="w-10"></TH>
                   <TH className="w-[44%]">Bucket</TH>
-                  <TH className="w-[32%]">Kind</TH>
-                  <TH align="right" className="w-[24%]">Amount</TH>
+                  <TH className="hidden sm:table-cell w-[32%]">Kind</TH>
+                  <TH align="right" className="w-[32%] sm:w-[24%]">Amount</TH>
                 </tr>
               </THead>
               <tbody>
                 {accBuckets.length === 0 && (
                   <tr>
-                    <TD colSpan={4} className="text-sm text-muted text-center py-4">
+                    <TD colSpan={3} className="sm:hidden text-sm text-muted text-center py-4">
+                      No buckets yet — click the account name to add.
+                    </TD>
+                    <TD colSpan={4} className="hidden sm:table-cell text-sm text-muted text-center py-4">
                       No buckets yet — click the account name to add.
                     </TD>
                   </tr>
@@ -503,7 +506,7 @@ export default function BucketsPage() {
                       <BucketIcon icon={b.icon || (b.credit_card_id ? "credit-card" : undefined)} color={b.color} />
                     </TD>
                     <TD className="text-ink"><span className="block truncate">{b.name}</span></TD>
-                    <TD>
+                    <TD className="hidden sm:table-cell">
                       {b.credit_card_id ? (
                         <KindBadge colorKey={kindColors.card}>{cardName(b.credit_card_id)}</KindBadge>
                       ) : (
@@ -596,19 +599,22 @@ export default function BucketsPage() {
             <p className="text-muted text-sm">No moves match.</p>
           ) : (
             <>
-              <Table className="table-fixed min-w-[32rem]">
+              <Table className="table-fixed sm:min-w-[32rem]">
                 <THead>
                   <tr>
-                    <TH className="w-[22%]">Date</TH>
-                    <TH className="w-[58%]">Summary</TH>
-                    <TH align="right" className="w-[20%]">Amount</TH>
+                    <TH className="hidden sm:table-cell w-[22%]">Date</TH>
+                    <TH className="w-[62%] sm:w-[58%]">Summary</TH>
+                    <TH align="right" className="w-[38%] sm:w-[20%]">Amount</TH>
                   </tr>
                 </THead>
                 <tbody>
                   {histPageItems.map((m) => (
                     <TR key={m.id}>
-                      <TD className="text-ink whitespace-nowrap">{formatDate(m.created_at)}</TD>
-                      <TD className="text-muted"><span className="block truncate" title={m.summary}>{m.summary}</span></TD>
+                      <TD className="hidden sm:table-cell text-ink whitespace-nowrap">{formatDate(m.created_at)}</TD>
+                      <TD className="text-muted">
+                        <span className="block truncate" title={m.summary}>{m.summary}</span>
+                        <span className="sm:hidden block text-xs tabular-nums">{formatDate(m.created_at)}</span>
+                      </TD>
                       <TD align="right"><strong className="text-ink"><Amount value={m.amount} /></strong></TD>
                     </TR>
                   ))}

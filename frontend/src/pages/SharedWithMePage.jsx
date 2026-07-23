@@ -18,6 +18,7 @@ import {
   TH,
   TR,
   TD,
+  cn,
 } from "../components/ui";
 import SharedChargePanel from "../components/shares/SharedChargePanel";
 
@@ -189,14 +190,14 @@ export default function SharedWithMePage() {
             <p className="text-muted text-sm">No charges match.</p>
           ) : (
             <>
-              <Table className="table-fixed min-w-[44rem]">
+              <Table className="table-fixed sm:min-w-[44rem]">
                 <THead>
                   <tr>
-                    <TH className={multi ? "w-[13%]" : "w-[14%]"}>Date</TH>
+                    <TH className={cn("hidden sm:table-cell", multi ? "w-[13%]" : "w-[14%]")}>Date</TH>
                     {multi && <TH className="w-[15%]">Shared by</TH>}
                     <TH className={multi ? "w-[24%]" : "w-[30%]"}>Merchant</TH>
-                    <TH className={multi ? "w-[18%]" : "w-[20%]"}>Category</TH>
-                    <TH className={multi ? "w-[14%]" : "w-[16%]"}>Status</TH>
+                    <TH className={cn("hidden sm:table-cell", multi ? "w-[18%]" : "w-[20%]")}>Category</TH>
+                    <TH className={cn("hidden sm:table-cell", multi ? "w-[14%]" : "w-[16%]")}>Status</TH>
                     <TH align="right" className={multi ? "w-[16%]" : "w-[20%]"}>
                       Amount
                     </TH>
@@ -205,7 +206,7 @@ export default function SharedWithMePage() {
                 <tbody>
                   {pageItems.map((t) => (
                     <TR key={t.id} onClick={() => openDetail(t)} className="cursor-pointer">
-                      <TD className="text-ink whitespace-nowrap tnum">
+                      <TD className="hidden sm:table-cell text-ink whitespace-nowrap tnum">
                         {formatDate(t.transaction_date)}
                       </TD>
                       {multi && <TD className="text-ink truncate">{t.profile_name}</TD>}
@@ -213,9 +214,14 @@ export default function SharedWithMePage() {
                         <span className="block truncate text-ink font-medium">
                           {t.merchant || "—"}
                         </span>
+                        <span className="sm:hidden inline-flex mt-0.5">
+                          <Badge tone={t.is_paid_back ? "success" : "orange"}>
+                            {t.is_paid_back ? "Paid back" : "Unpaid"}
+                          </Badge>
+                        </span>
                       </TD>
-                      <TD className="text-muted truncate">{t.category || "—"}</TD>
-                      <TD>
+                      <TD className="hidden sm:table-cell text-muted truncate">{t.category || "—"}</TD>
+                      <TD className="hidden sm:table-cell">
                         <Badge tone={t.is_paid_back ? "success" : "orange"}>
                           {t.is_paid_back ? "Paid back" : "Unpaid"}
                         </Badge>
