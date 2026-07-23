@@ -48,8 +48,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# ---------- Claude Code (local, per-machine) ----------
-.claude/settings.local.json
+# ---------- Local tooling settings (per-machine) ----------
+.claude/
 
 # ---------- Editors / OS ----------
 .DS_Store
@@ -59,9 +59,14 @@ Thumbs.db
 *.swp
 *~
 
-# ---------- Markdown files / md ----------
+# ---------- Local-only docs (kept off the public repo) ----------
 CLAUDE.md
 SPEC.md
+DEPLOY.md
+DEPLOY-KICKOFF.md
+HANDOFF.md
+FRONTEND-HANDOFF.md
+FRONTEND-KICKOFF.md
 
 # ---------- Private data imports (never commit financial data) ----------
 data/

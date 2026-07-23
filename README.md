@@ -1,173 +1,182 @@
-# Personal Finance / Credit Card Tracker
+# Finance Tracker
 
-A full-stack web app for tracking credit-card spending, cashback, money owed by
-different people, savings "buckets," account balances, and net worth — a cleaner,
-faster alternative to managing the same data in a spreadsheet.
+A full-stack personal-finance web app for tracking credit-card spending,
+cashback, money other people owe you, envelope-style budgets, account balances,
+and net worth — everything I used to keep in a sprawling Google Sheet, in one
+place that does the math for me.
 
-Built as an MVP with correctness of the data model and calculations as the first
-priority.
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38BDF8?logo=tailwindcss&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+**Live demo:** _coming soon_ &nbsp;·&nbsp; **Tech:** React + FastAPI + Supabase
+
+---
+
+## Why I built it
+
+I was tracking my whole financial life in a spreadsheet — credit-card balances,
+cashback per card, who owed me money, savings goals, net worth — and it had
+grown past a thousand rows and stopped being trustworthy. Small mistakes crept
+in, the formulas were fragile, and it couldn't answer simple questions like
+"where did my money actually go last month." So I rebuilt it as a real
+application, with the data model and the money math as the first priority.
+
+It's now a multi-user product: anyone can sign up, and every account's data is
+fully isolated.
+
+## Screenshots
+
+_Screenshots coming soon._
+<!-- Add images under docs/screenshots/ and embed them here, e.g.
+![Dashboard](docs/screenshots/dashboard.png)
+Use a demo account with seeded (non-real) data — never real financial data. -->
 
 ## Features
 
-- **Auth & multi-tenancy** — email/password sign-in (Supabase Auth); each user's
-  data is private via row-level security. The frontend never touches the database
-  directly — it calls the backend, which uses the service-role key.
-- **Profiles** — separate people whose spending is tracked independently; they can
-  share the same credit cards. Mark one as "me" for a true personal net worth.
-- **Profile sharing** — share a profile read-only with another account by email
-  (Google-Docs style), so they can see what they owe.
-- **Credit cards** — shared across profiles; balances calculated from transactions;
-  per-category cashback rules that auto-fill on the expense form; statement due
-  dates with reminders; upgrade history (archive an old card, keep its data).
-- **Expenses** — each belongs to a profile and a credit card *or* a bank account,
-  with per-transaction cashback and a "paid back" flag. Filter by profile, card,
-  category, year, paid/unpaid, and merchant search.
-- **Income** — track money in (jobs, gigs, tips, gifts, cashback) per account.
-- **Accounts** — manual bank/cash/investment balances; close/archive accounts
-  without losing their history.
-- **Buckets (envelope budgeting)** — buckets live inside an account and carve up its
-  balance; move money between them, never more than the account actually holds.
-- **Pay a card** — settle a card's charges by drawing from a chosen account + bucket.
-- **Smart allocation** — marking a charge paid suggests moving the money from a
-  per-profile default bucket into the card's payoff bucket.
-- **Dashboard** — card debt, income, cashback earned/pending, bucket totals, real
-  available money, net worth, owed-by-profile, debt-by-card, and upcoming-payment
-  reminders. Year filter (defaults to the current year) plus "hide repayments" and
-  "only my debt" toggles.
-- **Data import** — one-off scripts import a full Google Sheets history (expenses +
-  income) with a dry-run reconciliation before anything is written.
+- **Multi-user with strict data isolation** — email/password sign-in via
+  Supabase Auth. Every table is scoped by owner, and the frontend never touches
+  the database directly. Switch between multiple accounts on one device without
+  logging out.
+- **Profiles** — track different people's spending separately (they can share the
+  same cards); mark one profile as "me" for a true personal net worth. Share a
+  profile read-only with someone by email so they can see what they owe.
+- **Credit cards** — shared across profiles, balances derived from transactions,
+  per-category cashback rules that auto-fill on the expense form, statement/due
+  days with reminders, and per-card color used throughout the UI.
+- **Expenses** — each belongs to a profile and a card *or* a bank account, with
+  per-transaction cashback and a "paid back" flag. Refunds link to the purchase
+  they offset; a group purchase splits one receipt proportionally (tax, tip, and
+  fees included) across everyone involved.
+- **Income, accounts, and envelope budgeting** — track money in per account;
+  keep manual bank/cash/investment balances; carve an account's balance into
+  "buckets" and move money between them, never more than the account holds.
+- **Pay a card** — settle a card by drawing from a chosen account and bucket.
+  Reconciles the difference between the date you enter a charge and the date the
+  issuer actually posts it, so a statement matches reality near the cycle edge.
+- **Investments** — buy/sell holdings against an account's buying power, with a
+  trade history and live stock/crypto prices (manual refresh). Net worth values
+  an investment account as cash plus holdings.
+- **Dashboard & insights** — real available money, net worth, cashback, debt by
+  card, owed by profile, and upcoming payments; plus spending charts (by month,
+  by category with drill-down into the underlying transactions, and by what paid
+  for it).
+- **Built for real use** — dark mode, a one-tap "hide amounts" privacy mask, a
+  printable statement you can share, and a fully responsive layout for the phone.
 
 ## Tech stack
 
-- **Frontend:** React + Vite
-- **Backend:** Python + FastAPI
-- **Database:** Supabase (Postgres)
-
-The frontend never talks to Supabase directly — it calls the FastAPI backend, which
-is the only thing that connects to the database.
+| Layer     | Choice                                                       |
+| --------- | ------------------------------------------------------------ |
+| Frontend  | React 18 + Vite, Tailwind CSS v4, React Router v7, Recharts  |
+| Backend   | Python 3.12 + FastAPI                                        |
+| Database  | Supabase (Postgres) with Row-Level Security                  |
+| Auth      | Supabase Auth (frontend), Bearer-token validation (backend)  |
 
 ## Architecture
 
 ```
-React (Vite)  --HTTP-->  FastAPI backend  --supabase-py-->  Supabase Postgres
-  frontend/                 backend/                          (RLS on every table)
+React (Vite)  ──HTTP──>  FastAPI backend  ──supabase-py──>  Supabase Postgres
+  frontend/                  backend/                        (RLS on every table)
 ```
 
-Row Level Security is enabled on every table with no public policies, so the public
-anon key is fully locked out. The backend authenticates with the Supabase **service
-role key**, which bypasses RLS.
+The frontend never talks to the database directly — it calls the FastAPI
+backend, which is the only thing holding the privileged database key. Row-Level
+Security is on for every table with no public policy, so the public anon key
+(the one shipped to the browser for login) cannot read or write application
+data at all.
+
+## Engineering highlights
+
+A few problems that were more interesting than they first looked:
+
+- **Multi-tenant isolation as an invariant.** Every read and write is scoped to
+  the signed-in user's id, and the database enforces it independently via RLS.
+  The design means a bug in one endpoint can't leak another user's data.
+- **Pagination correctness.** PostgREST caps a single query at 1,000 rows.
+  Wholesale fetches page through that limit; skipping it silently dropped a
+  user's oldest transactions once their history grew past the cap — a bug that
+  looked like correct data until you went looking for it.
+- **Statement accuracy.** Card issuers bill by *posting* date, not the date you
+  enter a charge, so charges near a cycle's edge drift onto the wrong statement.
+  The app reconciles this, nets linked refunds onto the right cycle, and keeps a
+  manual override as an escape hatch.
+- **Money math you can trust.** Calculations run in integer cents to avoid
+  floating-point drift, live in pure, separately tested functions, and are
+  covered by a backend test suite (140 tests).
+
+## Getting started
+
+**Prerequisites:** Node 18+, Python 3.11+, and a Supabase project.
+
+### 1. Database
+
+In the Supabase SQL Editor, run every file in `backend/migrations/` in numeric
+order.
+
+### 2. Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp ../.env.example ../.env.local # then fill in your Supabase values
+uvicorn app.main:app --reload
+```
+
+API runs at `http://localhost:8000` (interactive docs at `/docs`).
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+# create frontend/.env.local with VITE_API_BASE_URL, VITE_SUPABASE_URL,
+# and VITE_SUPABASE_ANON_KEY pointing at your backend + Supabase project
+npm run dev
+```
+
+App runs at `http://localhost:5173`.
+
+## Testing
+
+```bash
+cd backend
+pytest tests -q      # 140 tests: auth, ownership, calculations, endpoints
+```
 
 ## Project structure
 
 ```
 finance-app/
-├── .env.local               backend secrets (gitignored)
-├── .env.example             backend env template
 ├── backend/
-│   ├── requirements.txt
-│   ├── migrations/          SQL migrations, run in order in the Supabase SQL Editor
+│   ├── migrations/          SQL migrations, run in order in Supabase
+│   ├── tests/               pytest suite
 │   └── app/
-│       ├── main.py          FastAPI app + CORS + routers
-│       ├── config.py        loads env vars
-│       ├── database.py      Supabase client
-│       ├── db_errors.py     maps DB errors to HTTP responses
+│       ├── main.py          FastAPI app, CORS, routers
+│       ├── routers/         one module per resource + dashboard
 │       ├── models/          Pydantic request/response models
-│       ├── routers/         one file per resource + dashboard
 │       └── services/        pure calculation functions
 └── frontend/
-    ├── .env.local           VITE_API_BASE_URL (gitignored)
     └── src/
         ├── api/client.js    fetch wrappers for the backend
-        └── pages/           Dashboard, Profiles, Credit Cards, Expenses, Income,
-                             Buckets, Pay a card, Accounts, Shared with me
+        ├── components/      design-system UI + per-feature components
+        └── pages/           Dashboard, Insights, Profiles, Expenses, Income,
+                             Buckets, Accounts, Credit Cards, Pay a card,
+                             Investments, Shared with me
 ```
 
-## Prerequisites
+## Roadmap
 
-- Python 3.9+ (3.11+ recommended)
-- Node.js 18+
-- A Supabase project
+- Optional bank connection (Plaid/Teller) so statements reconcile automatically
+- Rolling statement balances with interest and late fees
+- CSV export and a monthly summary view
 
-## Setup
+## License
 
-### 1. Database
-
-In the Supabase **SQL Editor**, run every file in `backend/migrations/` in numeric
-order (`001_…` through `021_…`).
-
-### 2. Backend environment
-
-Copy `.env.example` to `.env.local` and fill in your values:
-
-```
-SUPABASE_URL=https://<project-ref>.supabase.co     # API URL, NOT the dashboard URL
-SUPABASE_KEY=<service role key>                     # Project Settings -> API -> service_role
-```
-
-The `service_role` key is a full-access secret. It lives only in the backend and is
-never exposed to the frontend. `.env.local` is gitignored.
-
-### 3. Run the backend
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-The API runs at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
-
-### 4. Run the frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The app runs at `http://localhost:5173`. (`frontend/.env.local` already points
-`VITE_API_BASE_URL` at the backend.)
-
-## How to manually test
-
-1. **Profiles** — add two profiles.
-2. **Credit Cards** — add "Chase Freedom", issuer "Chase", cashback `1.5`.
-3. **Transactions** — add an unpaid purchase: merchant "Publix", Groceries, type
-   Purchase, amount `52.40`, pick a profile and card, cashback `1.5`. It stores as
-   `-52.40` with `+$0.79` cashback.
-4. **Accounts** — add "Chase Checking", type `checking`, balance `1500`, Asset.
-5. **Buckets** — add "Car insurance", saved `300`.
-6. **Dashboard** — verify card debt, bucket money, liquid cash, real available money,
-   and net worth. With the data above plus a `$400` unpaid charge you should see
-   real available money = `$1500 − $400 − $300 = $800` and net worth = `$1100`
-   (buckets do not reduce net worth).
-7. Mark the transaction **paid back** — card debt drops and its cashback moves from
-   pending to earned.
-
-## Key calculations
-
-- **Amount sign:** purchases are stored negative, refunds/income positive.
-- **Card debt / amount owed:** negated sum of unpaid transaction amounts.
-- **Cashback per transaction:** `-(amount × rate)`, so cashback on a purchase is
-  positive. Computed by the backend.
-- **Real available money:** liquid cash − card debt − bucket money.
-- **Net worth:** assets − liabilities. Buckets are excluded.
-
-## Security notes
-
-- Secrets are stored in environment variables only; `.env.local` files are gitignored.
-- The service role key is backend-only and never shipped to the frontend.
-- RLS is enabled on all tables so the public anon key cannot read or write data.
-
-## Known limitations / future work
-
-- Each charge tracks two independent states: **reimbursed** (a person paid you
-  back — you toggle it) and **paid to bank** (you paid the card issuer — set by
-  Pay-a-card). Card debt / net worth use "paid to bank"; "owed by profile" and
-  the bucket-allocation banner use "reimbursed."
-- Reminders are in-app (shown on the dashboard); no email/push yet.
-- Not yet built (deferred): charts / "finance wrapped" summaries, a dedicated
-  monthly view, Plaid/bank sync (balances are tracked manually by choice),
-  recurring expenses, CSV export, dark mode.
+[MIT](LICENSE) © Alfredo Benites
